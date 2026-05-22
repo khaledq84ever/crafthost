@@ -826,9 +826,12 @@ body { background: var(--slate-900); }
     height: auto !important;
     gap: 10px;
   }
-  .players-panel { max-height: 200px; order: 2; }
-  .terminal-panel { order: 1; min-height: 60vh; display: flex; flex-direction: column; }
-  .terminal-panel .term { min-height: 40vh; }
+  /* Smaller terminal viewport on phones — was 60vh, took too much screen.
+     Drops the panel to 40vh and the terminal area to 30vh so the player
+     list + metrics aren't pushed off-screen. */
+  .players-panel { max-height: 140px; order: 2; }
+  .terminal-panel { order: 1; min-height: 40vh; display: flex; flex-direction: column; }
+  .terminal-panel .term { min-height: 28vh; }
   .metrics-panel { order: 3; max-height: none; }
   /* Make command bar sticky at the bottom of the terminal so it's always reachable */
   .term-input-wrap { position: sticky; bottom: 0; background: var(--glass-strong); backdrop-filter: blur(12px); z-index: 5; }
