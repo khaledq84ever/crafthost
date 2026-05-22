@@ -62,7 +62,10 @@ html {
   -webkit-text-size-adjust: 100%;      /* iOS Safari: no auto-zoom on text */
   -moz-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  overflow-x: hidden;                  /* belt-and-braces against horizontal scroll bugs */
+  /* overflow-x: clip prevents horizontal scroll WITHOUT breaking sticky
+     descendants or interfering with vertical scroll on Android Chrome the
+     way overflow-x: hidden does. */
+  overflow-x: clip;
 }
 
 body {
@@ -82,7 +85,9 @@ body {
     radial-gradient(ellipse 80% 60% at 10% -10%, rgba(16, 185, 129, 0.10) 0%, transparent 60%),
     radial-gradient(ellipse 70% 50% at 90% 100%, rgba(167, 139, 250, 0.08) 0%, transparent 60%);
   background-attachment: fixed;
-  overflow-x: hidden;                  /* no horizontal scroll on any page */
+  overflow-x: clip;                    /* prevent horizontal scroll without
+                                          breaking sticky positioning or
+                                          vertical scroll on Android Chrome */
 }
 
 /* Media defaults — fluid by default so phone screenshots/images never overflow */
@@ -132,9 +137,9 @@ code, kbd, .ip, .mono { word-break: break-word; overflow-wrap: anywhere; }
   backface-visibility: hidden;
 }
 
-/* Pull-to-refresh disabled on dashboard-style pages (avoids the rubber-band
-   "refresh" gesture mis-triggering inside the file manager / console). */
-html, body { overscroll-behavior-y: none; }
+/* Body already has overscroll-behavior-y: contain — that's enough to prevent
+   scroll chaining into the URL bar refresh without disabling scrolling itself.
+   (Stricter "none" can interact badly with sticky elements on Android.) */
 
 /* iPhone X / Pixel 6+ notch — push the mobile-nav above the gesture bar. */
 .mobile-nav {

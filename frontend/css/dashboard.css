@@ -780,7 +780,9 @@ body { background: var(--slate-900); }
   .topbar {
     padding: 8px 12px; gap: 8px;
     flex-wrap: nowrap;                  /* one row, always — no messy stacking */
-    overflow: hidden;                   /* clip rather than push the page wider */
+    overflow-x: clip;                   /* horizontal clip without breaking
+                                            sticky positioning or vertical scroll */
+    overflow-y: visible;
   }
   .topbar-search { display: none; }
   .topbar select.select, .topbar .select {
