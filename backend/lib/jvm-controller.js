@@ -882,6 +882,51 @@ async function prewarmJarCache() {
   console.log(`📦 JAR cache prewarmed: ${hits} hit · ${misses} downloaded (${mb.toFixed(0)}MB) · ${errors} errors`);
 }
 
+// Lightweight JAR cache health check — verifies every cached JAR is still
+// on disk and the right size. Auto-repairs corrupt/missing JARs by deleting
+// the bad file and re-downloading. Designed to run every ~10 min as a
+// continuous probe — cheap when everything is healthy (just stat() calls).
+//
+// Returns { healthy, repaired, errors, scanned } — caller can log/alert.
+async function checkJarCacheHealth() {
+  const out = { healthy: 0, repaired: 0, errors: 0, scanned: 0 };
+  if (!fs.existsSync(JAR_CACHE_DIR)) return out;
+  const expected = [
+    { type: 'paper',   version: '1.20.1',  resolve: paperJarUrl   },
+    { type: 'paper',   version: 'LATEST',  resolve: paperJarUrl   },
+    { type: 'vanilla', version: '1.20.1',  resolve: vanillaJarUrl },
+    { type: 'vanilla', version: 'LATEST',  resolve: vanillaJarUrl },
+    { type: 'purpur',  version: '1.20.1',  resolve: purpurJarUrl  },
+    { type: 'purpur',  version: 'LATEST',  resolve: purpurJarUrl  },
+    { type: 'fabric',  version: '1.20.1',  resolve: fabricJarUrl  },
+    { type: 'fabric',  version: 'LATEST',  resolve: fabricJarUrl  },
+  ];
+  for (const t of expected) {
+    out.scanned++;
+    try {
+      const info = await t.resolve(t.version);
+      const cachePath = cachedJarPath(t.type, info.version, info);
+      let needsRepair = false;
+      // Threshold: a Paper/Vanilla launcher is ~40-60 MB. Fabric's bootstrap
+      // is small (200KB) but still > 50KB. Anything under 50KB is suspect.
+      if (!fs.existsSync(cachePath)) { needsRepair = true; }
+      else if (fs.statSync(cachePath).size < 50_000) { needsRepair = true; }
+      if (needsRepair) {
+        console.warn(`[jar-health] repairing ${t.type}-${info.version} (missing or truncated)`);
+        try { fs.unlinkSync(cachePath); } catch {}
+        await downloadFile(info.url, cachePath, `${t.type} ${info.version} repair`);
+        out.repaired++;
+      } else {
+        out.healthy++;
+      }
+    } catch (err) {
+      out.errors++;
+      console.warn(`[jar-health] ${t.type}-${t.version} check failed: ${err.message.slice(0, 100)}`);
+    }
+  }
+  return out;
+}
+
 module.exports = {
   isAvailable,
   makeRconPassword,
@@ -891,6 +936,7 @@ module.exports = {
   restartServer,
   removeServer,
   prewarmJarCache,
+  checkJarCacheHealth,
   getStats,
   attachLogStream,
   sendRcon,

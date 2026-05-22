@@ -836,23 +836,42 @@ server.listen(PORT, async () => {
     console.log('📦 JAR pre-warm scheduled (10s + every 24h)');
   }
 
-  // Auto-smoke-test scheduler — every 6h re-run the JAR cache prewarm.
-  // This proves: (a) the JAR resolver APIs (Paper/Vanilla/Purpur/Fabric)
-  // are reachable; (b) the cache layer still works; (c) any LATEST version
-  // bump is captured. If something breaks (rate limit, API change, disk
-  // full), the failure logs go to Railway where ops can see them.
-  // Disabled by setting AUTO_SMOKE=0 in env.
-  if (backend === 'jvm' && process.env.AUTO_SMOKE !== '0' && jvmCtl.prewarmJarCache) {
-    const runSmoke = async () => {
+  // Continuous JAR health probe — every 10 min verifies every cached JAR
+  // is on disk + correct size, and AUTO-REPAIRS corrupt/missing ones by
+  // re-downloading. Cheap when healthy (just stat() + 4 HTTP HEAD/GET).
+  // Logs 🚨 if anything had to be repaired so ops can investigate root cause.
+  if (backend === 'jvm' && process.env.AUTO_SMOKE !== '0' && jvmCtl.checkJarCacheHealth) {
+    const runHealth = async () => {
       try {
-        await jvmCtl.prewarmJarCache();
-        console.log('🩺 Auto-smoke: JAR cache check OK');
+        const r = await jvmCtl.checkJarCacheHealth();
+        if (r.repaired > 0 || r.errors > 0) {
+          console.log(`🚨 JAR health: ${r.healthy}✓ ${r.repaired} repaired · ${r.errors} errors (of ${r.scanned})`);
+        } else {
+          console.log(`🩺 JAR health: ${r.healthy}/${r.scanned} OK`);
+        }
       } catch (err) {
-        console.error(`🚨 Auto-smoke FAILED: ${err.message}`);
+        console.error(`🚨 JAR health probe failed: ${err.message}`);
       }
     };
-    setInterval(runSmoke, 6 * 60 * 60 * 1000);
-    console.log('🩺 Auto-smoke-test scheduled (every 6h)');
+    // First run 60s after boot (after the prewarm has had a chance), then
+    // every 10 min forever.
+    setTimeout(runHealth, 60_000);
+    setInterval(runHealth, 10 * 60 * 1000);
+    console.log('🩺 JAR health probe scheduled (every 10 min, auto-repair enabled)');
+  }
+
+  // Deep auto-smoke — every 6h re-run the full JAR cache prewarm. Catches
+  // new LATEST builds + verifies upstream APIs are reachable.
+  if (backend === 'jvm' && process.env.AUTO_SMOKE !== '0' && jvmCtl.prewarmJarCache) {
+    const deepSmoke = async () => {
+      try {
+        await jvmCtl.prewarmJarCache();
+      } catch (err) {
+        console.error(`🚨 Deep auto-smoke FAILED: ${err.message}`);
+      }
+    };
+    setInterval(deepSmoke, 6 * 60 * 60 * 1000);
+    console.log('🩺 Deep auto-smoke scheduled (every 6h)');
   }
 
   // Clear stale tunnel rows on boot. Bore allocates a fresh remote port every
