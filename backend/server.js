@@ -152,6 +152,30 @@ app.get('/api/health', async (req, res) => {
   const dockerOk = await dockerCtl.isDockerAvailable();
   const jvmOk = jvmCtl.isAvailable();
   const backend = await dc.backendName();
+
+  // Disk view from INSIDE the container. Railway's dashboard metric can lag
+  // behind reality; this is the truth as the JVM sees it when writing files.
+  let disk = null;
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const DATA_DIR = process.env.DATA_DIR || '/data';
+    const stat = fs.statfsSync ? fs.statfsSync(DATA_DIR) : null;
+    if (stat) {
+      const total = stat.blocks * stat.bsize;
+      const free  = stat.bavail * stat.bsize;
+      disk = {
+        mount: DATA_DIR,
+        total_mb: Math.round(total / 1024 / 1024),
+        free_mb:  Math.round(free  / 1024 / 1024),
+        used_mb:  Math.round((total - free) / 1024 / 1024),
+        used_pct: total ? Math.round(((total - free) / total) * 100) : 0,
+        inodes_total: stat.files,
+        inodes_free:  stat.ffree,
+      };
+    }
+  } catch (err) { disk = { error: err.message }; }
+
   res.json({
     ok: true,
     docker: dockerOk,
@@ -160,8 +184,7 @@ app.get('/api/health', async (req, res) => {
     db: true,
     ts: Date.now(),
     uptime: Date.now() - BOOT_TS,
-    // Public-side port (Railway TCP proxy) — the port a Minecraft client should connect to.
-    // Falls back to the internal MC_PORT for local dev.
+    disk,
     public_mc_port: parseInt(process.env.PUBLIC_MC_PROXY_PORT || process.env.MC_PORT || '25565', 10),
     public_mc_host: process.env.PUBLIC_MC_HOST || process.env.RAILWAY_PUBLIC_DOMAIN || null,
   });

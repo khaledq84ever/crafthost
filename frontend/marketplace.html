@@ -19,71 +19,127 @@
 <link rel="stylesheet" href="/css/theme.css" />
 <link rel="stylesheet" href="/css/dashboard.css" />
 <style>
-/* Top picks — curated one-click plugin row */
+/* Pro-grade compact marketplace — pattern: tiny uppercase section labels,
+   dense cards, refined hierarchy. */
+
+/* Section header — small uppercase Stripe/Linear-style instead of huge h3. */
+.mp-section {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 8px; margin: 26px 0 10px;
+}
+.mp-section:first-of-type { margin-top: 4px; }
+.mp-section-label {
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-strong);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.mp-section-label .ico { font-size: 13px; }
+.mp-section-sub {
+  font-size: 11px; color: var(--slate-500);
+  letter-spacing: 0.01em;
+}
+
+/* Page-lead summary line under the topbar. */
+.mp-lead { font-size: 12.5px; color: var(--slate-400); margin: 0 0 12px; }
+
+/* Top picks (curated) — denser tiles. */
 .mp-top-picks {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 10px;
-  margin-bottom: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
 }
 .mp-pick {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px;
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 10px;
   background: var(--slate-800);
   border: 1px solid var(--glass-border);
   border-left: 3px solid var(--c);
-  border-radius: 10px;
-  transition: transform .15s, border-color .15s;
-}
-.mp-pick:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--c) 50%, var(--glass-border)); }
-.mp-pick-icon {
-  width: 36px; height: 36px;
-  display: grid; place-items: center;
   border-radius: 9px;
+  transition: transform .15s, border-color .15s, background .15s;
+}
+.mp-pick:hover { transform: translateY(-1px); background: var(--slate-700); border-color: color-mix(in srgb, var(--c) 60%, var(--glass-border)); }
+.mp-pick-icon {
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border-radius: 7px;
   background: color-mix(in srgb, var(--c) 20%, var(--slate-700));
-  font-size: 18px;
+  font-size: 15px;
   flex-shrink: 0;
 }
 .mp-pick-text { flex: 1; min-width: 0; }
-.mp-pick-name { font-weight: 700; font-size: 13.5px; color: var(--text-strong); }
-.mp-pick-desc { font-size: 11.5px; color: var(--slate-400); white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+.mp-pick-name {
+  font-weight: 700; font-size: 12.5px;
+  color: var(--text-strong);
+  letter-spacing: -0.005em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mp-pick-desc {
+  font-size: 10.5px; color: var(--slate-400);
+  white-space: nowrap; text-overflow: ellipsis; overflow: hidden;
+}
 .mp-pick-btn {
   flex-shrink: 0;
-  font-size: 12px;
-  padding: 6px 12px;
+  font-size: 11px; font-weight: 600;
+  padding: 4px 10px;
+  min-height: 26px;
 }
 
-/* Live Modrinth feed grids */
+/* Modrinth live feeds — same denser tile pattern. */
 .mp-feed {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
 }
-.mp-feed-loading { color: var(--slate-500); padding: 18px 0; font-size: 13px; }
+.mp-feed-loading {
+  color: var(--slate-500);
+  font-size: 11.5px; padding: 12px 0;
+}
 .mp-feed-card {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px;
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 10px;
   background: var(--slate-800);
   border: 1px solid var(--glass-border);
-  border-radius: 10px;
-  transition: transform .15s, border-color .15s;
+  border-radius: 9px;
+  transition: transform .15s, border-color .15s, background .15s;
+  text-decoration: none; color: inherit;
 }
-.mp-feed-card:hover { transform: translateY(-2px); border-color: var(--emerald); }
+.mp-feed-card:hover { transform: translateY(-1px); background: var(--slate-700); border-color: var(--emerald); }
 .mp-feed-icon {
-  width: 40px; height: 40px;
-  border-radius: 8px;
+  width: 30px; height: 30px;
+  border-radius: 7px;
   background: var(--slate-700);
-  object-fit: cover;
-  flex-shrink: 0;
+  object-fit: cover; flex-shrink: 0;
 }
-.mp-feed-text { flex: 1; min-width: 0; }
-.mp-feed-name { font-weight: 700; font-size: 13.5px; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mp-feed-desc { font-size: 11.5px; color: var(--slate-400); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mp-feed-meta { font-size: 11px; color: var(--slate-500); margin-top: 2px; }
+.mp-feed-text { flex: 1; min-width: 0; line-height: 1.25; }
+.mp-feed-name {
+  font-weight: 700; font-size: 12.5px;
+  color: var(--text-strong);
+  letter-spacing: -0.005em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mp-feed-desc {
+  font-size: 10.5px; color: var(--slate-400);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mp-feed-meta {
+  font-size: 10px; color: var(--slate-500);
+  margin-top: 1px;
+  display: flex; gap: 6px; align-items: center;
+}
+
+/* Mobile — single col, even tighter. */
 @media (max-width: 600px) {
-  .mp-feed { grid-template-columns: 1fr; }
+  .mp-top-picks, .mp-feed { grid-template-columns: 1fr; gap: 6px; }
+  .mp-section { margin: 20px 0 8px; }
+  .mp-section-label { font-size: 10.5px; }
+  .mp-pick, .mp-feed-card { padding: 8px 9px; gap: 8px; }
+  .mp-pick-icon, .mp-feed-icon { width: 28px; height: 28px; }
+  .mp-pick-name, .mp-feed-name { font-size: 12px; }
+  .mp-pick-desc, .mp-feed-desc { font-size: 10px; }
+  .mp-feed-meta { font-size: 9.5px; }
+  .mp-pick-btn { font-size: 10.5px; padding: 3px 8px; min-height: 24px; }
+  .mp-lead { font-size: 11.5px; }
 }
 </style>
 </head>
@@ -114,33 +170,31 @@
     </div>
 
     <main class="main">
-      <p class="sub" data-i18n="market_sub" style="margin:0 0 18px;">200,000+ from Modrinth & CurseForge. One-click install on your server.</p>
+      <p class="mp-lead" data-i18n="market_sub">200,000+ from Modrinth & CurseForge. One-click install on your server.</p>
 
-      <!-- Top picks — curated, one-click install for the most-used plugins -->
-      <h3 style="margin:0 0 14px;display:flex;align-items:center;justify-content:space-between;">
-        <span data-i18n="market_top_picks">⭐ Top Plugins · One-Click</span>
-        <span style="font-size:12px;font-weight:500;color:var(--slate-400);" data-i18n="market_top_sub">Curated by CraftHost · paper/spigot/purpur</span>
-      </h3>
+      <div class="mp-section">
+        <span class="mp-section-label"><span class="ico">⭐</span> <span data-i18n="market_top_picks">Top Plugins · One-Click</span></span>
+        <span class="mp-section-sub" data-i18n="market_top_sub">Curated · paper/spigot/purpur</span>
+      </div>
       <div class="mp-top-picks" id="topPicksRow"></div>
 
-      <!-- Live trending — public Modrinth feed, no login needed -->
-      <h3 style="margin:32px 0 14px;display:flex;align-items:center;justify-content:space-between;">
-        <span>🔥 Trending Now</span>
-        <span style="font-size:12px;font-weight:500;color:var(--slate-400);">Most downloaded · live from Modrinth</span>
-      </h3>
+      <div class="mp-section">
+        <span class="mp-section-label"><span class="ico">🔥</span> Trending Now</span>
+        <span class="mp-section-sub">Live · most downloaded on Modrinth</span>
+      </div>
       <div class="mp-feed" id="trendingRow">
         <div class="mp-feed-loading">Loading…</div>
       </div>
 
-      <h3 style="margin:32px 0 14px;display:flex;align-items:center;justify-content:space-between;">
-        <span>✨ Recently Updated</span>
-        <span style="font-size:12px;font-weight:500;color:var(--slate-400);">Fresh releases · live from Modrinth</span>
-      </h3>
+      <div class="mp-section">
+        <span class="mp-section-label"><span class="ico">✨</span> Recently Updated</span>
+        <span class="mp-section-sub">Live · fresh releases on Modrinth</span>
+      </div>
       <div class="mp-feed" id="recentRow">
         <div class="mp-feed-loading">Loading…</div>
       </div>
 
-      <p class="text-muted" style="text-align:center;margin:32px 0 16px;font-size:13px;">
+      <p style="text-align:center;margin:28px 0 16px;font-size:11.5px;color:var(--slate-500);">
         Want to install? Sign in and create a server first.
       </p>
     </main>
