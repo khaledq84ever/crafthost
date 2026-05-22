@@ -378,7 +378,8 @@ window.applyLang = (lang) => {
       // .nav-cta is the right-side CTA cluster — append there so it sits inline
       // with the dashboard / sign-in buttons.
       const cta = document.querySelector('.nav .nav-cta');
-      const topbar = cta || document.querySelector('.topbar') || document.querySelector('header') || document.querySelector('nav.main-nav') || document.querySelector('nav.nav');
+      const actions = document.querySelector('.topbar-actions');
+      const topbar = cta || actions || document.querySelector('.topbar') || document.querySelector('header') || document.querySelector('nav.main-nav') || document.querySelector('nav.nav');
       if (topbar) topbar.appendChild(btn); else document.body.appendChild(btn);
     }
     // Apply the saved language (or detect from browser on first visit)

@@ -440,21 +440,22 @@ body.lang-ar button,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 32px;
-  min-width: 48px;
-  padding: 0 12px;
+  height: 30px;
+  min-width: 42px;
+  padding: 0 10px;
   border-radius: 999px;
   background: var(--slate-800);
   border: 1px solid var(--glass-border);
   color: var(--text-strong);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.3px;
   cursor: pointer;
   transition: background .15s, border-color .15s, transform .1s;
-  margin-left: 10px;
+  margin-left: 4px;
   flex-shrink: 0;
 }
+[dir="rtl"] .lang-toggle { margin-left: 0; margin-right: 4px; }
 .lang-toggle:hover {
   background: var(--slate-700);
   border-color: var(--glass-border-strong);
@@ -571,13 +572,9 @@ body.is-home .lang-toggle { display: none; }
   body.is-home .brand-mark { width: 28px; height: 28px; font-size: 14px; }
 }
 
-/* On wide dashboard pages, shift the brand button right so it doesn't sit on
-   the sidebar's own brand link. Still visible — user wants "CraftHost" text
-   on every page. */
-@media (min-width: 901px) {
-  body:has(.dash) .ch-home-btn { left: 270px; }
-  [dir="rtl"] body:has(.dash) .ch-home-btn { left: auto; right: 270px; }
-}
+/* Dashboard pages already show the brand in the sidebar — hide the fixed
+   home button there so it doesn't overlap the topbar. */
+body:has(.dash) .ch-home-btn { display: none !important; }
 
 /* Mobile: keep BOTH the mark AND the "CraftHost" text — just tighten spacing.
    The user explicitly wants the wordmark on every page, not just desktop. */
