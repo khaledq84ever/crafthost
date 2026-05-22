@@ -192,10 +192,13 @@
      and the terminal eats too much height. !important needed because the
      base .pp-head etc rules are also class-targeted (same specificity, but
      they win over plain media queries when written second in the file). */
-  .console-grid { grid-template-columns: 1fr !important; height: auto !important; gap: 8px !important; }
-  .players-panel { max-height: 160px !important; order: 2; }
-  .terminal-panel { order: 1; min-height: 55vh; }
-  .metrics-panel { order: 3; max-height: none !important; padding: 8px !important; }
+  .console-grid { grid-template-columns: 1fr !important; height: auto !important; gap: 6px !important; }
+  .players-panel { max-height: 120px !important; order: 2; }
+  .terminal-panel { order: 1; min-height: 32vh !important; }
+  .terminal-panel .term { min-height: 22vh !important; max-height: 38vh !important; }
+  .metrics-panel { order: 3; max-height: none !important; padding: 6px !important; }
+  /* shrink the main padding too — every pixel counts on a phone */
+  .main { padding: 8px 8px 60px !important; }
 
   .pp-head { padding: 7px 10px !important; font-size: 10.5px !important; }
   .player { padding: 5px 10px !important; gap: 6px !important; }
