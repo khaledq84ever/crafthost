@@ -135,8 +135,24 @@
   .mp-section-label { font-size: 10.5px; }
   .mp-pick, .mp-feed-card { padding: 8px 9px; gap: 8px; }
   .mp-pick-icon, .mp-feed-icon { width: 28px; height: 28px; }
-  .mp-pick-name, .mp-feed-name { font-size: 12px; }
-  .mp-pick-desc, .mp-feed-desc { font-size: 10px; }
+  .mp-pick-name, .mp-feed-name {
+    font-size: 12px;
+    /* Force single-line + ellipsis even when the global overflow-wrap:
+       anywhere rule on .mp-feed-card tries to break long names. */
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    word-break: keep-all !important;
+    overflow-wrap: normal !important;
+  }
+  .mp-pick-desc, .mp-feed-desc {
+    font-size: 10px;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    word-break: keep-all !important;
+    overflow-wrap: normal !important;
+  }
   .mp-feed-meta { font-size: 9.5px; }
   .mp-pick-btn { font-size: 10.5px; padding: 3px 8px; min-height: 24px; }
   .mp-lead { font-size: 11.5px; }
@@ -308,7 +324,7 @@ async function loadFeed(targetId, sort) {
           <div class="mp-feed-text">
             <div class="mp-feed-name">${escapeHtml(m.title || '?')}</div>
             <div class="mp-feed-desc">${escapeHtml(m.description || '')}</div>
-            <div class="mp-feed-meta">⬇ ${fmtDownloads(m.downloads)} · by ${escapeHtml(m.author || '—')}</div>
+            <div class="mp-feed-meta">⬇ ${fmtDownloads(m.downloads)}</div>
           </div>
         </a>
       `;
