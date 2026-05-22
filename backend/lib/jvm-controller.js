@@ -882,33 +882,84 @@ async function prewarmJarCache() {
   console.log(`📦 JAR cache prewarmed: ${hits} hit · ${misses} downloaded (${mb.toFixed(0)}MB) · ${errors} errors`);
 }
 
+// Persistent state for tracking which LATEST version we've successfully
+// verified per engine. Lives next to the cache. Survives container restarts.
+const JAR_STATE_FILE = path.join(JAR_CACHE_DIR, '_versions.json');
+function loadJarState() {
+  try { return JSON.parse(fs.readFileSync(JAR_STATE_FILE, 'utf8')); }
+  catch { return {}; }
+}
+function saveJarState(s) {
+  try { fs.writeFileSync(JAR_STATE_FILE, JSON.stringify(s, null, 2)); } catch {}
+}
+
+// Real-test a freshly-downloaded JAR by running `java -jar X.jar --version`
+// (or equivalent) with a 15s timeout. If it exits 0 OR prints recognizable
+// launcher banner, the JAR is runnable. Otherwise we treat it as broken,
+// rename to .broken, and keep the previous known-good version.
+//
+// This catches: corrupt downloads, upstream API changes that ship a bad
+// build, JAR signature mismatches, JDK incompatibilities.
+async function realTestJar(jarPath, type) {
+  return new Promise((resolve) => {
+    const args = ['-jar', jarPath, '--version'];
+    const proc = spawn('java', args, { stdio: ['ignore', 'pipe', 'pipe'], timeout: 15_000 });
+    let out = '', err = '';
+    proc.stdout.on('data', d => { out += d.toString('utf8').slice(0, 8000); });
+    proc.stderr.on('data', d => { err += d.toString('utf8').slice(0, 8000); });
+    let done = false;
+    const finish = (ok, reason) => { if (done) return; done = true; resolve({ ok, reason, stdout: out.slice(0, 400), stderr: err.slice(0, 400) }); };
+    proc.on('error', e => finish(false, `spawn: ${e.message}`));
+    proc.on('exit', (code, signal) => {
+      // Successful launcher: exit code 0, OR exit non-zero but with output
+      // matching known good patterns (some launchers exit 1 from --version
+      // because they don't implement the flag but print enough to identify).
+      const launcherOk = code === 0
+        || /(paperclip|paper|spigot|bukkit|fabric|forge|neoforge|net\.minecraft|java\s+\d+\.\d+|Minecraft\s+server)/i.test(out + err);
+      if (launcherOk) finish(true, `exit ${code}/${signal}`);
+      else finish(false, `exit ${code}/${signal} — unrecognized output`);
+    });
+    setTimeout(() => {
+      // Some launchers don't honor --version and start a server. Killing
+      // after 15s with no exit is OK if we got launcher-banner output.
+      if (!done) {
+        try { proc.kill('SIGKILL'); } catch {}
+        const launcherOk = /(paperclip|paper|spigot|bukkit|fabric|forge|neoforge|net\.minecraft|Minecraft\s+server)/i.test(out + err);
+        finish(launcherOk, launcherOk ? 'timed out but banner detected' : 'timed out, no banner');
+      }
+    }, 15_500);
+  });
+}
+
 // Lightweight JAR cache health check — verifies every cached JAR is still
 // on disk and the right size. Auto-repairs corrupt/missing JARs by deleting
-// the bad file and re-downloading. Designed to run every ~10 min as a
-// continuous probe — cheap when everything is healthy (just stat() calls).
+// the bad file and re-downloading. ALSO real-tests any JAR whose LATEST
+// version just changed (via `java -jar X --version`), and rolls back to
+// the previous version if the new build doesn't boot.
 //
-// Returns { healthy, repaired, errors, scanned } — caller can log/alert.
+// Returns { healthy, repaired, real_tested, real_failed, errors, scanned, new_versions }
 async function checkJarCacheHealth() {
-  const out = { healthy: 0, repaired: 0, errors: 0, scanned: 0 };
+  const out = { healthy: 0, repaired: 0, real_tested: 0, real_failed: 0, errors: 0, scanned: 0, new_versions: [] };
   if (!fs.existsSync(JAR_CACHE_DIR)) return out;
   const expected = [
-    { type: 'paper',   version: '1.20.1',  resolve: paperJarUrl   },
-    { type: 'paper',   version: 'LATEST',  resolve: paperJarUrl   },
-    { type: 'vanilla', version: '1.20.1',  resolve: vanillaJarUrl },
-    { type: 'vanilla', version: 'LATEST',  resolve: vanillaJarUrl },
-    { type: 'purpur',  version: '1.20.1',  resolve: purpurJarUrl  },
-    { type: 'purpur',  version: 'LATEST',  resolve: purpurJarUrl  },
-    { type: 'fabric',  version: '1.20.1',  resolve: fabricJarUrl  },
-    { type: 'fabric',  version: 'LATEST',  resolve: fabricJarUrl  },
+    { type: 'paper',   version: '1.20.1',  resolve: paperJarUrl,   stable: true },
+    { type: 'paper',   version: 'LATEST',  resolve: paperJarUrl                 },
+    { type: 'vanilla', version: '1.20.1',  resolve: vanillaJarUrl, stable: true },
+    { type: 'vanilla', version: 'LATEST',  resolve: vanillaJarUrl               },
+    { type: 'purpur',  version: '1.20.1',  resolve: purpurJarUrl,  stable: true },
+    { type: 'purpur',  version: 'LATEST',  resolve: purpurJarUrl                },
+    { type: 'fabric',  version: '1.20.1',  resolve: fabricJarUrl,  stable: true },
+    { type: 'fabric',  version: 'LATEST',  resolve: fabricJarUrl                },
   ];
+  const state = loadJarState();
   for (const t of expected) {
     out.scanned++;
     try {
       const info = await t.resolve(t.version);
       const cachePath = cachedJarPath(t.type, info.version, info);
+
+      // 1) Existence + size check
       let needsRepair = false;
-      // Threshold: a Paper/Vanilla launcher is ~40-60 MB. Fabric's bootstrap
-      // is small (200KB) but still > 50KB. Anything under 50KB is suspect.
       if (!fs.existsSync(cachePath)) { needsRepair = true; }
       else if (fs.statSync(cachePath).size < 50_000) { needsRepair = true; }
       if (needsRepair) {
@@ -918,6 +969,33 @@ async function checkJarCacheHealth() {
         out.repaired++;
       } else {
         out.healthy++;
+      }
+
+      // 2) Real-test ONLY when LATEST resolves to a NEW version we haven't
+      // verified before. Stable versions don't change, so they're verified
+      // once and trusted forever (we'd notice via the existence check above).
+      if (t.version === 'LATEST') {
+        const key = `${t.type}_latest`;
+        const lastVerified = state[key];
+        if (lastVerified !== info.version) {
+          console.log(`[jar-health] NEW VERSION detected: ${t.type} ${lastVerified || '(none)'} → ${info.version}`);
+          out.new_versions.push(`${t.type}-${info.version}`);
+          out.real_tested++;
+          const test = await realTestJar(cachePath, t.type);
+          if (test.ok) {
+            console.log(`[jar-health] ✓ ${t.type}-${info.version} real-test passed (${test.reason})`);
+            state[key] = info.version;
+            state[`${key}_verified_at`] = Date.now();
+            saveJarState(state);
+          } else {
+            out.real_failed++;
+            console.error(`🚨 [jar-health] ${t.type}-${info.version} real-test FAILED: ${test.reason}`);
+            console.error(`  stderr: ${test.stderr.slice(0, 200)}`);
+            // Quarantine the bad JAR so the cache layer doesn't serve it.
+            try { fs.renameSync(cachePath, cachePath + '.broken-' + Date.now()); } catch {}
+            console.warn(`[jar-health] quarantined ${t.type}-${info.version}, keeping previous LATEST=${lastVerified || 'none'}`);
+          }
+        }
       }
     } catch (err) {
       out.errors++;

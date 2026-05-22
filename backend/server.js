@@ -844,7 +844,12 @@ server.listen(PORT, async () => {
     const runHealth = async () => {
       try {
         const r = await jvmCtl.checkJarCacheHealth();
-        if (r.repaired > 0 || r.errors > 0) {
+        const newVer = (r.new_versions || []).length ? `  🆕 new: ${r.new_versions.join(', ')}` : '';
+        if (r.real_failed > 0) {
+          console.error(`🚨 JAR health: ${r.real_failed} NEW version(s) FAILED real-test — rolled back${newVer}`);
+        } else if (r.real_tested > 0) {
+          console.log(`✅ JAR health: ${r.real_tested} new version(s) verified real-runnable${newVer}`);
+        } else if (r.repaired > 0 || r.errors > 0) {
           console.log(`🚨 JAR health: ${r.healthy}✓ ${r.repaired} repaired · ${r.errors} errors (of ${r.scanned})`);
         } else {
           console.log(`🩺 JAR health: ${r.healthy}/${r.scanned} OK`);
