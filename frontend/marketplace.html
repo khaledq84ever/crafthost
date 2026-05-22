@@ -54,6 +54,37 @@
   font-size: 12px;
   padding: 6px 12px;
 }
+
+/* Live Modrinth feed grids */
+.mp-feed {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+.mp-feed-loading { color: var(--slate-500); padding: 18px 0; font-size: 13px; }
+.mp-feed-card {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px;
+  background: var(--slate-800);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  transition: transform .15s, border-color .15s;
+}
+.mp-feed-card:hover { transform: translateY(-2px); border-color: var(--emerald); }
+.mp-feed-icon {
+  width: 40px; height: 40px;
+  border-radius: 8px;
+  background: var(--slate-700);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.mp-feed-text { flex: 1; min-width: 0; }
+.mp-feed-name { font-weight: 700; font-size: 13.5px; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-feed-desc { font-size: 11.5px; color: var(--slate-400); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-feed-meta { font-size: 11px; color: var(--slate-500); margin-top: 2px; }
+@media (max-width: 600px) {
+  .mp-feed { grid-template-columns: 1fr; }
+}
 </style>
 </head>
 <body>
@@ -91,6 +122,27 @@
         <span style="font-size:12px;font-weight:500;color:var(--slate-400);" data-i18n="market_top_sub">Curated by CraftHost · paper/spigot/purpur</span>
       </h3>
       <div class="mp-top-picks" id="topPicksRow"></div>
+
+      <!-- Live trending — public Modrinth feed, no login needed -->
+      <h3 style="margin:32px 0 14px;display:flex;align-items:center;justify-content:space-between;">
+        <span>🔥 Trending Now</span>
+        <span style="font-size:12px;font-weight:500;color:var(--slate-400);">Most downloaded · live from Modrinth</span>
+      </h3>
+      <div class="mp-feed" id="trendingRow">
+        <div class="mp-feed-loading">Loading…</div>
+      </div>
+
+      <h3 style="margin:32px 0 14px;display:flex;align-items:center;justify-content:space-between;">
+        <span>✨ Recently Updated</span>
+        <span style="font-size:12px;font-weight:500;color:var(--slate-400);">Fresh releases · live from Modrinth</span>
+      </h3>
+      <div class="mp-feed" id="recentRow">
+        <div class="mp-feed-loading">Loading…</div>
+      </div>
+
+      <p class="text-muted" style="text-align:center;margin:32px 0 16px;font-size:13px;">
+        Want to install? Sign in and create a server first.
+      </p>
     </main>
   </div>
 </div>
@@ -173,11 +225,49 @@ async function installPlugin(projectId, title, btn, projectType) {
   }
 }
 
+// Live Modrinth feeds — public, no auth required. Sorted by downloads / updated.
+function fmtDownloads(n) {
+  if (!n) return '0';
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return String(n);
+}
+async function loadFeed(targetId, sort) {
+  const row = document.getElementById(targetId);
+  if (!row) return;
+  try {
+    const r = await fetch(`/api/modrinth/search?type=mod&sort=${sort}&limit=12`, { credentials: 'include' });
+    const data = await r.json();
+    const hits = data.hits || [];
+    if (!hits.length) { row.innerHTML = '<div class="mp-feed-loading">No results</div>'; return; }
+    row.innerHTML = hits.map(m => {
+      const icon = m.icon_url
+        ? `<img class="mp-feed-icon" src="${escapeHtml(m.icon_url)}" loading="lazy" alt="" />`
+        : `<div class="mp-feed-icon"></div>`;
+      return `
+        <a class="mp-feed-card" href="https://modrinth.com/mod/${escapeHtml(m.slug || m.project_id)}" target="_blank" rel="noopener">
+          ${icon}
+          <div class="mp-feed-text">
+            <div class="mp-feed-name">${escapeHtml(m.title || '?')}</div>
+            <div class="mp-feed-desc">${escapeHtml(m.description || '')}</div>
+            <div class="mp-feed-meta">⬇ ${fmtDownloads(m.downloads)} · by ${escapeHtml(m.author || '—')}</div>
+          </div>
+        </a>
+      `;
+    }).join('');
+  } catch (err) {
+    row.innerHTML = `<div class="mp-feed-loading">Failed to load (${escapeHtml(err.message)})</div>`;
+  }
+}
+
 (async function init() {
   picker = await useServerPicker(document.getElementById('serverPicker'));
   picker.onChange(() => {});
   if (picker.demo) toast('Sign in and create a server to install plugins for real.', 'warn');
   renderTopPicks();
+  // Don't await — fire in parallel so the curated row paints immediately.
+  loadFeed('trendingRow', 'downloads');
+  loadFeed('recentRow', 'updated');
 })();
 </script>
 </body>
