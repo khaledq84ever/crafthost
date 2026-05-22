@@ -921,6 +921,53 @@ router.get('/:id/events', (req, res) => {
   }
 });
 
+// GET /api/servers/:id/players — per-player data: name, IP, first seen,
+// last seen, total session count. Persists across restarts (read from
+// player_events table). Owner-only.
+router.get('/:id/players', (req, res) => {
+  const s = getOwnedServer(req, res); if (!s) return;
+  try {
+    const rows = db.prepare(`
+      SELECT
+        player,
+        MIN(ts)  AS first_seen,
+        MAX(ts)  AS last_seen,
+        SUM(CASE WHEN event='join'  THEN 1 ELSE 0 END) AS joins,
+        SUM(CASE WHEN event='leave' THEN 1 ELSE 0 END) AS leaves,
+        SUM(CASE WHEN event='chat'  THEN 1 ELSE 0 END) AS messages,
+        (SELECT ip FROM player_events
+          WHERE server_id=? AND player=pe.player AND ip IS NOT NULL
+          ORDER BY ts DESC LIMIT 1) AS last_ip
+      FROM player_events pe
+      WHERE server_id = ?
+      GROUP BY player
+      ORDER BY last_seen DESC
+      LIMIT 100
+    `).all(s.id, s.id);
+    res.json({ players: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/servers/:id/players/:name — full timeline of one specific player
+// on this server (every join, leave, chat with timestamp + IP).
+router.get('/:id/players/:name', (req, res) => {
+  const s = getOwnedServer(req, res); if (!s) return;
+  try {
+    const rows = db.prepare(`
+      SELECT event, ip, message, ts
+        FROM player_events
+       WHERE server_id = ? AND player = ?
+       ORDER BY ts DESC
+       LIMIT 500
+    `).all(s.id, req.params.name);
+    res.json({ player: req.params.name, events: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // PATCH /api/servers/:id/webhook — set or clear the Discord webhook URL for
 // this server. Owner-only. Body: { url: "https://discord.com/api/webhooks/..." | "" }
 router.patch('/:id/webhook', (req, res) => {

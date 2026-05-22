@@ -113,6 +113,23 @@ if (!hasColumn('servers', 'scheduled_restart_at')) {
 if (!hasColumn('servers', 'discord_webhook')) {
   db.exec(`ALTER TABLE servers ADD COLUMN discord_webhook TEXT`);
 }
+
+// Per-player event log. Persists across restarts (unlike the in-memory event
+// ring). Lets server owners see WHO connected, WHEN, FROM WHERE.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS player_events (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id  TEXT NOT NULL,
+    player     TEXT NOT NULL,
+    ip         TEXT,
+    event      TEXT NOT NULL,   -- 'join' | 'leave' | 'chat'
+    message    TEXT,            -- chat content (null for join/leave)
+    ts         INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+  );
+`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_player_events_server ON player_events(server_id, ts DESC);`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_player_events_player ON player_events(player, ts DESC);`);
 if (!hasColumn('servers', 'last_scheduled_restart_at')) {
   db.exec(`ALTER TABLE servers ADD COLUMN last_scheduled_restart_at INTEGER`);
 }

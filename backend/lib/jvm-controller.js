@@ -438,28 +438,58 @@ async function startServer(containerId, server) {
     state.logs.push(stamped);
     if (state.logs.length > LOG_RING_SIZE) state.logs.shift();
 
-    // ── Player join / leave events ────────────────────────────────────
-    // Paper / Spigot / Vanilla all use the same log line format. Track in
-    // a per-server event ring (last 50) and fire optional Discord webhook.
+    // ── Player join / leave / chat / IP capture ───────────────────────
+    // Paper logs three lines per join:
+    //   "UUID of player <name> is <uuid>"
+    //   "<name>[/<ip>:<port>] logged in with entity id <n> at (...)"
+    //   "<name> joined the game"
+    // We capture the IP from line 2, then surface it on the join event.
+    // state._pendingIp[name] holds the IP between line 2 and line 3.
+    const ipLine = stamped.match(/\[[^\]]+\]:\s+(\w+)\[\/([0-9a-fA-F.:]+):\d+\]\s+logged in with entity id/);
+    if (ipLine) {
+      if (!state._pendingIp) state._pendingIp = {};
+      state._pendingIp[ipLine[1]] = ipLine[2];
+    }
     const join  = stamped.match(/\[[^\]]+\]:\s+(\w+) joined the game\s*$/i);
     const leave = stamped.match(/\[[^\]]+\]:\s+(\w+) left the game\s*$/i);
     const chat  = stamped.match(/\[[^\]]+\]:\s+<(\w+)>\s+(.+)$/);
     if (join || leave || chat) {
       if (!state.events) state.events = [];
-      const ev = join ? { type: 'join', player: join[1], at: Date.now() }
-              : leave ? { type: 'leave', player: leave[1], at: Date.now() }
-              :         { type: 'chat', player: chat[1], message: chat[2], at: Date.now() };
+      let ev;
+      if (join) {
+        const ip = (state._pendingIp && state._pendingIp[join[1]]) || null;
+        ev = { type: 'join', player: join[1], ip, at: Date.now() };
+        if (state._pendingIp) delete state._pendingIp[join[1]];
+      } else if (leave) {
+        ev = { type: 'leave', player: leave[1], at: Date.now() };
+      } else {
+        ev = { type: 'chat', player: chat[1], message: chat[2], at: Date.now() };
+      }
       state.events.push(ev);
       if (state.events.length > 50) state.events.shift();
-      // Optional Discord webhook — column added below, NULL if not set
+
+      // Persist to DB so events survive restarts + can be queried per player.
+      try {
+        const db = require('../db');
+        db.prepare(
+          'INSERT INTO player_events (server_id, player, ip, event, message, ts) VALUES (?, ?, ?, ?, ?, ?)'
+        ).run(id, ev.player, ev.ip || null, ev.type, ev.message || null, Math.floor(ev.at / 1000));
+      } catch (err) {
+        if (!state._dbWarned) {
+          console.warn(`[jvm/${id}] failed to log player event: ${err.message}`);
+          state._dbWarned = true;
+        }
+      }
+
+      // Optional Discord webhook
       if ((ev.type === 'join' || ev.type === 'leave') && server.discord_webhook) {
         const emoji = ev.type === 'join' ? '🟢' : '🔴';
         const verb  = ev.type === 'join' ? 'joined' : 'left';
+        const ipStr = ev.ip ? ` (\`${ev.ip}\`)` : '';
         const body  = JSON.stringify({
-          content: `${emoji} **${ev.player}** ${verb} **${server.name}**`,
+          content: `${emoji} **${ev.player}**${ipStr} ${verb} **${server.name}**`,
           username: 'CraftHost',
         });
-        // Fire-and-forget, never block the log pipeline
         fetch(server.discord_webhook, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
         }).catch(() => {});
