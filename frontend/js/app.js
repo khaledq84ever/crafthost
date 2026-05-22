@@ -228,13 +228,9 @@ window.applyLang = (lang) => {
     else document.addEventListener('DOMContentLoaded', fn);
   }
   ready(() => {
-    // Credit footer — single shared element across every page
-    if (!document.querySelector('.site-credit')) {
-      const f = document.createElement('div');
-      f.className = 'site-credit';
-      f.innerHTML = `<span data-i18n="footer_credit">Programmed by</span> <a href="https://x.com/KhaledQ84Ever" target="_blank" rel="noopener noreferrer" aria-label="@KhaledQ84Ever on X">@KhaledQ84Ever</a>`;
-      document.body.appendChild(f);
-    }
+    // Credit footer removed per user request — also clean up any cached
+    // .site-credit nodes that might still be in the DOM from prior loads.
+    document.querySelectorAll('.site-credit').forEach(n => n.remove());
     // Home icon — fixed top-left circular button on every page so users can
     // always return to the marketing homepage with one tap. Idempotent —
     // skips injection if the page already has a brand-link to "/" visible
