@@ -127,12 +127,12 @@ db.exec(`
 // netherite) removed per user request. Existing servers on those tiers stay
 // (the rows aren't deleted, just hidden from /api/plans below).
 // Format: [id, name, price_cents, ram_mb, cpu_cores, storage_gb, max_players, plugin_slots, backups_count]
-// Single Free plan. 2 GB RAM (1.5 GB heap + 0.5 GB JVM overhead) — comfortably
-// runs Paper 1.21+, vanilla, Purpur, light Fabric/NeoForge. 2 vCPU, 10 GB
-// storage, 50 player slots, unlimited plugins, 30-day backup retention.
+// Single Free plan. 3 GB RAM (~2.4 GB heap + 0.6 GB JVM overhead) — handles
+// Paper 1.21+ + heavy modpacks comfortably. 3 vCPU, 10 GB storage, 50 player
+// slots, unlimited plugins, 30-day backup retention.
 // Format: [id, name, price_cents, ram_mb, cpu_cores, storage_gb, max_players, plugin_slots, backups_count]
 const seedPlans = [
-  ['free', 'Free', 0, 2048, 2, 10, 50, -1, 30],
+  ['free', 'Free', 0, 3072, 3, 10, 50, -1, 30],
 ];
 // Mark the deprecated tiers as hidden so they don't show on /api/plans or in
 // the wizard, while existing servers on them keep working until their owners

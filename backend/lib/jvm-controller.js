@@ -20,10 +20,10 @@ const PUBLIC_PORT = parseInt(process.env.MC_PORT || '25565', 10);
 // Cap heap to stay under Railway's container memory. Paper 1.21+ needs ~500MB
 // during DataFixers static init or it throws OutOfMemoryError. 480 is the
 // sweet spot for free tier (leaves ~64MB for the Node parent + JVM overhead).
-// Heap cap per server. Plan is 2 GB RAM. 1.5 GB heap leaves 0.5 GB JVM overhead
-// — fits Paper 1.21+, vanilla, Purpur, light Fabric/NeoForge. Override via
-// MAX_HEAP_MB env per-deploy if needed.
-const MAX_HEAP_MB = parseInt(process.env.MAX_HEAP_MB || '1536', 10);
+// Heap cap per server. Plan is 3 GB RAM. 2.4 GB heap leaves 0.6 GB JVM overhead
+// — fits Paper 1.21+, heavier modpacks, Fabric/NeoForge with ~50 mods. Override
+// via MAX_HEAP_MB env per-deploy if needed.
+const MAX_HEAP_MB = parseInt(process.env.MAX_HEAP_MB || '2456', 10);
 const INTERNAL_PORT_BASE = 26000;
 const LOG_RING_SIZE = 1000;
 
@@ -302,22 +302,35 @@ async function startServer(containerId, server) {
   const planRam = parseInt(server.ram_mb || 512, 10);
   const heap = Math.max(256, Math.min(planRam, MAX_HEAP_MB));
 
-  // Tight, low-RAM JVM args optimized for Railway free tier (~512 MB container).
-  // -XX:+UnlockExperimentalVMOptions MUST come BEFORE any experimental flag (G1NewSizePercent etc).
+  // Aikar's Flags — industry-standard JVM tuning for Paper/Spigot
+  // https://docs.papermc.io/paper/aikars-flags  (params for < 12 GB heaps)
+  // Result: smoother TPS, lower GC pause spikes, fewer stalls under load.
+  // -XX:+UnlockExperimentalVMOptions MUST precede any experimental flag.
   const args = [
-    `-Xms${Math.min(128, heap)}M`,
+    `-Xms${heap}M`,                    // Aikar: start = max so G1 sizes properly
     `-Xmx${heap}M`,
     '-XX:+UnlockExperimentalVMOptions',
     '-XX:+UseG1GC',
-    '-XX:MaxGCPauseMillis=200',
     '-XX:+ParallelRefProcEnabled',
+    '-XX:MaxGCPauseMillis=200',
     '-XX:+DisableExplicitGC',
-    '-XX:G1HeapRegionSize=8M',
-    '-XX:G1NewSizePercent=20',
-    '-XX:G1ReservePercent=15',
+    '-XX:+AlwaysPreTouch',
+    '-XX:G1NewSizePercent=30',
     '-XX:G1MaxNewSizePercent=40',
+    '-XX:G1HeapRegionSize=8M',
+    '-XX:G1ReservePercent=20',
+    '-XX:G1HeapWastePercent=5',
+    '-XX:G1MixedGCCountTarget=4',
+    '-XX:InitiatingHeapOccupancyPercent=15',
+    '-XX:G1MixedGCLiveThresholdPercent=90',
+    '-XX:G1RSetUpdatingPauseTimePercent=5',
+    '-XX:SurvivorRatio=32',
+    '-XX:+PerfDisableSharedMem',
+    '-XX:MaxTenuringThreshold=1',
+    '-Dusing.aikars.flags=https://mcflags.emc.gs',
+    '-Daikars.new.flags=true',
     '-XX:MetaspaceSize=64M',
-    '-XX:MaxMetaspaceSize=128M',
+    '-XX:MaxMetaspaceSize=192M',
     '-XX:ReservedCodeCacheSize=64M',
     '-Dlog4j2.formatMsgNoLookups=true',
     '-jar', jarPath,
