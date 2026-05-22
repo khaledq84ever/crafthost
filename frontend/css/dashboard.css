@@ -63,7 +63,8 @@ body { background: var(--slate-900); }
   color: var(--slate-400);
 }
 .topbar-search input { background: none; border: none; outline: none; color: white; flex: 1; font-size: 14px; }
-.topbar-actions { display: flex; gap: 12px; align-items: center; }
+.topbar-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+.topbar-actions .select { max-width: 200px; min-width: 100px; width: auto; flex: 0 1 200px; }
 /* When a page puts its title in the topbar instead of a search or server picker. */
 .topbar-title { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; overflow: hidden; }
 .topbar-title h1 {
