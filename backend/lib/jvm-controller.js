@@ -848,20 +848,22 @@ function clearCrash(id) { crashes.delete(id); }
 // Runs in background — never blocks startup. Skips anything already cached.
 // Errors are non-fatal: if a download fails, log it and move on.
 async function prewarmJarCache() {
-  const STABLE = '1.20.1';
-  const QUICK  = '1.21.1';   // version used by all 4 quick-deploy presets
-  const targets = [
-    { type: 'paper',   version: STABLE,  resolve: paperJarUrl   },
-    { type: 'paper',   version: QUICK,   resolve: paperJarUrl   },
-    { type: 'paper',   version: 'LATEST', resolve: paperJarUrl   },
-    { type: 'vanilla', version: STABLE,  resolve: vanillaJarUrl },
-    { type: 'vanilla', version: 'LATEST', resolve: vanillaJarUrl },
-    { type: 'purpur',  version: STABLE,  resolve: purpurJarUrl  },
-    { type: 'purpur',  version: 'LATEST', resolve: purpurJarUrl  },
-    { type: 'fabric',  version: STABLE,  resolve: fabricJarUrl  },
-    { type: 'fabric',  version: QUICK,   resolve: fabricJarUrl  },
-    { type: 'fabric',  version: 'LATEST', resolve: fabricJarUrl  },
-  ];
+  // Popular MC versions worth caching upfront so users get instant boots.
+  // Heavier engines (Paper, Vanilla, Purpur, Fabric) × every common MC ver.
+  const PAPER_VERS   = ['1.19.4', '1.20.1', '1.20.4', '1.21.1', '1.21.4'];
+  const FABRIC_VERS  = ['1.19.4', '1.20.1', '1.20.4', '1.21.1', '1.21.4'];
+  const VANILLA_VERS = ['1.20.1', '1.21.1'];
+  const PURPUR_VERS  = ['1.20.1', '1.21.1'];
+  const targets = [];
+  for (const v of PAPER_VERS)   targets.push({ type: 'paper',   version: v, resolve: paperJarUrl   });
+  for (const v of FABRIC_VERS)  targets.push({ type: 'fabric',  version: v, resolve: fabricJarUrl  });
+  for (const v of VANILLA_VERS) targets.push({ type: 'vanilla', version: v, resolve: vanillaJarUrl });
+  for (const v of PURPUR_VERS)  targets.push({ type: 'purpur',  version: v, resolve: purpurJarUrl  });
+  // Plus LATEST per engine
+  targets.push({ type: 'paper',   version: 'LATEST', resolve: paperJarUrl   });
+  targets.push({ type: 'vanilla', version: 'LATEST', resolve: vanillaJarUrl });
+  targets.push({ type: 'purpur',  version: 'LATEST', resolve: purpurJarUrl  });
+  targets.push({ type: 'fabric',  version: 'LATEST', resolve: fabricJarUrl  });
   try { fs.mkdirSync(JAR_CACHE_DIR, { recursive: true }); } catch {}
 
   let hits = 0, misses = 0, errors = 0, mb = 0;
@@ -999,23 +1001,28 @@ async function realTestJar(jarPath, type, version) {
 async function checkJarCacheHealth() {
   const out = { healthy: 0, repaired: 0, real_tested: 0, real_failed: 0, errors: 0, scanned: 0, new_versions: [] };
   if (!fs.existsSync(JAR_CACHE_DIR)) return out;
-  const expected = [
-    { type: 'paper',    version: '1.20.1', resolve: paperJarUrl,    stable: true },
-    { type: 'paper',    version: '1.21.1', resolve: paperJarUrl,    stable: true }, // ← used by Survival/Creative/Skyblock quick-deploys
-    { type: 'paper',    version: 'LATEST', resolve: paperJarUrl                  },
-    { type: 'vanilla',  version: '1.20.1', resolve: vanillaJarUrl,  stable: true },
-    { type: 'vanilla',  version: 'LATEST', resolve: vanillaJarUrl                },
-    { type: 'purpur',   version: '1.20.1', resolve: purpurJarUrl,   stable: true },
-    { type: 'purpur',   version: 'LATEST', resolve: purpurJarUrl                 },
-    { type: 'fabric',   version: '1.20.1', resolve: fabricJarUrl,   stable: true },
-    { type: 'fabric',   version: '1.21.1', resolve: fabricJarUrl,   stable: true }, // ← used by Modded quick-deploy
-    { type: 'fabric',   version: 'LATEST', resolve: fabricJarUrl                 },
-    // NeoForge: existence + size only (no boot test). The installer flow is
-    // ~3 min cold and the boot can't run inside the same temp-dir pattern
-    // because NeoForge mutates the dir on install. Existence proves the
-    // upstream Maven URL is reachable + the JAR file is intact.
-    { type: 'neoforge', version: 'LATEST', resolve: neoforgeJarUrl, skipBootTest: true },
-  ];
+  // Every popular MC version users actually deploy.
+  // Stable versions (1.19.4, 1.20.1, 1.20.4, 1.21.1, 1.21.4): boot-tested
+  // ONCE on first encounter, then trusted (version doesn't change).
+  // LATEST: re-tested every time upstream bumps it.
+  const STABLE_VERSIONS = ['1.19.4', '1.20.1', '1.20.4', '1.21.1', '1.21.4'];
+  const expected = [];
+  for (const v of STABLE_VERSIONS) {
+    expected.push({ type: 'paper',   version: v, resolve: paperJarUrl,   stable: true });
+    expected.push({ type: 'fabric',  version: v, resolve: fabricJarUrl,  stable: true });
+  }
+  // Vanilla + Purpur: stable 1.20.1 + 1.21.1 only (these are the popular ones)
+  for (const v of ['1.20.1', '1.21.1']) {
+    expected.push({ type: 'vanilla', version: v, resolve: vanillaJarUrl, stable: true });
+    expected.push({ type: 'purpur',  version: v, resolve: purpurJarUrl,  stable: true });
+  }
+  // LATEST per engine (continuously re-tested when upstream bumps)
+  expected.push({ type: 'paper',   version: 'LATEST', resolve: paperJarUrl   });
+  expected.push({ type: 'vanilla', version: 'LATEST', resolve: vanillaJarUrl });
+  expected.push({ type: 'purpur',  version: 'LATEST', resolve: purpurJarUrl  });
+  expected.push({ type: 'fabric',  version: 'LATEST', resolve: fabricJarUrl  });
+  // NeoForge: existence + size only (no boot test — installer is heavy + mutates dir)
+  expected.push({ type: 'neoforge', version: 'LATEST', resolve: neoforgeJarUrl, skipBootTest: true });
   const state = loadJarState();
   for (const t of expected) {
     out.scanned++;
@@ -1036,31 +1043,31 @@ async function checkJarCacheHealth() {
         out.healthy++;
       }
 
-      // 2) Real-test ONLY when LATEST resolves to a NEW version we haven't
-      // verified before. Stable versions don't change, so they're verified
-      // once and trusted forever (we'd notice via the existence check above).
-      // skipBootTest engines (NeoForge) get version tracking without the
-      // expensive boot.
-      if (t.version === 'LATEST' && !t.skipBootTest) {
-        const key = `${t.type}_latest`;
-        const lastVerified = state[key];
-        if (lastVerified !== info.version) {
-          console.log(`[jar-health] NEW VERSION detected: ${t.type} ${lastVerified || '(none)'} → ${info.version} — running boot test (~30-60s)`);
-          out.new_versions.push(`${t.type}-${info.version}`);
+      // 2) Real boot-test. Three modes:
+      //    - skipBootTest engines (NeoForge): never boot-test (heavy installer)
+      //    - LATEST: re-test every time upstream version bumps
+      //    - stable: test ONCE on first encounter, then trust (versions don't change)
+      // Either passes → record `${type}-${version}: timestamp` in state
+      // Either fails → quarantine JAR + log alert + keep previous canonical
+      if (!t.skipBootTest) {
+        const verKey = `${t.type}-${info.version}`;
+        const alreadyVerified = !!state[verKey];
+        const latestChanged = t.version === 'LATEST' && state[`${t.type}_latest`] !== info.version;
+        if (!alreadyVerified || latestChanged) {
+          console.log(`[jar-health] BOOT-TESTING ${t.type}-${info.version}${latestChanged ? ' (LATEST changed)' : ' (first time)'}`);
+          out.new_versions.push(verKey);
           out.real_tested++;
           const test = await realTestJar(cachePath, t.type, info.version);
           if (test.ok) {
-            console.log(`[jar-health] ✓ ${t.type}-${info.version} real-test passed (${test.reason})`);
-            state[key] = info.version;
-            state[`${key}_verified_at`] = Date.now();
+            console.log(`[jar-health] ✓ ${verKey} boot-test passed (${test.reason})`);
+            state[verKey] = Date.now();
+            if (t.version === 'LATEST') state[`${t.type}_latest`] = info.version;
             saveJarState(state);
           } else {
             out.real_failed++;
-            console.error(`🚨 [jar-health] ${t.type}-${info.version} real-test FAILED: ${test.reason}`);
-            console.error(`  stderr: ${test.stderr.slice(0, 200)}`);
-            // Quarantine the bad JAR so the cache layer doesn't serve it.
+            console.error(`🚨 [jar-health] ${verKey} boot-test FAILED: ${test.reason}`);
+            console.error(`  stderr tail: ${test.stderr.slice(-300)}`);
             try { fs.renameSync(cachePath, cachePath + '.broken-' + Date.now()); } catch {}
-            console.warn(`[jar-health] quarantined ${t.type}-${info.version}, keeping previous LATEST=${lastVerified || 'none'}`);
           }
         }
       }
