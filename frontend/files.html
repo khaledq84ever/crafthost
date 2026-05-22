@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>File Manager · CraftHost</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/css/theme.css" />
+<link rel="stylesheet" href="/css/dashboard.css" />
+<style>
+.fm {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 18px;
+  height: calc(100vh - 180px);
+}
+.fm-tree {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  padding: 14px;
+  overflow-y: auto;
+}
+.fm-tree-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--slate-300);
+}
+.fm-tree-item:hover { background: var(--slate-800); color: white; }
+.fm-tree-item.active { background: rgba(0, 200, 83, 0.15); color: var(--emerald); }
+.fm-tree-item svg { width: 14px; height: 14px; flex-shrink: 0; }
+.fm-tree-item .ind { display: inline-block; }
+
+/* Editor modal toolbar — compact, tidy, responsive. */
+.editor-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--slate-900);
+}
+.editor-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+.editor-title-wrap #editorTitle {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.editor-title-wrap #editorMeta {
+  font-size: 11px;
+  color: var(--slate-400);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.editor-dirty {
+  display: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(212, 168, 67, .15);
+  color: #d4a843;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  flex-shrink: 0;
+}
+.editor-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.editor-actions .btn-sm { padding: 5px 10px; font-size: 12px; }
+@media (max-width: 600px) {
+  .editor-bar { padding: 8px 10px; gap: 6px; }
+  .editor-title-wrap #editorTitle { font-size: 12px; }
+  .editor-title-wrap #editorMeta { display: none; }
+  .editor-actions .btn-sm { padding: 4px 8px; font-size: 11px; min-height: 28px; }
+}
+
+.fm-view {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.fm-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--glass-border);
+  flex-wrap: wrap;
+}
+.fm-crumb {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--slate-400);
+}
+.fm-body {
+  flex: 1;
+  overflow: auto;
+  padding: 0;
+}
+.fm-row {
+  display: grid;
+  grid-template-columns: auto 1fr 100px 140px 80px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--glass-border);
+  cursor: pointer;
+  font-size: 13px;
+  transition: background .12s;
+}
+.fm-row:hover { background: var(--slate-800); }
+.fm-row svg { width: 18px; height: 18px; color: var(--slate-400); }
+.fm-row .name { font-weight: 500; }
+.fm-row .size, .fm-row .date { color: var(--slate-400); font-size: 12px; }
+.fm-row .act { color: var(--slate-400); display: flex; gap: 6px; justify-content: end; }
+.fm-row .act button { padding: 4px 6px; border-radius: 4px; }
+.fm-row .act button:hover { background: var(--slate-700); color: white; }
+
+.fm-editor {
+  background: #0d1117;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: #c9d1d9;
+  padding: 16px;
+  height: 100%;
+  min-height: 400px;
+  overflow: auto;
+  white-space: pre;
+}
+
+/* Tabs */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--glass-border); margin-bottom: 20px; }
+.tab {
+  padding: 10px 16px;
+  font-size: 14px;
+  color: var(--slate-400);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s;
+}
+.tab.active { color: var(--emerald); border-bottom-color: var(--emerald); }
+
+/* Files topbar buttons — show full label on desktop, icon-only under 700px so
+   the picker + 3 actions + avatar all fit in a single row. */
+.lbl-short { display: none; }
+@media (max-width: 700px) {
+  .lbl-full { display: none; }
+  .lbl-short { display: inline; font-size: 14px; }
+  .topbar-actions .btn-sm { padding: 4px 8px; min-width: 32px; }
+}
+</style>
+</head>
+<body>
+<div class="dash">
+  <aside class="side">
+    <a href="/" class="brand"><span class="brand-mark">C</span><span>CraftHost</span></a>
+    <nav class="side-nav">
+      <a href="/dashboard.html">My Servers</a>
+      <a href="/marketplace.html">Plugins & Mods</a>
+      <a href="/files.html" class="active">File Manager</a>
+      <a href="/jars.html">JAR Library</a>
+      <a href="/console.html">Live Console</a>
+      <div class="side-section">Account</div>
+      <a href="/settings.html">Settings</a>
+    </nav>
+  </aside>
+
+  <div>
+    <div class="topbar">
+      <select class="select" style="width:220px;max-width:42vw;" id="serverPicker"></select>
+      <div class="topbar-actions">
+        <input type="file" id="uploadInput" multiple style="display:none;" />
+        <button class="btn btn-secondary btn-sm" id="uploadBtn" title="Upload"><span class="lbl-full">⬆ Upload</span><span class="lbl-short">⬆</span></button>
+        <button class="btn btn-primary btn-sm" id="newFileBtn" title="New File"><span class="lbl-full">+ New File</span><span class="lbl-short">+</span></button>
+        <button class="btn btn-ghost btn-sm" id="newFolderBtn" title="New Folder"><span class="lbl-full">+ New Folder</span><span class="lbl-short">📁+</span></button>
+        <div class="avatar">K</div>
+      </div>
+    </div>
+
+    <main class="main">
+      <div class="page-head">
+        <div>
+          <h1>📁 <span data-i18n="files_title">File Manager</span></h1>
+          <p class="sub" data-i18n="files_sub">Browse, edit, and upload files on your server.</p>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active" data-tab="files" data-i18n="files_files_tab">Files</div>
+        <div class="tab" data-tab="props" data-i18n="files_settings_tab">server.properties</div>
+        <div class="tab" data-tab="backups" data-i18n="files_backups_tab">Backups</div>
+      </div>
+
+      <div id="filesTab">
+        <div class="fm">
+          <div class="fm-tree" id="tree"></div>
+          <div class="fm-view">
+            <div class="fm-toolbar">
+              <button class="btn btn-ghost btn-sm" id="upBtn" title="Up one level">←</button>
+              <div class="fm-crumb" id="crumb">/</div>
+              <button class="btn btn-secondary btn-sm" id="refreshBtn" title="Refresh">↻</button>
+            </div>
+            <div class="fm-body" id="fmBody"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Inline editor modal -->
+      <div id="editor" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;backdrop-filter:blur(4px);">
+        <div style="position:absolute;inset:5% 8%;background:var(--slate-900);border:1px solid var(--glass-border);border-radius:var(--radius);display:flex;flex-direction:column;overflow:hidden;">
+          <div class="editor-bar">
+            <div class="editor-title-wrap">
+              <strong id="editorTitle">file.txt</strong>
+              <span class="text-muted" id="editorMeta"></span>
+              <span id="editorDirty" class="editor-dirty">● UNSAVED</span>
+            </div>
+            <div class="editor-actions">
+              <button class="btn btn-primary btn-sm" id="editorSave">💾 Save</button>
+              <button class="btn btn-ghost btn-sm" id="editorClose">✕ Close</button>
+            </div>
+          </div>
+          <textarea id="editorArea" spellcheck="false" style="flex:1;background:#0d1117;color:#c9d1d9;font-family:var(--font-mono);font-size:13px;padding:16px;border:none;outline:none;resize:none;white-space:pre;"></textarea>
+        </div>
+      </div>
+
+      <div id="propsTab" style="display:none;">
+        <div class="card">
+          <h3 style="margin-bottom:18px;">server.properties <span class="text-muted" id="propsHint" style="font-size:12px;font-weight:400;">(loading from disk…)</span></h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;" id="propsForm">
+            <div class="field"><label class="label">MOTD</label><input class="input" id="p_motd" /></div>
+            <div class="field"><label class="label">Max Players</label><input class="input" id="p_max_players" type="number" min="1" max="999" /></div>
+            <div class="field"><label class="label">Gamemode</label>
+              <select class="select" id="p_gamemode"><option value="survival">Survival</option><option value="creative">Creative</option><option value="adventure">Adventure</option><option value="spectator">Spectator</option></select>
+            </div>
+            <div class="field"><label class="label">Difficulty</label>
+              <select class="select" id="p_difficulty"><option value="peaceful">Peaceful</option><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select>
+            </div>
+            <div class="field"><label class="label">View Distance (chunks)</label><input class="input" id="p_view_distance" type="number" min="3" max="32" /></div>
+            <div class="field"><label class="label">Simulation Distance</label><input class="input" id="p_simulation_distance" type="number" min="3" max="32" /></div>
+          </div>
+          <div style="margin-top:16px;display:flex;gap:18px;flex-wrap:wrap;">
+            <label class="flex items-center gap-2"><input type="checkbox" id="p_pvp" /> Enable PvP</label>
+            <label class="flex items-center gap-2"><input type="checkbox" id="p_hardcore" /> Hardcore</label>
+            <label class="flex items-center gap-2"><input type="checkbox" id="p_whitelist" /> Whitelist</label>
+          </div>
+          <div style="margin-top:24px;display:flex;gap:10px;justify-content:end;">
+            <label class="flex items-center gap-2"><input type="checkbox" id="p_restart" checked /> Restart to apply</label>
+            <button class="btn btn-primary" id="p_save">💾 Save</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="backupsTab" style="display:none;">
+        <div class="page-head">
+          <div>
+            <span class="text-muted" id="bkSummary" style="font-size:13px;">Loading backups…</span>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button class="btn btn-primary" id="bkNowBtn">+ Backup Now</button>
+          </div>
+        </div>
+        <div class="card" style="padding:0;" id="bkList">
+          <div class="fm-row" style="border-bottom:1px solid var(--glass-border);color:var(--slate-400);font-size:11px;text-transform:uppercase;font-weight:600;letter-spacing:.05em;">
+            <div></div><div>Backup</div><div>Size</div><div>Created</div><div>Actions</div>
+          </div>
+          <div class="fm-row" style="padding:24px;justify-content:center;"><span class="text-muted">Loading…</span></div>
+        </div>
+        <p class="text-muted mt-4" style="font-size:13px;" id="bkFootnote">Auto-backups run every 6h on paid plans · server is briefly paused during snapshot.</p>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="toast-host" id="toasts"></div>
+<script src="/js/app.js"></script>
+<script>
+// ── State ─────────────────────────────────────────────────────────────
+let picker = null;
+let currentPath = '/';
+let currentItems = [];
+
+function fileIcon(type) {
+  if (type === 'folder') return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+}
+
+function fmtRel(ms) {
+  if (!ms) return '—';
+  const diff = (Date.now() - ms) / 1000;
+  if (diff < 60) return Math.floor(diff) + 's ago';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  return new Date(ms).toLocaleDateString();
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+// ── API wrappers ──────────────────────────────────────────────────────
+const sid = () => picker?.current?.id;
+
+async function listDir(p) {
+  if (!sid()) return { path: '/', items: [] };
+  try {
+    return await api(`/api/servers/${sid()}/files?path=${encodeURIComponent(p)}`);
+  } catch (err) {
+    if (picker?.demo) {
+      // Demo data when not signed in
+      const demoItems = [
+        { name: 'plugins', type: 'folder', size: 0, mtime: Date.now() - 86400e3, editable: false },
+        { name: 'mods', type: 'folder', size: 0, mtime: Date.now() - 86400e3, editable: false },
+        { name: 'world', type: 'folder', size: 142e6, mtime: Date.now() - 120e3, editable: false },
+        { name: 'logs', type: 'folder', size: 8.4e6, mtime: Date.now() - 300e3, editable: false },
+        { name: 'server.properties', type: 'file', size: 1245, mtime: Date.now() - 3600e3, editable: true },
+        { name: 'ops.json', type: 'file', size: 234, mtime: Date.now() - 86400e3, editable: true },
+        { name: 'eula.txt', type: 'file', size: 142, mtime: Date.now() - 7*86400e3, editable: true },
+        { name: 'whitelist.json', type: 'file', size: 89, mtime: Date.now() - 3*86400e3, editable: true },
+        { name: 'paper-global.yml', type: 'file', size: 9430, mtime: Date.now() - 5*86400e3, editable: true },
+      ];
+      return { path: p, items: demoItems };
+    }
+    toast(err.message, 'error');
+    return { path: p, items: [] };
+  }
+}
+
+async function readFile(p) {
+  if (picker?.demo) {
+    return { path: p, size: 64, content: `# ${p.split('/').pop()}\n# (demo content — sign in to edit real files)\n\nkey=value\nplayers=25\n` };
+  }
+  return api(`/api/servers/${sid()}/files/read?path=${encodeURIComponent(p)}`);
+}
+
+async function writeFile(p, content) {
+  if (picker?.demo) { toast('Demo mode — sign in to save', 'warn'); return { ok: false }; }
+  return api(`/api/servers/${sid()}/files/write`, { method: 'PUT', body: { path: p, content } });
+}
+
+async function mkdir(p) {
+  if (picker?.demo) { toast('Demo mode — sign in to create', 'warn'); return; }
+  await api(`/api/servers/${sid()}/files/mkdir`, { method: 'POST', body: { path: p } });
+}
+
+async function deletePath(p) {
+  if (picker?.demo) { toast('Demo mode — sign in to delete', 'warn'); return; }
+  await api(`/api/servers/${sid()}/files?path=${encodeURIComponent(p)}`, { method: 'DELETE' });
+}
+
+function uploadFilesXhr(fileList, basePath, onProgress) {
+  if (picker?.demo) { toast('Demo mode — sign in to upload', 'warn'); return Promise.reject(new Error('demo')); }
+  return new Promise((resolve, reject) => {
+    const fd = new FormData();
+    fd.append('path', basePath);
+    // Each File may have webkitRelativePath set (from folder drops); encode using __SLASH__ tokens in filename
+    for (const f of fileList) {
+      const rel = f.relativePath || f.webkitRelativePath || f.name;
+      const encoded = rel.replace(/\//g, '__SLASH__');
+      fd.append('files', f, encoded);
+    }
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `/api/servers/${sid()}/files/upload`);
+    xhr.withCredentials = true;
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress?.(e.loaded, e.total); };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) { try { resolve(JSON.parse(xhr.responseText)); } catch { resolve({}); } }
+      else { try { reject(new Error(JSON.parse(xhr.responseText).error || `HTTP ${xhr.status}`)); } catch { reject(new Error('Upload failed')); } }
+    };
+    xhr.onerror = () => reject(new Error('Network error'));
+    xhr.send(fd);
+  });
+}
+
+async function uploadFiles(fileList) {
+  if (!fileList || !fileList.length) return;
+  const total = Array.from(fileList).reduce((a, f) => a + (f.size || 0), 0);
+  const toastEl = makeProgressToast(`Uploading ${fileList.length} file${fileList.length === 1 ? '' : 's'}…`);
+  try {
+    const data = await uploadFilesXhr(fileList, currentPath, (loaded) => {
+      const pct = total ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
+      toastEl.update(`${pct}% · ${fmtBytes(loaded)} / ${fmtBytes(total)}`, pct);
+    });
+    toastEl.finish(`✓ Uploaded ${(data.uploaded || []).length} file(s)`);
+  } catch (err) {
+    toastEl.finish(`✗ ${err.message}`, true);
+  }
+}
+
+function makeProgressToast(title) {
+  const host = document.getElementById('toasts') || (() => {
+    const h = document.createElement('div'); h.className = 'toast-host'; h.id = 'toasts';
+    document.body.appendChild(h); return h;
+  })();
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.style.cssText = 'min-width:300px;';
+  t.innerHTML = `
+    <div style="font-weight:600;margin-bottom:6px;">${title}</div>
+    <div class="pt-detail" style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Starting…</div>
+    <div style="height:4px;background:var(--slate-700);border-radius:4px;overflow:hidden;">
+      <div class="pt-bar" style="height:100%;width:0%;background:var(--emerald);transition:width .15s;"></div>
+    </div>`;
+  host.appendChild(t);
+  return {
+    update(msg, pct) {
+      t.querySelector('.pt-detail').textContent = msg;
+      t.querySelector('.pt-bar').style.width = pct + '%';
+    },
+    finish(msg, isError) {
+      t.querySelector('.pt-detail').textContent = msg;
+      t.querySelector('.pt-bar').style.width = '100%';
+      if (isError) t.style.borderLeftColor = 'var(--red)';
+      setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 2500);
+    },
+  };
+}
+
+// Walk a DataTransferItemList (drag-drop) including folder recursion.
+async function collectDroppedFiles(items) {
+  const files = [];
+  async function walkEntry(entry, prefix) {
+    if (entry.isFile) {
+      const f = await new Promise(r => entry.file(r));
+      f.relativePath = (prefix ? prefix + '/' : '') + f.name;
+      files.push(f);
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      const entries = await new Promise(r => reader.readEntries(r));
+      for (const e of entries) await walkEntry(e, (prefix ? prefix + '/' : '') + entry.name);
+    }
+  }
+  const tasks = [];
+  for (const it of items) {
+    const entry = it.webkitGetAsEntry ? it.webkitGetAsEntry() : null;
+    if (entry) tasks.push(walkEntry(entry, ''));
+    else if (it.kind === 'file') { const f = it.getAsFile(); if (f) files.push(f); }
+  }
+  await Promise.all(tasks);
+  return files;
+}
+
+// ── Rendering ─────────────────────────────────────────────────────────
+function renderTree(items) {
+  const folders = items.filter(i => i.type === 'folder');
+  const el = document.getElementById('tree');
+  el.innerHTML = `
+    <div class="fm-tree-item ${currentPath === '/' ? 'active' : ''}" onclick="navigate('/')">
+      ${fileIcon('folder')} <span>/ (root)</span>
+    </div>
+    ${folders.map(f => {
+      const p = (currentPath === '/' ? '' : currentPath) + '/' + f.name;
+      return `<div class="fm-tree-item" style="padding-left:24px;" onclick="navigate('${escapeHtml(p)}')">${fileIcon('folder')} <span>${escapeHtml(f.name)}</span></div>`;
+    }).join('')}
+  `;
+}
+
+function renderFiles(items) {
+  const body = document.getElementById('fmBody');
+  if (!items.length) {
+    body.innerHTML = `<div style="padding:40px;text-align:center;color:var(--slate-400);">Empty folder</div>`;
+    return;
+  }
+  body.innerHTML = items.map((f, i) => `
+    <div class="fm-row" data-i="${i}">
+      ${fileIcon(f.type)}
+      <div class="name">${escapeHtml(f.name)}</div>
+      <div class="size">${f.type === 'folder' ? '—' : fmtBytes(f.size)}</div>
+      <div class="date">${fmtRel(f.mtime)}</div>
+      <div class="act">
+        ${f.type === 'file' ? `<button data-act="download" title="Download">↓</button>` : ''}
+        ${f.type === 'file' && f.editable ? `<button data-act="edit" title="Edit">✎</button>` : ''}
+        ${f.type === 'file' && !f.editable ? `<button data-act="info" title="Too large or binary" disabled style="opacity:.4;">—</button>` : ''}
+        <button data-act="delete" title="Delete">🗑</button>
+      </div>
+    </div>
+  `).join('');
+
+  body.querySelectorAll('.fm-row').forEach(row => {
+    const i = +row.dataset.i;
+    const item = items[i];
+    const p = (currentPath === '/' ? '' : currentPath) + '/' + item.name;
+
+    row.addEventListener('click', (e) => {
+      if (e.target.tagName === 'BUTTON') return;
+      if (item.type === 'folder') navigate(p);
+      else if (item.editable) openEditor(p);
+    });
+
+    row.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const act = btn.dataset.act;
+        if (act === 'edit') openEditor(p);
+        else if (act === 'delete') doDelete(p, item.name);
+        else if (act === 'download') {
+          if (picker?.demo) { toast('Demo mode — sign in to download', 'warn'); return; }
+          window.location.href = `/api/servers/${sid()}/files/download?path=${encodeURIComponent(p)}`;
+        }
+      });
+    });
+  });
+}
+
+function setCrumb(p) {
+  const parts = p.split('/').filter(Boolean);
+  let acc = '';
+  const crumbs = [`<a href="#" data-path="/" style="color:var(--emerald);">/</a>`];
+  for (const part of parts) {
+    acc += '/' + part;
+    crumbs.push(`<a href="#" data-path="${acc}">${escapeHtml(part)}</a>`);
+  }
+  const el = document.getElementById('crumb');
+  el.innerHTML = crumbs.join(' <span style="color:var(--slate-600);">/</span> ');
+  el.querySelectorAll('a').forEach(a => a.addEventListener('click', (e) => {
+    e.preventDefault();
+    navigate(a.dataset.path);
+  }));
+}
+
+async function navigate(p) {
+  currentPath = p || '/';
+  setCrumb(currentPath);
+  const r = await listDir(currentPath);
+  currentItems = r.items;
+  renderFiles(currentItems);
+  // Re-render tree from root for nav stability
+  if (currentPath === '/' || !document.getElementById('tree').children.length) {
+    const root = await listDir('/');
+    renderTree(root.items);
+  }
+}
+
+// ── Editor ────────────────────────────────────────────────────────────
+let editingPath = null;
+let editorOriginal = '';      // last-saved content, used for dirty detection
+let editorDirty = false;
+async function openEditor(p) {
+  try {
+    const r = await readFile(p);
+    editingPath = p;
+    editorOriginal = r.content;
+    editorDirty = false;
+    document.getElementById('editorTitle').textContent = p;
+    document.getElementById('editorMeta').textContent = fmtBytes(r.size);
+    document.getElementById('editorArea').value = r.content;
+    document.getElementById('editor').style.display = 'block';
+    updateDirtyBadge();
+    // Reset Save button label in case a previous open left it in error/success state
+    setSaveButtonState('idle');
+  } catch (err) { toast(err.message, 'error'); }
+}
+function updateDirtyBadge() {
+  const badge = document.getElementById('editorDirty');
+  if (!badge) return;
+  badge.style.display = editorDirty ? 'inline-block' : 'none';
+}
+function setSaveButtonState(state) {
+  // states: idle, saving, saved, error
+  const btn = document.getElementById('editorSave');
+  if (!btn) return;
+  btn.disabled = (state === 'saving');
+  btn.classList.remove('saving','saved','error');
+  if (state === 'saving') { btn.classList.add('saving'); btn.innerHTML = '<span class="ed-spin"></span> Saving…'; }
+  else if (state === 'saved') { btn.classList.add('saved'); btn.innerHTML = '✓ Saved'; }
+  else if (state === 'error') { btn.classList.add('error'); btn.innerHTML = '✗ Save failed'; }
+  else { btn.innerHTML = '💾 Save'; }
+}
+
+// Live dirty detection
+document.getElementById('editorArea').addEventListener('input', () => {
+  const cur = document.getElementById('editorArea').value;
+  const wasDirty = editorDirty;
+  editorDirty = (cur !== editorOriginal);
+  if (wasDirty !== editorDirty) updateDirtyBadge();
+  // If user starts editing after a save flash, return button to idle so they
+  // can save again clearly.
+  const btn = document.getElementById('editorSave');
+  if (btn?.classList.contains('saved')) setSaveButtonState('idle');
+});
+
+document.getElementById('editorClose').onclick = () => {
+  if (editorDirty && !confirm('You have unsaved changes — discard them?')) return;
+  document.getElementById('editor').style.display = 'none';
+  editingPath = null;
+  editorDirty = false;
+  editorOriginal = '';
+};
+document.getElementById('editorSave').onclick = async () => {
+  if (!editingPath) return;
+  const btn = document.getElementById('editorSave');
+  if (btn?.disabled) return; // ignore double-clicks during save
+  const content = document.getElementById('editorArea').value;
+  // If user clicks Save with no changes, give a clear hint instead of silently rewriting.
+  if (content === editorOriginal) { toast('No changes to save', 'warn'); return; }
+  setSaveButtonState('saving');
+  try {
+    const r = await writeFile(editingPath, content);
+    if (r && r.ok === false) {
+      // writeFile returned a soft-fail (e.g. demo mode) — already toasted there
+      setSaveButtonState('error');
+      setTimeout(() => setSaveButtonState('idle'), 2000);
+      return;
+    }
+    editorOriginal = content;
+    editorDirty = false;
+    updateDirtyBadge();
+    setSaveButtonState('saved');
+    toast('✓ Saved ' + editingPath);
+    // Stay on the editor — the user can keep editing OR close manually.
+    // Flash success for 1.5s then reset to idle.
+    setTimeout(() => setSaveButtonState('idle'), 1500);
+  } catch (err) {
+    setSaveButtonState('error');
+    toast('Save failed: ' + (err.message || 'unknown error'), 'error');
+    setTimeout(() => setSaveButtonState('idle'), 2500);
+  }
+};
+// Cmd/Ctrl+S to save
+document.getElementById('editorArea').addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); document.getElementById('editorSave').click(); }
+});
+// Warn before unloading the tab with unsaved changes
+window.addEventListener('beforeunload', (e) => {
+  if (editorDirty) { e.preventDefault(); e.returnValue = ''; }
+});
+
+// ── Toolbar actions ───────────────────────────────────────────────────
+async function doDelete(p, name) {
+  if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+  try { await deletePath(p); toast('Deleted'); navigate(currentPath); }
+  catch (err) { toast(err.message, 'error'); }
+}
+
+document.getElementById('upBtn').onclick = () => {
+  if (currentPath === '/') return;
+  const parts = currentPath.split('/').filter(Boolean);
+  parts.pop();
+  navigate('/' + parts.join('/'));
+};
+document.getElementById('refreshBtn').onclick = () => navigate(currentPath);
+
+document.getElementById('newFileBtn').onclick = async () => {
+  const name = prompt('New file name (e.g. notes.txt):');
+  if (!name) return;
+  const p = (currentPath === '/' ? '' : currentPath) + '/' + name;
+  try { await writeFile(p, ''); toast('Created ' + p); navigate(currentPath); }
+  catch (err) { toast(err.message, 'error'); }
+};
+
+document.getElementById('newFolderBtn').onclick = async () => {
+  const name = prompt('New folder name:');
+  if (!name) return;
+  const p = (currentPath === '/' ? '' : currentPath) + '/' + name;
+  try { await mkdir(p); toast('Created ' + p); navigate(currentPath); }
+  catch (err) { toast(err.message, 'error'); }
+};
+
+const uploadInput = document.getElementById('uploadInput');
+document.getElementById('uploadBtn').onclick = () => uploadInput.click();
+uploadInput.addEventListener('change', async (e) => {
+  if (!e.target.files.length) return;
+  try { await uploadFiles(e.target.files); navigate(currentPath); }
+  catch (err) { toast(err.message, 'error'); }
+  uploadInput.value = '';
+});
+
+// ── Tabs ──────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  ['files','props','backups'].forEach(id => document.getElementById(id + 'Tab').style.display = 'none');
+  document.getElementById(t.dataset.tab + 'Tab').style.display = 'block';
+  if (t.dataset.tab === 'backups') loadBackups();
+  if (t.dataset.tab === 'props') loadProps();
+}));
+
+// ── Backups ───────────────────────────────────────────────────────────
+async function loadBackups() {
+  if (!sid()) return;
+  const list = document.getElementById('bkList');
+  const summary = document.getElementById('bkSummary');
+  if (picker?.demo) {
+    summary.textContent = 'Sign in to view real backups.';
+    list.innerHTML = list.children[0].outerHTML + `<div class="fm-row" style="padding:24px;justify-content:center;"><span class="text-muted">Demo mode — no backups</span></div>`;
+    return;
+  }
+  try {
+    const r = await api(`/api/servers/${sid()}/backups`);
+    const items = r.backups || [];
+    summary.textContent = `${items.length} backup${items.length === 1 ? '' : 's'} · ${fmtBytes(r.used_bytes || 0)} used · retention: ${r.retention} max`;
+    if (!items.length) {
+      list.innerHTML = list.children[0].outerHTML + `<div class="fm-row" style="padding:24px;justify-content:center;"><span class="text-muted">No backups yet — click "Backup Now"</span></div>`;
+      return;
+    }
+    list.innerHTML = list.children[0].outerHTML + items.map(b => `
+      <div class="fm-row" data-bid="${escapeHtml(b.id)}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+        <div class="name" style="font-family:var(--font-mono);font-size:12px;">${escapeHtml(b.id)}.zip</div>
+        <div class="size">${fmtBytes(b.size)}</div>
+        <div class="date">${fmtRel(b.created_at)}</div>
+        <div class="act">
+          <button data-act="restore" title="Restore — replaces current world">↻ Restore</button>
+          <button data-act="download" title="Download as .zip">↓</button>
+          <button data-act="delete" title="Delete">🗑</button>
+        </div>
+      </div>
+    `).join('');
+    list.querySelectorAll('button[data-act]').forEach(btn => {
+      const bid = btn.closest('.fm-row').dataset.bid;
+      btn.addEventListener('click', () => doBackupAction(btn.dataset.act, bid));
+    });
+  } catch (err) {
+    summary.textContent = 'Failed: ' + err.message;
+  }
+}
+
+async function doBackupAction(act, bid) {
+  if (picker?.demo) { toast('Sign in for real backups', 'warn'); return; }
+  if (act === 'download') {
+    window.location.href = `/api/servers/${sid()}/backups/${encodeURIComponent(bid)}/download`;
+    return;
+  }
+  if (act === 'delete') {
+    if (!confirm(`Delete backup ${bid}? Cannot be undone.`)) return;
+    try {
+      await api(`/api/servers/${sid()}/backups/${encodeURIComponent(bid)}`, { method: 'DELETE' });
+      toast('Backup deleted');
+      loadBackups();
+    } catch (err) { toast(err.message, 'error'); }
+    return;
+  }
+  if (act === 'restore') {
+    if (!confirm(`Restore backup ${bid}?\n\n⚠ This will REPLACE the current world. The server will stop, restore, then restart.`)) return;
+    const toastEl = makeProgressToast(`Restoring ${bid}…`);
+    toastEl.update('Stopping server + unpacking…', 50);
+    try {
+      const r = await api(`/api/servers/${sid()}/backups/${encodeURIComponent(bid)}/restore`, { method: 'POST' });
+      toastEl.finish(r.restarted ? '✓ Restored. Server restarting.' : '✓ Restored.');
+      loadBackups();
+    } catch (err) {
+      toastEl.finish('✗ ' + err.message, true);
+    }
+  }
+}
+
+// ── Settings (server.properties) ──────────────────────────────────────
+async function loadProps() {
+  if (!sid() || picker?.demo) {
+    document.getElementById('propsHint').textContent = picker?.demo ? '(sign in to edit)' : '(no server)';
+    return;
+  }
+  try {
+    const r = await api(`/api/servers/${sid()}/properties`);
+    const p = r.properties || {};
+    const set = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined) el.value = v; };
+    const check = (id, v) => { const el = document.getElementById(id); if (el) el.checked = String(v).toLowerCase() === 'true'; };
+    set('p_motd', p['motd'] || '');
+    set('p_max_players', p['max-players'] || picker.current?.max_players || 10);
+    set('p_gamemode', p['gamemode'] || 'survival');
+    set('p_difficulty', p['difficulty'] || 'normal');
+    set('p_view_distance', p['view-distance'] || 8);
+    set('p_simulation_distance', p['simulation-distance'] || 6);
+    check('p_pvp', p['pvp'] ?? 'true');
+    check('p_hardcore', p['hardcore'] ?? 'false');
+    check('p_whitelist', p['white-list'] ?? 'false');
+    document.getElementById('propsHint').textContent = `(loaded ${Object.keys(p).length} keys from server.properties)`;
+  } catch (err) {
+    document.getElementById('propsHint').textContent = 'Failed: ' + err.message;
+  }
+}
+
+document.getElementById('p_save').addEventListener('click', async () => {
+  if (!sid() || picker?.demo) { toast('Sign in to save', 'warn'); return; }
+  const body = {
+    motd: document.getElementById('p_motd').value,
+    max_players: parseInt(document.getElementById('p_max_players').value, 10),
+    gamemode: document.getElementById('p_gamemode').value,
+    difficulty: document.getElementById('p_difficulty').value,
+    view_distance: parseInt(document.getElementById('p_view_distance').value, 10),
+    simulation_distance: parseInt(document.getElementById('p_simulation_distance').value, 10),
+    pvp: document.getElementById('p_pvp').checked,
+    hardcore: document.getElementById('p_hardcore').checked,
+    whitelist: document.getElementById('p_whitelist').checked,
+    restart: document.getElementById('p_restart').checked,
+  };
+  const btn = document.getElementById('p_save');
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ Saving…';
+  try {
+    const r = await api(`/api/servers/${sid()}`, { method: 'PATCH', body });
+    toast(r.restarted ? '✓ Saved + restarting' : '✓ Saved (restart needed to apply)');
+    setTimeout(loadProps, 600);
+  } catch (err) { toast(err.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = orig; }
+});
+
+document.getElementById('bkNowBtn').addEventListener('click', async () => {
+  if (picker?.demo) { toast('Sign in to back up', 'warn'); return; }
+  const btn = document.getElementById('bkNowBtn');
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ Snapshotting…';
+  try {
+    const r = await api(`/api/servers/${sid()}/backups`, { method: 'POST' });
+    toast(`✓ Backup ${r.id} created (${fmtBytes(r.size)})`);
+    loadBackups();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = orig;
+  }
+});
+
+// ── Drag-and-drop ─────────────────────────────────────────────────────
+function attachDragDrop() {
+  const body = document.getElementById('fmBody');
+  if (!body || body._dragWired) return;
+  body._dragWired = true;
+  let counter = 0;
+  body.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    counter++;
+    body.classList.add('drag-over');
+  });
+  body.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    counter--;
+    if (counter <= 0) { counter = 0; body.classList.remove('drag-over'); }
+  });
+  body.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  body.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    counter = 0;
+    body.classList.remove('drag-over');
+    if (picker?.demo) { toast('Sign in to upload', 'warn'); return; }
+    const items = e.dataTransfer.items;
+    let files;
+    if (items && items.length && items[0].webkitGetAsEntry) {
+      files = await collectDroppedFiles(items);
+    } else {
+      files = Array.from(e.dataTransfer.files || []);
+    }
+    if (!files.length) return;
+    await uploadFiles(files);
+    navigate(currentPath);
+  });
+}
+
+// Inject drag-over styling once
+(function injectDragCss(){
+  if (document.getElementById('dragCss')) return;
+  const st = document.createElement('style');
+  st.id = 'dragCss';
+  st.textContent = `
+    .fm-body.drag-over { outline: 2px dashed var(--emerald); outline-offset: -8px; background: rgba(16,185,129,0.04); }
+    .fm-body.drag-over::after { content: '⬇ Drop here to upload'; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: var(--emerald); font-weight: 700; font-size: 16px; pointer-events: none; }
+    .fm-body { position: relative; }
+    /* Editor Save button states — visible feedback so users never wonder if it worked */
+    #editorSave { min-width: 110px; transition: background .15s, color .15s; }
+    #editorSave.saving { opacity: .7; cursor: progress; }
+    #editorSave.saved { background: var(--emerald) !important; color: white !important; }
+    #editorSave.error { background: var(--red, #ef4444) !important; color: white !important; }
+    .ed-spin { display:inline-block; width:10px; height:10px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation: ed-spin 0.7s linear infinite; vertical-align:-1px; margin-right:6px; }
+    @keyframes ed-spin { to { transform: rotate(360deg); } }
+  `;
+  document.head.appendChild(st);
+})();
+
+// ── Boot ──────────────────────────────────────────────────────────────
+(async function init() {
+  picker = await useServerPicker(document.getElementById('serverPicker'));
+  picker.onChange(() => navigate('/'));
+  if (picker.demo) toast('Showing demo files — sign in to manage your real server.', 'warn');
+  await navigate('/');
+  attachDragDrop();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+{
+  "name": "CraftHost — Minecraft Server Hosting",
+  "short_name": "CraftHost",
+  "description": "Free Minecraft server hosting. One-click deploy in 60 seconds.",
+  "start_url": "/dashboard.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#0f172a",
+  "background_color": "#0f172a",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["games", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Open Dashboard",
+      "url": "/dashboard.html",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Live Console",
+      "url": "/console.html",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}

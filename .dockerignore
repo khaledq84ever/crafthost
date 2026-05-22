@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log
+.env
+.git
+.gitignore
+.DS_Store
+data
+backups
+uploads
+jars
+*.log
+README.md
+deploy.sh

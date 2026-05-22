@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Plugins & Mods · CraftHost</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/css/theme.css" />
+<link rel="stylesheet" href="/css/dashboard.css" />
+<style>
+/* Top picks — curated one-click plugin row */
+.mp-top-picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.mp-pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: var(--slate-800);
+  border: 1px solid var(--glass-border);
+  border-left: 3px solid var(--c);
+  border-radius: 10px;
+  transition: transform .15s, border-color .15s;
+}
+.mp-pick:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--c) 50%, var(--glass-border)); }
+.mp-pick-icon {
+  width: 36px; height: 36px;
+  display: grid; place-items: center;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--c) 20%, var(--slate-700));
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.mp-pick-text { flex: 1; min-width: 0; }
+.mp-pick-name { font-weight: 700; font-size: 13.5px; color: var(--text-strong); }
+.mp-pick-desc { font-size: 11.5px; color: var(--slate-400); white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+.mp-pick-btn {
+  flex-shrink: 0;
+  font-size: 12px;
+  padding: 6px 12px;
+}
+</style>
+</head>
+<body>
+<div class="dash">
+  <aside class="side">
+    <a href="/" class="brand"><span class="brand-mark">C</span><span>CraftHost</span></a>
+    <nav class="side-nav">
+      <a href="/dashboard.html">My Servers</a>
+      <a href="/marketplace.html" class="active">Plugins & Mods</a>
+      <a href="/files.html">File Manager</a>
+      <a href="/jars.html">JAR Library</a>
+      <a href="/console.html">Live Console</a>
+      <div class="side-section">Account</div>
+      <a href="/settings.html">Settings</a>
+    </nav>
+  </aside>
+
+  <div>
+    <div class="topbar">
+      <div class="topbar-title">
+        <h1>🧩 <span data-i18n="market_title">Plugins & Mods</span></h1>
+      </div>
+      <div class="topbar-actions">
+        <select class="select" style="width:240px;" id="serverPicker"></select>
+        <div class="avatar">K</div>
+      </div>
+    </div>
+
+    <main class="main">
+      <p class="sub" data-i18n="market_sub" style="margin:0 0 18px;">200,000+ from Modrinth & CurseForge. One-click install on your server.</p>
+
+      <!-- Top picks — curated, one-click install for the most-used plugins -->
+      <h3 style="margin:0 0 14px;display:flex;align-items:center;justify-content:space-between;">
+        <span data-i18n="market_top_picks">⭐ Top Plugins · One-Click</span>
+        <span style="font-size:12px;font-weight:500;color:var(--slate-400);" data-i18n="market_top_sub">Curated by CraftHost · paper/spigot/purpur</span>
+      </h3>
+      <div class="mp-top-picks" id="topPicksRow"></div>
+    </main>
+  </div>
+</div>
+
+<div class="toast-host" id="toasts"></div>
+<script src="/js/app.js"></script>
+<script>
+let picker = null;
+
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
+
+// Curated top picks — slugs accepted by Modrinth /v2/project/<slug_or_id>.
+// One-click install via existing /plugins/install endpoint.
+const TOP_PICKS = [
+  { slug: 'luckperms',      name: 'LuckPerms',      icon: '🔒', c: '#10B981', desc: 'Permissions & ranks' },
+  { slug: 'essentialsx',    name: 'EssentialsX',    icon: '⚙️', c: '#F59E0B', desc: 'Server essentials' },
+  { slug: 'worldedit',      name: 'WorldEdit',      icon: '🗺️', c: '#3B82F6', desc: 'Terrain editor' },
+  { slug: 'worldguard',     name: 'WorldGuard',     icon: '🛡️', c: '#A855F7', desc: 'Region protection' },
+  { slug: 'viaversion',     name: 'ViaVersion',     icon: '🔄', c: '#06B6D4', desc: 'Cross-version compat' },
+  { slug: 'coreprotect',    name: 'CoreProtect',    icon: '📜', c: '#EF4444', desc: 'Block logging' },
+  { slug: 'squaremap',      name: 'squaremap',      icon: '🗺️', c: '#FBBF24', desc: 'Lightweight web map' },
+  { slug: 'placeholderapi', name: 'PlaceholderAPI', icon: '🔧', c: '#8B5CF6', desc: 'Dynamic placeholders' },
+  { slug: 'geyser',         name: 'Geyser',         icon: '📱', c: '#10B981', desc: 'Bedrock players → Java' },
+  { slug: 'skinsrestorer',  name: 'SkinsRestorer',  icon: '👤', c: '#0284C7', desc: 'Keep skins on offline mode' },
+  { slug: 'multiverse-core',name: 'Multiverse',     icon: '🌌', c: '#6366F1', desc: 'Multiple worlds' },
+  { slug: 'discordsrv',     name: 'DiscordSRV',     icon: '💬', c: '#5865F2', desc: 'Discord bridge' },
+  { slug: 'bluemap',        name: 'BlueMap',        icon: '🌍', c: '#0EA5E9', desc: '3D web map' },
+  { slug: 'chunky',         name: 'Chunky',         icon: '⛰️', c: '#92400E', desc: 'Pre-generate chunks' },
+];
+function renderTopPicks() {
+  const row = document.getElementById('topPicksRow');
+  if (!row) return;
+  row.innerHTML = TOP_PICKS.map(p => `
+    <div class="mp-pick" style="--c:${p.c};" data-slug="${p.slug}" data-name="${escapeHtml(p.name)}">
+      <div class="mp-pick-icon">${p.icon}</div>
+      <div class="mp-pick-text">
+        <div class="mp-pick-name">${p.name}</div>
+        <div class="mp-pick-desc">${escapeHtml(p.desc)}</div>
+      </div>
+      <button class="btn btn-secondary btn-sm mp-pick-btn" data-slug="${p.slug}" data-name="${escapeHtml(p.name)}">Install</button>
+    </div>
+  `).join('');
+  row.querySelectorAll('.mp-pick-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      installPlugin(btn.dataset.slug, btn.dataset.name, btn, 'plugin');
+    });
+  });
+}
+
+async function installPlugin(projectId, title, btn, projectType) {
+  const sid = picker?.current?.id;
+  if (!sid || picker.demo || sid.startsWith('demo-')) {
+    toast('Sign in and create a server first.', 'warn');
+    return;
+  }
+  const isModpack = projectType === 'modpack';
+  if (isModpack && !confirm(`Install modpack "${title}"? This may add many mods to your server's mods/ folder and could take a moment.`)) return;
+
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Installing…'; }
+  toast(`Installing ${title}…`);
+  try {
+    const endpoint = isModpack
+      ? `/api/servers/${sid}/plugins/install-modpack`
+      : `/api/servers/${sid}/plugins/install`;
+    const r = await api(endpoint, { method: 'POST', body: { project_id: projectId } });
+    if (r.installed != null) {
+      toast(`✓ Modpack "${title}" — ${r.installed} mods installed`);
+    } else {
+      toast(`✓ Installed ${r.name} (v${r.version})`);
+    }
+    if (btn) {
+      btn.textContent = '✓ Installed';
+      setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 2500);
+    }
+  } catch (err) {
+    toast(err.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
+  }
+}
+
+(async function init() {
+  picker = await useServerPicker(document.getElementById('serverPicker'));
+  picker.onChange(() => {});
+  if (picker.demo) toast('Sign in and create a server to install plugins for real.', 'warn');
+  renderTopPicks();
+})();
+</script>
+</body>
+</html>

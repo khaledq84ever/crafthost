@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Live Console · CraftHost</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/css/theme.css" />
+<link rel="stylesheet" href="/css/dashboard.css" />
+<style>
+.console-grid {
+  display: grid;
+  grid-template-columns: 260px 1fr 280px;
+  gap: 16px;
+  height: calc(100vh - 130px);
+}
+
+/* Players panel */
+.players-panel {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+}
+.pp-head { padding: 14px 16px; border-bottom: 1px solid var(--glass-border); font-size: 13px; font-weight: 700; }
+.pp-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+.player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+.player:hover { background: var(--slate-800); }
+.player-avatar {
+  width: 32px; height: 32px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--emerald), var(--gold));
+  display: grid; place-items: center;
+  font-weight: 700; font-size: 14px;
+  color: var(--slate-900);
+}
+.player-name { font-weight: 500; font-size: 13px; flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.player-ping { font-family: var(--font-mono); font-size: 11px; color: var(--slate-400); }
+.player { transition: background .1s; }
+.player::after { content: '⋯'; color: var(--slate-500); margin-left: 6px; opacity: 0; transition: opacity .15s; }
+.player:hover::after { opacity: 1; }
+
+/* Terminal */
+.terminal-panel {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.term-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--glass-border);
+}
+.term-head .dot { margin-right: 8px; }
+.term {
+  flex: 1;
+  background: #0a0e1a;
+  color: #c9d1d9;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 14px;
+  overflow-y: auto;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+.term .line { padding: 1px 0; }
+.term .info { color: #58a6ff; }
+.term .warn { color: #f7b955; }
+.term .error { color: #ff7b72; }
+.term .ts { color: #6e7681; }
+.term .level-info { color: #7ee787; }
+.term .player { color: #ffa657; }
+.term .you { color: var(--emerald); }
+
+.term-input-wrap {
+  border-top: 1px solid var(--glass-border);
+  padding: 10px 14px;
+}
+.term-quick { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.term-quick button {
+  padding: 4px 10px;
+  background: var(--slate-800);
+  border: 1px solid var(--slate-700);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--slate-300);
+  cursor: pointer;
+}
+.term-quick button:hover { background: var(--slate-700); color: white; border-color: var(--emerald); }
+.term-input {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--slate-900);
+  border: 1px solid var(--slate-700);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+}
+.term-input::before { content: ">"; color: var(--emerald); font-family: var(--font-mono); font-weight: 700; }
+.term-input input {
+  flex: 1; background: none; border: none; outline: none;
+  font-family: var(--font-mono); font-size: 13px; color: white;
+}
+
+/* Metrics panel */
+.metrics-panel {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  padding: 16px;
+  overflow-y: auto;
+}
+.metric {
+  margin-bottom: 18px;
+}
+.metric-lbl {
+  display: flex; justify-content: space-between;
+  font-size: 12px; color: var(--slate-400);
+  margin-bottom: 6px;
+}
+.metric-lbl strong { color: white; font-size: 14px; font-weight: 700; font-family: var(--font-mono); }
+.metric-bar {
+  height: 8px;
+  background: var(--slate-800);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.metric-bar > div {
+  height: 100%;
+  background: linear-gradient(90deg, var(--emerald), var(--gold));
+  border-radius: 4px;
+  transition: width .5s;
+}
+.tps-gauge {
+  text-align: center; padding: 12px 0;
+  background: var(--slate-800);
+  border-radius: var(--radius-sm);
+  margin-bottom: 14px;
+}
+.tps-gauge .v {
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--emerald), var(--gold));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-family: var(--font-mono);
+}
+.tps-gauge .l { font-size: 11px; color: var(--slate-400); }
+.chart-canvas {
+  width: 100%; height: 60px;
+  background: var(--slate-800);
+  border-radius: var(--radius-sm);
+  margin-top: 6px;
+}
+
+@media (max-width: 1100px) {
+  .console-grid { grid-template-columns: 1fr; height: auto; }
+  .players-panel, .metrics-panel { max-height: 300px; }
+}
+
+/* Console action buttons — show full label on desktop, icon-only on mobile so
+   the topbar fits in a single row with the server picker. */
+.lbl-short { display: none; }
+@media (max-width: 700px) {
+  .lbl-full { display: none; }
+  .lbl-short { display: inline; font-size: 14px; }
+  .topbar-actions .btn-sm { padding: 4px 8px; min-width: 32px; }
+}
+</style>
+</head>
+<body>
+<div class="dash">
+  <aside class="side">
+    <a href="/" class="brand"><span class="brand-mark">C</span><span>CraftHost</span></a>
+    <nav class="side-nav">
+      <a href="/dashboard.html">My Servers</a>
+      <a href="/marketplace.html">Plugins & Mods</a>
+      <a href="/files.html">File Manager</a>
+      <a href="/jars.html">JAR Library</a>
+      <a href="/console.html" class="active">Live Console</a>
+      <div class="side-section">Account</div>
+      <a href="/settings.html">Settings</a>
+    </nav>
+  </aside>
+
+  <div>
+    <div class="topbar">
+      <select class="select" style="width:220px;max-width:48vw;" id="serverPicker"></select>
+      <div class="topbar-actions">
+        <span id="connDot" class="dot offline" title="Disconnected"></span>
+        <button class="btn btn-secondary btn-sm" id="startBtn" title="Start"><span class="lbl-full">▶ Start</span><span class="lbl-short">▶</span></button>
+        <button class="btn btn-secondary btn-sm" id="restartBtn" title="Restart"><span class="lbl-full">⟳ Restart</span><span class="lbl-short">⟳</span></button>
+        <button class="btn btn-danger btn-sm" id="stopBtn" title="Stop"><span class="lbl-full">■ Stop</span><span class="lbl-short">■</span></button>
+        <div class="avatar">K</div>
+      </div>
+    </div>
+
+    <main class="main" style="padding-bottom:20px;">
+      <div class="console-grid">
+
+        <!-- Players -->
+        <div class="players-panel">
+          <div class="pp-head">Players Online <span class="text-muted" id="playerCount">0/0</span></div>
+          <div class="pp-list" id="playerList"></div>
+        </div>
+
+        <!-- Terminal -->
+        <div class="terminal-panel">
+          <div class="term-head">
+            <div><strong>Console</strong> <span class="text-muted" id="termHost" style="margin-left:6px;font-family:var(--font-mono);font-size:12px;"></span></div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-ghost btn-sm" id="autoscrollBtn" title="Toggle auto-scroll">⤓ Auto</button>
+              <button class="btn btn-ghost btn-sm" onclick="document.getElementById('term').innerHTML=''">Clear</button>
+              <button class="btn btn-ghost btn-sm" id="dlLogBtn" title="Download log">↓</button>
+            </div>
+          </div>
+          <div class="term" id="term"></div>
+          <div class="term-input-wrap">
+            <div class="term-quick">
+              <button onclick="runCmd('/list')">/list</button>
+              <button onclick="runCmd('/save-all')">/save-all</button>
+              <button onclick="runCmd('/weather clear')">/weather clear</button>
+              <button onclick="runCmd('/time set day')">/time set day</button>
+              <button onclick="runCmd('/say Hello players!')">/say</button>
+              <button onclick="runCmd('/op')">/op</button>
+              <button onclick="runCmd('/tps')">/tps</button>
+              <button onclick="runCmd('/gc')">/gc</button>
+            </div>
+            <div class="term-input">
+              <input id="cmdInput" placeholder="Type a command and press Enter..." data-i18n-placeholder="console_send_ph" autocomplete="off" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Metrics -->
+        <div class="metrics-panel">
+          <div class="tps-gauge">
+            <div class="v" id="tps">—</div>
+            <div class="l">TPS (target 20.0)</div>
+          </div>
+
+          <div class="metric">
+            <div class="metric-lbl"><span>RAM</span><strong id="ramTxt">—</strong></div>
+            <div class="metric-bar"><div style="width:0%" id="ramBar"></div></div>
+          </div>
+
+          <div class="metric">
+            <div class="metric-lbl"><span>CPU</span><strong id="cpuTxt">—</strong></div>
+            <div class="metric-bar"><div style="width:0%" id="cpuBar"></div></div>
+            <canvas class="chart-canvas" id="cpuChart"></canvas>
+          </div>
+
+          <div class="metric">
+            <div class="metric-lbl"><span>MSPT</span><strong id="msptTxt">—</strong></div>
+            <div class="metric-bar"><div style="width:0%" id="msptBar"></div></div>
+          </div>
+
+          <hr style="border-color:var(--glass-border);margin:14px 0;" />
+
+          <div style="font-size:12px;color:var(--slate-400);">
+            <div class="flex justify-between" style="padding:4px 0;"><span>Uptime</span><strong id="upTxt" style="color:white;">—</strong></div>
+            <div class="flex justify-between" style="padding:4px 0;"><span>MC version</span><strong id="mcVerTxt" style="color:white;">—</strong></div>
+            <div class="flex justify-between" style="padding:4px 0;"><span>Host port</span><strong id="hostPortTxt" style="color:white;font-family:var(--font-mono);">—</strong></div>
+            <div class="flex justify-between" style="padding:4px 0;"><span>Exit code</span><strong id="exitCodeTxt" style="color:white;">—</strong></div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="toast-host" id="toasts"></div>
+<script src="/js/app.js"></script>
+<script>
+// ── State ─────────────────────────────────────────────────────────────
+let picker = null;
+let ws = null;
+let demoTickers = [];
+let players = [];
+let ramMax = 4096;
+
+const term = document.getElementById('term');
+const cmdInput = document.getElementById('cmdInput');
+const connDot = document.getElementById('connDot');
+
+function ts() { return `<span class="ts">[${new Date().toLocaleTimeString('en-GB')}]</span>`; }
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+let autoscroll = true;
+function termLine(html) {
+  const div = document.createElement('div');
+  div.className = 'line';
+  div.innerHTML = html;
+  term.appendChild(div);
+  if (autoscroll) term.scrollTop = term.scrollHeight;
+  if (term.children.length > 800) term.removeChild(term.firstChild);
+}
+// Pause autoscroll when user scrolls up; resume when scrolled to bottom.
+term.addEventListener('scroll', () => {
+  const atBottom = term.scrollHeight - term.scrollTop - term.clientHeight < 40;
+  autoscroll = atBottom;
+});
+
+document.getElementById('autoscrollBtn').onclick = () => {
+  autoscroll = !autoscroll;
+  document.getElementById('autoscrollBtn').style.color = autoscroll ? 'var(--emerald)' : '';
+  if (autoscroll) term.scrollTop = term.scrollHeight;
+};
+document.getElementById('autoscrollBtn').style.color = 'var(--emerald)';
+
+document.getElementById('dlLogBtn').onclick = () => {
+  const text = Array.from(term.querySelectorAll('.line'))
+    .map(l => l.textContent).join('\n');
+  const blob = new Blob([text], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `console-${(picker?.current?.id || 'server')}-${new Date().toISOString().slice(0,19)}.log`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+// Colorize a Minecraft-style log line by detecting INFO/WARN/ERROR and chat tags.
+function colorize(line) {
+  const safe = escapeHtml(line.replace(/\[[0-9;]*m/g, '')); // strip ANSI
+  if (/WARN/i.test(safe)) return `${ts()} <span class="warn">${safe}</span>`;
+  if (/ERROR|SEVERE|EXCEPTION/i.test(safe)) return `${ts()} <span class="error">${safe}</span>`;
+  // Chat detection: <Player> message
+  const chat = safe.match(/^(.*?)(&lt;)([A-Za-z0-9_]+)(&gt;)(.*)$/);
+  if (chat) return `${ts()} ${chat[1]}<span class="player">&lt;${chat[3]}&gt;</span>${chat[5]}`;
+  return `${ts()} <span class="level-info">${safe}</span>`;
+}
+
+function renderPlayers() {
+  const max = picker?.current?.max_players || 0;
+  if (!players.length) {
+    document.getElementById('playerList').innerHTML = `<div style="padding:24px;text-align:center;color:var(--slate-400);font-size:12px;">No players online</div>`;
+  } else {
+    document.getElementById('playerList').innerHTML = players.map(p => `
+      <div class="player" data-name="${escapeHtml(p.name)}" title="Click for actions">
+        <div class="player-avatar">${escapeHtml((p.name || '?')[0].toUpperCase())}</div>
+        <div class="player-name">${escapeHtml(p.name)}</div>
+        ${p.ping != null ? `<div class="player-ping">${p.ping}ms</div>` : ''}
+      </div>
+    `).join('');
+    document.querySelectorAll('#playerList .player').forEach(row => {
+      row.addEventListener('click', (e) => { e.preventDefault(); openPlayerMenu(row.dataset.name, e); });
+      row.addEventListener('contextmenu', (e) => { e.preventDefault(); openPlayerMenu(row.dataset.name, e); });
+    });
+  }
+  document.getElementById('playerCount').textContent = `${players.length}/${max}`;
+}
+
+function openPlayerMenu(name, e) {
+  const isDemo = picker?.demo || picker?.current?.id?.startsWith('demo-');
+  if (isDemo) { toast('Sign in to manage real players', 'warn'); return; }
+  // Build a small contextual menu
+  document.querySelectorAll('.player-menu').forEach(el => el.remove());
+  const menu = document.createElement('div');
+  menu.className = 'player-menu';
+  const x = e.clientX || (e.target.getBoundingClientRect().left + 50);
+  const y = e.clientY || (e.target.getBoundingClientRect().top + 30);
+  menu.style.cssText = `position:fixed;z-index:500;background:var(--glass-strong);border:1px solid var(--glass-border-strong);border-radius:10px;padding:6px;min-width:170px;box-shadow:var(--shadow-md);backdrop-filter:blur(20px);font-size:13px;`;
+  const actions = [
+    { label: '⚙ OP', cmd: `op ${name}` },
+    { label: '↡ DEOP', cmd: `deop ${name}` },
+    { label: '✕ Kick', cmd: `kick ${name} Kicked by admin`, confirm: `Kick ${name}?` },
+    { label: '🚫 Ban', cmd: `ban ${name} Banned by admin`, confirm: `Ban ${name}? Use /pardon to undo.` },
+    { label: '📍 TP here', cmd: null, build: () => `tp ${name} @s` },
+    { label: '🎮 Creative', cmd: `gamemode creative ${name}` },
+    { label: '🌱 Survival', cmd: `gamemode survival ${name}` },
+    { label: '👻 Spectator', cmd: `gamemode spectator ${name}` },
+  ];
+  menu.innerHTML = `
+    <div style="padding:8px 12px;border-bottom:1px solid var(--glass-border);font-weight:700;color:var(--emerald);">${escapeHtml(name)}</div>
+    ${actions.map((a, i) => `<button class="pm-item" data-i="${i}" style="display:block;width:100%;text-align:left;padding:8px 12px;background:none;border:none;color:var(--text);border-radius:6px;cursor:pointer;font-size:13px;">${a.label}</button>`).join('')}
+  `;
+  menu.querySelectorAll('.pm-item').forEach(btn => {
+    btn.onmouseenter = () => btn.style.background = 'var(--slate-700)';
+    btn.onmouseleave = () => btn.style.background = 'none';
+    btn.onclick = async () => {
+      const a = actions[+btn.dataset.i];
+      const cmd = a.cmd || a.build?.();
+      if (!cmd) return;
+      if (a.confirm && !confirm(a.confirm)) { menu.remove(); return; }
+      menu.remove();
+      runCmd('/' + cmd);
+    };
+  });
+  document.body.appendChild(menu);
+  // Position
+  const rect = menu.getBoundingClientRect();
+  const left = Math.min(x, window.innerWidth - rect.width - 10);
+  const top = Math.min(y, window.innerHeight - rect.height - 10);
+  menu.style.left = left + 'px';
+  menu.style.top = top + 'px';
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', function close(e) {
+      if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', close); }
+    });
+  }, 0);
+}
+
+// ── WebSocket live logs ───────────────────────────────────────────────
+function setConn(state) {
+  connDot.classList.remove('online', 'offline', 'warn');
+  connDot.classList.add(state === 'live' ? 'online' : state === 'demo' ? 'warn' : 'offline');
+  connDot.title = state === 'live' ? 'Connected' : state === 'demo' ? 'Demo mode' : 'Disconnected';
+}
+
+// Auto-reconnect state — survives stop/start cycles + transient network drops
+// without forcing the user to refresh the page.
+let reconnectAttempt = 0;
+let reconnectTimer = null;
+let wantReconnect = true;
+window.addEventListener('beforeunload', () => { wantReconnect = false; });
+document.addEventListener('visibilitychange', () => {
+  // When user comes back to the tab, force an immediate reconnect if the WS is dead
+  if (!document.hidden && wantReconnect && (!ws || ws.readyState >= 2)) {
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    openLogStream();
+  }
+});
+
+function scheduleReconnect() {
+  if (!wantReconnect) return;
+  if (reconnectTimer) return;
+  // Backoff: 2s, 4s, 8s, 15s, 30s (capped)
+  const delays = [2000, 4000, 8000, 15000, 30000];
+  const delay = delays[Math.min(reconnectAttempt, delays.length - 1)];
+  reconnectAttempt += 1;
+  termLine(`${ts()} <span class="you">[Console]</span> Reconnecting in ${Math.round(delay/1000)}s…`);
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    openLogStream();
+  }, delay);
+}
+
+function openLogStream() {
+  if (ws) { try { ws.close(); } catch {} ws = null; }
+  stopDemo();
+  players = [];
+  renderPlayers();
+  if (!picker?.current) return;
+
+  if (picker.demo || picker.current.id.startsWith('demo-')) {
+    runDemo();
+    return;
+  }
+  if (picker.empty || picker.current.id === 'no-server') {
+    setConn('off');
+    termLine(`${ts()} <span class="you">[Console]</span> No server selected. <a href="/dashboard.html" style="color:var(--emerald);">Create one →</a>`);
+    return;
+  }
+
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const url = `${proto}://${location.host}/ws/servers/${picker.current.id}/logs`;
+  ws = new WebSocket(url);
+  setConn('off');
+  ws.onopen = () => {
+    setConn('live');
+    if (reconnectAttempt > 0) {
+      termLine(`${ts()} <span class="you">[Console]</span> Reconnected ✓ — resuming live stream`);
+    } else {
+      termLine(`${ts()} <span class="you">[Console]</span> Connected to live log stream`);
+    }
+    reconnectAttempt = 0;
+  };
+  ws.onmessage = (ev) => {
+    try {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === 'log') termLine(colorize(msg.line));
+      else if (msg.type === 'stats') updateStats(msg.stats);
+      else if (msg.type === 'connected') termLine(`${ts()} <span class="you">[Console]</span> Streaming ${escapeHtml(msg.server || '')}`);
+    } catch {}
+  };
+  ws.onerror = () => { setConn('off'); };
+  ws.onclose = () => {
+    setConn('off');
+    // The server may have restarted, the browser may have lost connectivity,
+    // or the load balancer may have idled us out — try to reconnect either way.
+    if (wantReconnect && picker?.current && !picker.demo && !picker.current.id.startsWith('demo-')) {
+      scheduleReconnect();
+    }
+  };
+}
+
+function stopDemo() { demoTickers.forEach(clearInterval); demoTickers = []; }
+
+function runDemo() {
+  setConn('demo');
+  players = [
+    { name: 'Steve_Builder', ping: 42 },
+    { name: 'AlexCrafter', ping: 58 },
+    { name: 'NotchFan99', ping: 23 },
+    { name: 'EnderHunter', ping: 91 },
+    { name: 'CreeperKing', ping: 67 },
+  ];
+  renderPlayers();
+  const boot = [
+    'Starting minecraft server version 1.21.1',
+    'Loading properties',
+    'This server is running Paper version 1.21.1-79-master',
+    'Preparing level "world"',
+    'Preparing spawn area: 0%',
+    'Preparing spawn area: 100%',
+    'Done (3.214s)! For help, type "help"',
+    'Steve_Builder joined the game',
+    'AlexCrafter joined the game',
+    "Can't keep up! Is the server overloaded? Running 2087ms behind",
+  ];
+  boot.forEach(l => termLine(colorize(l)));
+  const samples = [
+    () => `<${players[Math.floor(Math.random()*players.length)].name}> ${['nice build','lol','where is everyone','check out spawn','who has diamonds','gtg'][Math.floor(Math.random()*6)]}`,
+    () => `Saved the game`,
+    () => `${players[Math.floor(Math.random()*players.length)].name} earned the achievement [Stone Age]`,
+  ];
+  demoTickers.push(setInterval(() => termLine(colorize(samples[Math.floor(Math.random()*samples.length)]())), 3500));
+
+  // Demo stats ticker
+  demoTickers.push(setInterval(() => {
+    updateStats({
+      tps: 19 + Math.random(),
+      cpu: Math.max(15, Math.min(85, 34 + Math.floor(Math.random()*15) - 7)),
+      ram_used: Math.max(1200, Math.min(3600, 1800 + Math.floor((Math.random() - 0.5) * 500))),
+      ram_max: 4096,
+      mspt: Math.floor(30 + Math.random() * 30),
+    });
+  }, 2000));
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────
+let cpuData = Array(40).fill(34);
+
+function fmtUptime(sec) {
+  if (!sec || sec < 0) return '—';
+  if (sec < 60) return sec + 's';
+  if (sec < 3600) return Math.floor(sec/60) + 'm';
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60);
+  return `${h}h ${m}m`;
+}
+
+function updateStats(s) {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+
+  // Refresh real player list from SLP sample if present
+  if (Array.isArray(s.player_sample)) {
+    players = s.player_sample.map(name => ({ name }));
+    renderPlayers();
+  } else if (s.players === 0) {
+    if (players.length) { players = []; renderPlayers(); }
+  }
+
+  // Offline / crashed states
+  if (s.online === false) {
+    set('tps', '—'); set('cpuTxt', '—'); set('ramTxt', '—'); set('msptTxt', '—');
+    set('upTxt', '—'); set('mcVerTxt', '—');
+    set('hostPortTxt', s.host_port || '—');
+    if (s.oom) {
+      set('exitCodeTxt', '⚠ OOM');
+      termLine(`${ts()} <span class="error">[Console]</span> Server killed by OOM. Try smaller view distance or upgrade plan.`);
+    } else if (s.exit_code != null && s.exit_code !== 0) {
+      set('exitCodeTxt', `crash (${s.exit_code})`);
+    } else {
+      set('exitCodeTxt', '—');
+    }
+    return;
+  }
+
+  set('exitCodeTxt', '0 (running)');
+  if (s.tps != null) set('tps', (+s.tps).toFixed(2));
+  set('upTxt', fmtUptime(s.uptime));
+  if (s.mc_version) set('mcVerTxt', s.mc_version);
+  if (s.host_port) set('hostPortTxt', String(s.host_port));
+  if (s.cpu != null) {
+    document.getElementById('cpuTxt').textContent = Math.round(s.cpu) + '%';
+    document.getElementById('cpuBar').style.width = Math.min(100, s.cpu) + '%';
+    cpuData.push(s.cpu); cpuData.shift();
+    drawSparkline(document.getElementById('cpuChart'), cpuData);
+  }
+  if (s.ram_used != null) {
+    const max = s.ram_max || ramMax || 0;
+    ramMax = max;
+    // Show MB if heap < 1024MB, GB otherwise
+    const fmt = (mb) => mb >= 1024 ? (mb/1024).toFixed(1) + ' GB' : Math.round(mb) + ' MB';
+    document.getElementById('ramTxt').textContent = `${fmt(s.ram_used)} / ${fmt(max)}`;
+    document.getElementById('ramBar').style.width = max ? Math.min(100, (s.ram_used / max) * 100) + '%' : '0%';
+  }
+  if (s.mspt != null) {
+    document.getElementById('msptTxt').textContent = Math.round(s.mspt) + ' ms';
+    document.getElementById('msptBar').style.width = Math.min(100, s.mspt) + '%';
+  }
+}
+
+function drawSparkline(canvas, data) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width = canvas.offsetWidth;
+  const h = canvas.height = canvas.offsetHeight;
+  ctx.clearRect(0, 0, w, h);
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, 'rgba(0, 200, 83, 0.4)');
+  grad.addColorStop(1, 'rgba(0, 200, 83, 0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.moveTo(0, h);
+  data.forEach((v, i) => ctx.lineTo((i / (data.length - 1)) * w, h - (v / 100) * h));
+  ctx.lineTo(w, h);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#00C853';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  data.forEach((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - (v / 100) * h;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+}
+
+drawSparkline(document.getElementById('cpuChart'), cpuData);
+
+// ── Commands ──────────────────────────────────────────────────────────
+const history = [];
+let histIdx = -1;
+
+async function runCmd(cmd) {
+  if (!cmd || !cmd.trim()) return;
+  history.unshift(cmd); if (history.length > 50) history.pop();
+  histIdx = -1;
+  termLine(`${ts()} <span class="you">[You]</span> ${escapeHtml(cmd)}`);
+
+  if (!picker?.current || picker.demo || picker.current.id.startsWith('demo-')) {
+    // Demo replies
+    setTimeout(() => {
+      if (cmd === '/list') termLine(colorize(`There are ${players.length}/25 players online: ${players.map(p=>p.name).join(', ')}`));
+      else if (cmd === '/tps') termLine(colorize(`TPS: 19.8 (1m), 19.9 (5m), 19.9 (15m)`));
+      else if (cmd === '/save-all') termLine(colorize(`Saved the game`));
+      else if (cmd.startsWith('/weather')) termLine(colorize(`Set the weather to clear`));
+      else if (cmd.startsWith('/time')) termLine(colorize(`Set the time to 1000`));
+      else if (cmd.startsWith('/say')) termLine(colorize(`[Server] ${cmd.slice(5)}`));
+      else termLine(colorize(`Executed command: ${cmd}`));
+    }, 150);
+    return;
+  }
+
+  try {
+    const r = await api(`/api/servers/${picker.current.id}/console`, { method: 'POST', body: { command: cmd } });
+    if (r.response) termLine(colorize(r.response));
+  } catch (err) {
+    termLine(`${ts()} <span class="error">[Console]</span> ${escapeHtml(err.message)}`);
+  }
+}
+window.runCmd = runCmd;
+
+cmdInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.value.trim()) { runCmd(e.target.value); e.target.value = ''; }
+  else if (e.key === 'ArrowUp') { if (history.length) { histIdx = Math.min(history.length - 1, histIdx + 1); e.target.value = history[histIdx]; e.preventDefault(); } }
+  else if (e.key === 'ArrowDown') { if (histIdx > 0) { histIdx -= 1; e.target.value = history[histIdx]; } else { histIdx = -1; e.target.value = ''; } e.preventDefault(); }
+});
+
+// ── Lifecycle buttons ─────────────────────────────────────────────────
+async function lifecycle(action) {
+  if (!picker?.current) return;
+  if (picker.demo || picker.current.id.startsWith('demo-')) { toast('Demo mode — sign in to control real servers', 'warn'); return; }
+  const id = picker.current.id;
+  // Disable lifecycle buttons + flip the indicator to 'warn' (yellow) so the
+  // user immediately sees something happening, rather than clicking and
+  // waiting for the WS to reconnect.
+  const btns = ['startBtn', 'stopBtn', 'restartBtn'].map(x => document.getElementById(x));
+  btns.forEach(b => b && (b.disabled = true));
+  setConn(action === 'stop' ? 'offline' : 'demo');
+  try {
+    await api(`/api/servers/${id}/${action}`, { method: 'POST' });
+    toast(`Server ${action} requested`);
+    // Then tight-poll /status until the JVM reaches the target state, so the
+    // connDot flips to green (or fully offline) the instant it actually
+    // transitions — instead of waiting up to several seconds for the WS to
+    // reconnect on its own.
+    const target = action === 'stop' ? 'offline' : 'online';
+    const start = Date.now();
+    const MAX_MS = 60_000;
+    const tick = async () => {
+      if (Date.now() - start > MAX_MS) { btns.forEach(b => b && (b.disabled = false)); return; }
+      try {
+        const r = await api(`/api/servers/${id}/status`);
+        if (r.status === target) {
+          setConn(target === 'online' ? 'live' : 'offline');
+          btns.forEach(b => b && (b.disabled = false));
+          return;
+        }
+      } catch {}
+      setTimeout(tick, 2000);
+    };
+    setTimeout(tick, 1500);
+  } catch (err) {
+    btns.forEach(b => b && (b.disabled = false));
+    toast(err.message, 'error');
+  }
+}
+document.getElementById('startBtn').onclick = () => lifecycle('start');
+document.getElementById('stopBtn').onclick = () => { if (confirm('Stop the server?')) lifecycle('stop'); };
+document.getElementById('restartBtn').onclick = () => { if (confirm('Restart the server?')) lifecycle('restart'); };
+
+// ── Boot ──────────────────────────────────────────────────────────────
+function updateHostLabel() {
+  const s = picker?.current;
+  const el = document.getElementById('termHost');
+  if (s && el) el.textContent = `· ${s.name}${s.port ? ' :' + s.port : ''}`;
+}
+
+(async function init() {
+  picker = await useServerPicker(document.getElementById('serverPicker'));
+  picker.onChange(() => { term.innerHTML = ''; updateHostLabel(); openLogStream(); });
+  if (picker.demo) toast('Showing a demo console — sign in to control real servers.', 'warn');
+  updateHostLabel();
+  openLogStream();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>JAR Library · CraftHost</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/css/theme.css" />
+<link rel="stylesheet" href="/css/dashboard.css" />
+<style>
+.jar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.jar-card {
+  background: var(--glass); border: 1px solid var(--glass-border);
+  border-radius: var(--radius); padding: 18px; transition: transform .2s, border-color .2s;
+}
+.jar-card:hover { transform: translateY(-3px); border-color: var(--glass-border-strong); }
+.jar-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.jar-logo {
+  width: 44px; height: 44px; border-radius: 10px;
+  display: grid; place-items: center;
+  font-weight: 800; color: white;
+  overflow: hidden; flex-shrink: 0;
+}
+.jar-logo img { width: 28px; height: 28px; object-fit: contain; filter: drop-shadow(0 1px 2px rgba(0,0,0,.3)); }
+.jar-card h4 { font-size: 15px; }
+.jar-card .meta { color: var(--text-muted); font-size: 12px; margin-top: 2px; font-family: var(--font-mono); }
+.jar-card .desc { color: var(--text); font-size: 13px; line-height: 1.5; margin-bottom: 14px; min-height: 40px; }
+.jar-card .stats { display: flex; gap: 12px; font-size: 12px; color: var(--text-muted); margin-bottom: 14px; }
+.upload-zone {
+  border: 2px dashed var(--glass-border-strong); border-radius: var(--radius);
+  padding: 40px; text-align: center; cursor: pointer; transition: border-color .2s, background .2s;
+}
+.upload-zone:hover, .upload-zone.dragover { border-color: var(--emerald); background: rgba(16,185,129,0.04); }
+
+/* Topbar carries the page title on this page (no server picker). Force a
+   single row on mobile so the title and buttons never stack. */
+.topbar { flex-wrap: nowrap !important; }
+.topbar-title { display: flex; align-items: center; min-width: 0; flex: 1; overflow: hidden; }
+.topbar-title h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar-actions { flex-shrink: 0; flex-wrap: nowrap !important; }
+
+/* Tabs — replaces the inline style block so they obey mobile rules. */
+.jar-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--glass-border); margin-bottom: 18px; }
+.jar-tabs .tab { padding: 9px 14px; color: var(--text-muted); cursor: pointer; font-size: 13.5px; font-weight: 600; }
+.jar-tabs .tab.active { border-bottom: 2px solid var(--emerald); color: var(--emerald); }
+
+/* Toggle long/short upload button label by screen width. */
+.upload-label-short { display: none; }
+
+@media (max-width: 700px) {
+  .topbar-title h1 { font-size: 14.5px; }
+  .upload-label-full { display: none; }
+  .upload-label-short { display: inline; }
+  .jar-grid { grid-template-columns: 1fr; gap: 10px; }
+  .jar-card { padding: 14px; }
+  .jar-card h4 { font-size: 14px; }
+  .jar-card .desc { font-size: 12.5px; min-height: 0; margin-bottom: 10px; }
+  .upload-zone { padding: 22px 14px; }
+  .upload-zone svg { width: 32px; height: 32px; margin-bottom: 8px !important; }
+  .upload-zone p { font-size: 13px; }
+  .jar-tabs .tab { padding: 7px 10px; font-size: 12.5px; }
+}
+@media (max-width: 480px) {
+  .topbar-title h1 { font-size: 13.5px; }
+  .topbar-actions .btn-sm { font-size: 10.5px; padding: 4px 7px; min-height: 28px; }
+  .topbar-actions .avatar { width: 26px; height: 26px; font-size: 11px; }
+}
+</style>
+</head>
+<body>
+<div class="dash">
+  <aside class="side">
+    <a href="/" class="brand"><span class="brand-mark">C</span><span>CraftHost</span></a>
+    <nav class="side-nav">
+      <a href="/dashboard.html">My Servers</a>
+      <a href="/marketplace.html">Plugins & Mods</a>
+      <a href="/files.html">File Manager</a>
+      <a href="/jars.html" class="active">JAR Library</a>
+      <a href="/console.html">Live Console</a>
+      <div class="side-section">Account</div>
+      <a href="/settings.html">Settings</a>
+    </nav>
+  </aside>
+
+  <div>
+    <div class="topbar">
+      <div class="topbar-title">
+        <h1>📦 <span data-i18n="jars_title">JAR Library</span></h1>
+      </div>
+      <div class="topbar-actions">
+        <input type="file" id="jarUploadInput" accept=".jar" style="display:none;" />
+        <button class="btn btn-primary btn-sm" id="uploadBtn">
+          <span class="upload-label-full">⬆ Upload Custom JAR</span>
+          <span class="upload-label-short">⬆ Upload</span>
+        </button>
+        <div class="avatar" id="avatar">U</div>
+      </div>
+    </div>
+
+    <main class="main">
+      <p class="sub" data-i18n="jars_sub" style="margin: 0 0 14px;">Server types you can deploy + your own custom JAR uploads.</p>
+
+      <div class="tabs jar-tabs">
+        <div class="tab active" data-tab="official">Official Types</div>
+        <div class="tab" data-tab="custom">My Custom JARs <span id="customCount" class="text-muted">(0)</span></div>
+      </div>
+
+      <div id="officialTab">
+        <div class="jar-grid" id="officialGrid"></div>
+        <p class="text-muted mt-4" style="font-size:13px;">JARs are downloaded fresh from the official source each time you create a server — always up to date, no cache.</p>
+      </div>
+
+      <div id="customTab" style="display:none;">
+        <div class="upload-zone" id="uploadZone">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin:0 auto 12px;color:var(--text-muted);"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <p><strong>Click to upload</strong> or drag-drop a .jar file</p>
+          <small style="color:var(--text-muted);">Max 500 MB · stored in your private library</small>
+        </div>
+        <div class="jar-grid" id="customGrid" style="margin-top:20px;"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Mobile bottom nav injected by app.js -->
+
+<div class="toast-host" id="toasts"></div>
+<script src="/js/app.js"></script>
+<script>
+function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
+function fmtRel(ms) {
+  if (!ms) return '—';
+  const diff = (Date.now() - ms*1000) / 1000;
+  if (diff < 60) return Math.floor(diff) + 's ago';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  return new Date(ms*1000).toLocaleDateString();
+}
+
+// Official server types — fetched live from version endpoints. The `logo`
+// URL points to each project's favicon via Google's S2 favicon service, which
+// is heavily cached and almost never goes down. A text-initial fallback
+// renders if the image errors.
+const TYPES = [
+  { id: 'paper',    name: 'Paper',    c: '#10B981', domain: 'papermc.io',     desc: 'High-performance plugin server. Recommended for most setups.' },
+  { id: 'vanilla',  name: 'Vanilla',  c: '#7CB342', domain: 'minecraft.net',  desc: 'Pure Mojang Minecraft. No mods, no plugins.' },
+  { id: 'purpur',   name: 'Purpur',   c: '#283593', domain: 'purpurmc.org',   desc: 'Configurable Paper fork with extra features.' },
+  { id: 'fabric',   name: 'Fabric',   c: '#01579B', domain: 'fabricmc.net',   desc: 'Lightweight modding API. Great for client-side mods.' },
+  { id: 'neoforge', name: 'NeoForge', c: '#F59E0B', domain: 'neoforged.net',  desc: 'Modern Forge fork. Faster release cycle.' },
+  { id: 'spigot',   name: 'Spigot',   c: '#E65100', domain: 'spigotmc.org',   desc: 'Classic plugin-enabled server.' },
+];
+function logoFor(t) { return `https://www.google.com/s2/favicons?domain=${t.domain}&sz=64`; }
+
+async function loadOfficial() {
+  const grid = document.getElementById('officialGrid');
+  grid.innerHTML = TYPES.map(t => `
+    <div class="jar-card">
+      <div class="jar-head">
+        <div class="jar-logo" style="background:linear-gradient(135deg,${t.c},${t.c}99);">
+          <img src="${logoFor(t)}" alt="${t.name} logo" loading="lazy"
+               onerror="this.replaceWith(Object.assign(document.createTextNode('${t.name[0]}'), {}))"/>
+        </div>
+        <div><h4>${t.name}</h4><div class="meta" id="ver_${t.id}">loading…</div></div>
+      </div>
+      <p class="desc">${t.desc}</p>
+      <div class="stats"><span>🔄 Live from official API</span></div>
+      <a href="/dashboard.html?type=${t.id}" class="btn btn-primary btn-block btn-sm">Deploy with ${t.name}</a>
+    </div>
+  `).join('');
+  // Fetch latest version per type in parallel
+  await Promise.all(TYPES.map(async t => {
+    try {
+      const r = await fetch(`/api/versions/${t.id}?limit=1`, { credentials: 'include' });
+      const d = await r.json();
+      const v = d.versions?.[0];
+      const el = document.getElementById('ver_' + t.id);
+      if (el) el.textContent = v ? `Latest: ${v.id}` : 'No versions available';
+    } catch {
+      const el = document.getElementById('ver_' + t.id);
+      if (el) el.textContent = '—';
+    }
+  }));
+}
+
+async function loadCustom() {
+  const grid = document.getElementById('customGrid');
+  try {
+    const r = await api('/api/jars');
+    const jars = r.jars || [];
+    document.getElementById('customCount').textContent = `(${jars.length})`;
+    if (!jars.length) {
+      grid.innerHTML = '';
+      return;
+    }
+    grid.innerHTML = jars.map(j => `
+      <div class="jar-card">
+        <div class="jar-head">
+          <div class="jar-logo" style="background:linear-gradient(135deg,#A855F7,#A855F799);">📦</div>
+          <div style="overflow:hidden;flex:1;">
+            <h4 style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(j.filename)}</h4>
+            <div class="meta">${fmtBytes(j.size)} · ${fmtRel(j.created_at)}</div>
+          </div>
+        </div>
+        <p class="desc" style="font-family:var(--font-mono);font-size:11px;word-break:break-all;">sha256: ${escapeHtml((j.sha256 || '').slice(0, 32))}…</p>
+        <div style="display:flex;gap:6px;">
+          <a href="/api/jars/${encodeURIComponent(j.id)}/download" class="btn btn-secondary btn-sm" style="flex:1;">↓ Download</a>
+          <button class="btn btn-ghost btn-sm" data-del="${escapeHtml(j.id)}" data-name="${escapeHtml(j.filename)}">🗑</button>
+        </div>
+      </div>
+    `).join('');
+    grid.querySelectorAll('button[data-del]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm(`Delete ${btn.dataset.name}?`)) return;
+        try {
+          await api(`/api/jars/${encodeURIComponent(btn.dataset.del)}`, { method: 'DELETE' });
+          toast('Deleted');
+          loadCustom();
+        } catch (err) { toast(err.message, 'error'); }
+      });
+    });
+  } catch (err) {
+    grid.innerHTML = `<div class="card" style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-muted);">Sign in to view your JAR library — <a href="/login.html" style="color:var(--emerald);">log in</a></div>`;
+    document.getElementById('customCount').textContent = '';
+  }
+}
+
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => { x.classList.remove('active'); x.style.borderBottom = ''; x.style.color = 'var(--text-muted)'; });
+  t.classList.add('active');
+  t.style.borderBottom = '2px solid var(--emerald)';
+  t.style.color = 'var(--emerald)';
+  document.getElementById('officialTab').style.display = t.dataset.tab === 'official' ? 'block' : 'none';
+  document.getElementById('customTab').style.display = t.dataset.tab === 'custom' ? 'block' : 'none';
+}));
+
+// Upload handlers
+async function uploadJar(file) {
+  if (!file) return;
+  if (!/\.jar$/i.test(file.name)) { toast('Only .jar files', 'error'); return; }
+  if (file.size > 500 * 1024 * 1024) { toast('File too large (max 500 MB)', 'error'); return; }
+  const fd = new FormData();
+  fd.append('jar', file);
+  toast(`Uploading ${file.name}…`);
+  try {
+    const r = await fetch('/api/jars', { method: 'POST', body: fd, credentials: 'include' });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${r.status}`);
+    }
+    const data = await r.json();
+    toast(`✓ Uploaded ${data.filename} (${fmtBytes(data.size)})`);
+    document.querySelector('.tab[data-tab="custom"]').click();
+    loadCustom();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+const input = document.getElementById('jarUploadInput');
+document.getElementById('uploadBtn').addEventListener('click', () => input.click());
+input.addEventListener('change', (e) => uploadJar(e.target.files[0]));
+
+const zone = document.getElementById('uploadZone');
+zone.addEventListener('click', () => input.click());
+zone.addEventListener('dragenter', (e) => { e.preventDefault(); zone.classList.add('dragover'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+zone.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+zone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  zone.classList.remove('dragover');
+  if (e.dataTransfer.files[0]) uploadJar(e.dataTransfer.files[0]);
+});
+
+// Boot
+(async () => {
+  // Load user info for avatar
+  try {
+    const me = await api('/api/auth/me');
+    if (me?.user) {
+      document.getElementById('avatar').textContent = (me.user.username || 'U')[0].toUpperCase();
+    }
+  } catch {}
+  loadOfficial();
+  loadCustom();
+})();
+</script>
+</body>
+</html>

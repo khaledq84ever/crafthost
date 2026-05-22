@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#1E293B"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.6">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#10b981" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <ellipse cx="900" cy="315" rx="500" ry="400" fill="url(#glow)"/>
+  <!-- Brand block -->
+  <g transform="translate(120, 200)">
+    <rect width="120" height="120" rx="22" fill="url(#mark)"/>
+    <text x="60" y="92" font-family="Inter,system-ui,sans-serif" font-size="80" font-weight="900" text-anchor="middle" fill="white" letter-spacing="-2">C</text>
+  </g>
+  <text x="270" y="295" font-family="Inter,system-ui,sans-serif" font-size="70" font-weight="900" fill="white" letter-spacing="-2">CraftHost</text>
+  <text x="270" y="345" font-family="Inter,system-ui,sans-serif" font-size="26" font-weight="600" fill="#94a3b8">Free Minecraft server hosting</text>
+  <!-- Tagline -->
+  <text x="120" y="440" font-family="Inter,system-ui,sans-serif" font-size="48" font-weight="800" fill="white" letter-spacing="-1">Your Minecraft Server.</text>
+  <text x="120" y="500" font-family="Inter,system-ui,sans-serif" font-size="48" font-weight="800" fill="#10b981" letter-spacing="-1">Live in 60 Seconds.</text>
+  <text x="120" y="560" font-family="Inter,system-ui,sans-serif" font-size="22" font-weight="500" fill="#64748b">Paper · Vanilla · Plugins · One-click deploy · Completely free</text>
+</svg>

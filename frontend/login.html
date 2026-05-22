@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Sign in · CraftHost</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/css/theme.css" />
+<link rel="stylesheet" href="/css/auth.css" />
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-side">
+    <a href="/" class="brand"><span class="brand-mark">C</span><span>CraftHost</span></a>
+    <div>
+      <h1 data-i18n="auth_signin_title">Welcome back, builder.</h1>
+      <p data-i18n="auth_signin_sub">Sign in to manage your servers, browse mods, and chat with your community.</p>
+      <div class="auth-feats">
+        <div class="auth-feat"><span>✓</span> 60-second deploys</div>
+        <div class="auth-feat"><span>✓</span> Custom JAR uploads</div>
+        <div class="auth-feat"><span>✓</span> 24/7 human support</div>
+        <div class="auth-feat"><span>✓</span> 7-day money-back guarantee</div>
+      </div>
+    </div>
+    <div style="color:var(--slate-500);font-size:13px;">© 2026 CraftHost</div>
+  </div>
+  <div class="auth-main">
+    <div class="auth-card">
+      <h2 data-i18n="sign_in">Sign in</h2>
+      <p class="sub" data-i18n="auth_signin_sub">Enter your credentials to access your dashboard.</p>
+
+      <button class="oauth-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#FFC107" d="M21.35 11.1H12v3.8h5.36C16.86 17 14.7 18.5 12 18.5c-3.6 0-6.5-2.9-6.5-6.5S8.4 5.5 12 5.5c1.65 0 3.16.62 4.3 1.64l2.69-2.69C17.16 2.84 14.7 1.9 12 1.9 6.4 1.9 1.9 6.4 1.9 12S6.4 22.1 12 22.1c5.86 0 9.78-4.12 9.78-9.92 0-.66-.08-1.27-.18-1.85z"/></svg>
+        Continue with Google
+      </button>
+
+      <div class="divider">OR CONTINUE WITH EMAIL</div>
+
+      <form id="loginForm">
+        <div class="field">
+          <label class="label" data-i18n="auth_email">Email or username</label>
+          <input type="text" name="email" id="loginEmail" class="input" placeholder="you@example.com" autocomplete="username" required />
+        </div>
+        <div class="field">
+          <div class="flex justify-between items-center mb-2">
+            <label class="label" style="margin:0;" data-i18n="auth_password">Password</label>
+            <a href="/forgot.html" style="font-size:13px;color:var(--emerald);" data-i18n="auth_forgot">Forgot?</a>
+          </div>
+          <input type="password" name="password" class="input" placeholder="••••••••" autocomplete="current-password" required />
+        </div>
+        <label class="remember-row">
+          <input type="checkbox" name="remember" id="rememberMe" checked />
+          <span data-i18n="auth_remember">Keep me signed in for 30 days</span>
+        </label>
+        <button type="submit" class="btn btn-primary btn-block btn-lg" data-i18n="sign_in">Sign in →</button>
+      </form>
+
+      <p class="auth-foot"><span data-i18n="auth_no_account">No account yet?</span> <a href="/register.html" data-i18n="sign_up">Create one</a></p>
+    </div>
+  </div>
+</div>
+
+<div class="toast-host" id="toasts"></div>
+<script src="/js/app.js"></script>
+<script>
+// If the session cookie is still valid (i.e. user previously chose "remember me"),
+// bounce straight to the dashboard — no need to retype anything for 30 days.
+(async function autoRedirect() {
+  try {
+    const r = await fetch('/api/auth/me', { credentials: 'include' });
+    if (!r.ok) return;
+    const next = new URLSearchParams(location.search).get('next') || '/dashboard.html';
+    const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard.html';
+    location.replace(safeNext);
+  } catch {}
+})();
+
+// Pre-fill the email/username from the previous successful sign-in so a returning
+// user — even one who explicitly signed out — only has to type their password.
+(function prefillEmail() {
+  try {
+    const saved = localStorage.getItem('crafthost.lastEmail');
+    if (saved) {
+      const el = document.getElementById('loginEmail');
+      if (el && !el.value) {
+        el.value = saved;
+        // Move focus to the password field since the email is already filled
+        document.addEventListener('DOMContentLoaded', () => {
+          const pw = document.querySelector('input[name="password"]');
+          if (pw) pw.focus();
+        });
+      }
+    }
+    // If user previously unchecked "remember me," don't re-default it to checked
+    const remPref = localStorage.getItem('crafthost.remember');
+    if (remPref === '0') {
+      const cb = document.getElementById('rememberMe');
+      if (cb) cb.checked = false;
+    }
+  } catch {}
+})();
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const email = fd.get('email');
+  const password = fd.get('password');
+  const remember = document.getElementById('rememberMe')?.checked !== false;
+  try {
+    const r = await api('/api/auth/login', { method: 'POST', body: { email, password, remember } });
+    if (r.token) {
+      // Persist the username + full user profile for instant hydration on every
+      // page in this session (no flash of unauthenticated state while /api/auth/me
+      // round-trips). app.js reads this on every page load.
+      try {
+        localStorage.setItem('crafthost.lastEmail', email);
+        localStorage.setItem('crafthost.remember', remember ? '1' : '0');
+        if (r.user) localStorage.setItem('crafthost.user', JSON.stringify(r.user));
+      } catch {}
+      toast('Welcome back!');
+      const next = new URLSearchParams(location.search).get('next') || '/dashboard.html';
+      // Only allow same-origin redirects
+      const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard.html';
+      setTimeout(() => location.href = safeNext, 600);
+    }
+  } catch (err) { toast(err.message || 'Sign-in failed', 'error'); }
+});
+</script>
+</body>
+</html>

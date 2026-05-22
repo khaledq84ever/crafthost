@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>System Status · CraftHost</title>
+<link rel="stylesheet" href="/css/theme.css" />
+<style>
+.status-wrap { max-width: 880px; margin: 80px auto 40px; padding: 0 20px; }
+.status-head { text-align: center; margin-bottom: 36px; }
+.status-pill {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 10px 18px; border-radius: 999px; font-weight: 700;
+  background: rgba(16,185,129,0.18); color: #34d399;
+  border: 1px solid rgba(16,185,129,0.5);
+  font-size: 14px; margin-bottom: 18px;
+}
+.status-pill.degraded { background: rgba(245,158,11,0.18); color: #f59e0b; border-color: rgba(245,158,11,0.5); }
+.status-pill.down { background: rgba(239,68,68,0.18); color: #ef4444; border-color: rgba(239,68,68,0.5); }
+.status-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: pulse 1.8s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+.status-head h1 { font-size: clamp(28px, 5vw, 44px); font-weight: 800; letter-spacing: -0.02em; margin-bottom: 10px; }
+.status-head p { color: var(--slate-400); font-size: 15px; }
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 36px;
+}
+.stat-tile {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  padding: 18px;
+  text-align: center;
+}
+.stat-tile .v { font-size: 32px; font-weight: 800; color: var(--text-strong); letter-spacing: -0.02em; }
+.stat-tile .l { font-size: 12px; color: var(--slate-400); margin-top: 6px; text-transform: uppercase; letter-spacing: 0.08em; }
+.service-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--slate-800);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+.service-row .left { display: flex; align-items: center; gap: 12px; }
+.service-row .name { font-weight: 600; color: var(--text-strong); }
+.service-row .desc { font-size: 12px; color: var(--slate-400); }
+.svc-status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.svc-status .dot { width: 8px; height: 8px; border-radius: 50%; }
+.svc-up { color: #34d399; }
+.svc-up .dot { background: #34d399; box-shadow: 0 0 8px rgba(52,211,153,0.6); }
+.svc-down { color: #ef4444; }
+.svc-down .dot { background: #ef4444; }
+.events { margin-top: 30px; }
+.events h3 { font-size: 14px; color: var(--slate-300); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }
+.event-row {
+  display: flex; justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--slate-800);
+  border-radius: 8px;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+.event-row .a { color: var(--slate-300); font-family: var(--font-mono, monospace); }
+.event-row .n { color: var(--emerald); font-weight: 700; }
+.refresh-line { text-align: center; font-size: 12px; color: var(--slate-500); margin-top: 24px; }
+</style>
+</head>
+<body>
+<div class="status-wrap">
+  <div class="status-head">
+    <div class="status-pill" id="statusPill"><span class="dot"></span> <span id="statusLabel">Loading…</span></div>
+    <h1>CraftHost System Status</h1>
+    <p>Real-time platform health. Auto-refreshes every 30 seconds.</p>
+  </div>
+
+  <div class="status-grid" id="statTiles">
+    <div class="stat-tile"><div class="v" id="vUptime">—</div><div class="l">Uptime</div></div>
+    <div class="stat-tile"><div class="v" id="vUsers">—</div><div class="l">Users</div></div>
+    <div class="stat-tile"><div class="v" id="vServers">—</div><div class="l">Servers</div></div>
+    <div class="stat-tile"><div class="v" id="vRunning">—</div><div class="l">Running now</div></div>
+    <div class="stat-tile"><div class="v" id="vPlayers">—</div><div class="l">Players online</div></div>
+  </div>
+
+  <div id="services">
+    <div class="service-row" id="svc-api">
+      <div class="left">
+        <div>
+          <div class="name">API Backend</div>
+          <div class="desc">Node + Express + SQLite</div>
+        </div>
+      </div>
+      <span class="svc-status" id="svcApi"><span class="dot"></span><span>Checking…</span></span>
+    </div>
+    <div class="service-row" id="svc-jvm">
+      <div class="left">
+        <div>
+          <div class="name">JVM Controller</div>
+          <div class="desc">Minecraft server spawner</div>
+        </div>
+      </div>
+      <span class="svc-status" id="svcJvm"><span class="dot"></span><span>Checking…</span></span>
+    </div>
+    <div class="service-row" id="svc-tunnel">
+      <div class="left">
+        <div>
+          <div class="name">Public Tunnel</div>
+          <div class="desc">bore.pub TCP proxy</div>
+        </div>
+      </div>
+      <span class="svc-status" id="svcTunnel"><span class="dot"></span><span>Checking…</span></span>
+    </div>
+  </div>
+
+  <div class="events">
+    <h3>Last 24 hours · activity</h3>
+    <div id="events"><div class="event-row"><span class="a">Loading…</span></div></div>
+  </div>
+
+  <p class="refresh-line">Last checked: <span id="lastCheck">—</span></p>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+function fmtUptime(ms) {
+  if (!ms) return '—';
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return s + 's';
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + 'm';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + 'h ' + (m % 60) + 'm';
+  const d = Math.floor(h / 24);
+  return d + 'd ' + (h % 24) + 'h';
+}
+function setSvc(id, ok, label) {
+  const el = document.getElementById(id);
+  el.className = 'svc-status ' + (ok ? 'svc-up' : 'svc-down');
+  el.innerHTML = `<span class="dot"></span><span>${label}</span>`;
+}
+async function refresh() {
+  try {
+    const h = await fetch('/api/health').then(r => r.json());
+    const s = await fetch('/api/status').then(r => r.json());
+    // Top pill
+    const pill = document.getElementById('statusPill');
+    const allOk = h.ok && s.ok && h.jvm;
+    pill.className = 'status-pill' + (allOk ? '' : ' degraded');
+    document.getElementById('statusLabel').textContent = allOk ? 'All systems operational' : 'Degraded performance';
+    // Stat tiles
+    document.getElementById('vUptime').textContent = fmtUptime(s.uptime_ms);
+    document.getElementById('vUsers').textContent = (s.counts.users || 0).toLocaleString();
+    document.getElementById('vServers').textContent = (s.counts.servers || 0).toLocaleString();
+    document.getElementById('vRunning').textContent = (s.counts.running || 0).toLocaleString();
+    document.getElementById('vPlayers').textContent = (s.counts.players_online || 0).toLocaleString();
+    // Services
+    setSvc('svcApi', h.ok, 'Operational');
+    setSvc('svcJvm', h.jvm, h.jvm ? 'Operational' : 'Unavailable');
+    setSvc('svcTunnel', !!h.public_mc_host, h.public_mc_host ? 'Operational' : 'Configured locally');
+    // Events
+    const ev = document.getElementById('events');
+    if (s.events_24h && s.events_24h.length) {
+      ev.innerHTML = s.events_24h.map(e => `<div class="event-row"><span class="a">${e.action}</span><span class="n">${e.n}</span></div>`).join('');
+    } else {
+      ev.innerHTML = '<div class="event-row"><span class="a">No activity in the last 24h</span></div>';
+    }
+    document.getElementById('lastCheck').textContent = new Date().toLocaleTimeString();
+  } catch (err) {
+    const pill = document.getElementById('statusPill');
+    pill.className = 'status-pill down';
+    document.getElementById('statusLabel').textContent = 'Cannot reach API';
+    document.getElementById('lastCheck').textContent = 'Error: ' + err.message;
+  }
+}
+refresh();
+setInterval(refresh, 30000);
+</script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Create account · CraftHost</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/css/theme.css" />
+<link rel="stylesheet" href="/css/auth.css" />
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-side">
+    <a href="/" class="brand"><span class="brand-mark">C</span><span>CraftHost</span></a>
+    <div>
+      <h1 data-i18n="auth_signup_title">Start crafting today.</h1>
+      <p data-i18n="auth_signup_sub">Spin up your first server in under a minute. No credit card needed.</p>
+      <div class="auth-feats">
+        <div class="auth-feat"><span>✓</span> Free 7-day trial</div>
+        <div class="auth-feat"><span>✓</span> 1-click modpack installs</div>
+        <div class="auth-feat"><span>✓</span> Live console + file manager</div>
+        <div class="auth-feat"><span>✓</span> Cancel anytime</div>
+      </div>
+    </div>
+    <div style="color:var(--slate-500);font-size:13px;">© 2026 CraftHost</div>
+  </div>
+  <div class="auth-main">
+    <div class="auth-card">
+      <h2 data-i18n="auth_signup_title">Create your account</h2>
+      <p class="sub" data-i18n="auth_signup_sub">Free 7-day trial · No credit card required.</p>
+
+      <button class="oauth-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#FFC107" d="M21.35 11.1H12v3.8h5.36C16.86 17 14.7 18.5 12 18.5c-3.6 0-6.5-2.9-6.5-6.5S8.4 5.5 12 5.5c1.65 0 3.16.62 4.3 1.64l2.69-2.69C17.16 2.84 14.7 1.9 12 1.9 6.4 1.9 1.9 6.4 1.9 12S6.4 22.1 12 22.1c5.86 0 9.78-4.12 9.78-9.92 0-.66-.08-1.27-.18-1.85z"/></svg>
+        Continue with Google
+      </button>
+
+      <div class="divider">OR SIGN UP WITH EMAIL</div>
+
+      <form id="regForm">
+        <div class="field">
+          <label class="label" data-i18n="auth_username">Username</label>
+          <input type="text" name="username" class="input" placeholder="cooluser123" minlength="3" required />
+        </div>
+        <div class="field">
+          <label class="label" data-i18n="auth_email">Email</label>
+          <input type="email" name="email" class="input" placeholder="you@example.com" required />
+        </div>
+        <div class="field">
+          <label class="label" data-i18n="auth_password">Password</label>
+          <input type="password" id="pw" name="password" class="input" placeholder="At least 8 characters" minlength="8" required />
+          <div class="password-strength"><div class="password-strength-bar" id="pwBar"></div></div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block btn-lg" data-i18n="sign_up">Create account →</button>
+      </form>
+
+      <p class="auth-foot"><span data-i18n="auth_have_account">Already have an account?</span> <a href="/login.html" data-i18n="sign_in">Sign in</a></p>
+    </div>
+  </div>
+</div>
+
+<div class="toast-host" id="toasts"></div>
+<script src="/js/app.js"></script>
+<script>
+const pw = document.getElementById('pw');
+const bar = document.getElementById('pwBar');
+pw.addEventListener('input', () => {
+  let s = 0;
+  if (pw.value.length >= 8) s++;
+  if (/[A-Z]/.test(pw.value)) s++;
+  if (/[0-9]/.test(pw.value)) s++;
+  if (/[^A-Za-z0-9]/.test(pw.value)) s++;
+  const colors = ['#EF4444','#F59E0B','#FFB300','#84CC16','#00C853'];
+  bar.style.width = (s * 25) + '%';
+  bar.style.background = colors[s];
+});
+
+document.getElementById('regForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  try {
+    const r = await api('/api/auth/register', { method: 'POST', body: {
+      username: fd.get('username'),
+      email: fd.get('email'),
+      password: fd.get('password')
+    } });
+    if (r.token) {
+      // Same hydration as login — cache full user object so every page shows
+      // the user instantly without an API roundtrip flash.
+      try {
+        localStorage.setItem('crafthost.lastEmail', fd.get('email'));
+        if (r.user) localStorage.setItem('crafthost.user', JSON.stringify(r.user));
+      } catch {}
+      toast('Account created! Redirecting...');
+      const next = new URLSearchParams(location.search).get('next') || '/dashboard.html';
+      const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard.html';
+      setTimeout(() => location.href = safeNext, 700);
+    }
+  } catch (err) { toast(err.message || 'Sign-up failed', 'error'); }
+});
+</script>
+</body>
+</html>

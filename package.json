@@ -1,0 +1,33 @@
+{
+  "name": "crafthost",
+  "version": "1.1.0",
+  "description": "Minecraft server hosting platform — instant deploys, custom JARs, mod support.",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "nodemon backend/server.js",
+    "init-db": "node backend/db/init.js"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.17",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.10.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dockerode": "^4.0.12",
+    "dotenv": "^17.4.2",
+    "express": "^4.22.2",
+    "express-rate-limit": "^8.5.2",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.1.1",
+    "rcon-client": "^4.2.4",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

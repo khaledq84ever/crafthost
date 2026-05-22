@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Reset password · CraftHost</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/css/theme.css" />
+<link rel="stylesheet" href="/css/auth.css" />
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-side">
+    <a href="/" class="brand"><span class="brand-mark">C</span><span>CraftHost</span></a>
+    <div>
+      <h1>Forgot your password?</h1>
+      <p>No worries — we'll send you a link to set a new one.</p>
+    </div>
+    <div style="color:var(--slate-500);font-size:13px;">© 2026 CraftHost</div>
+  </div>
+  <div class="auth-main">
+    <div class="auth-card">
+      <h2>Reset password</h2>
+      <p class="sub">Enter the email tied to your account and we'll send a reset link.</p>
+      <form id="forgotForm">
+        <div class="field">
+          <label class="label">Email</label>
+          <input type="email" name="email" class="input" placeholder="you@example.com" required />
+        </div>
+        <button type="submit" class="btn btn-primary btn-block btn-lg">Send reset link →</button>
+      </form>
+      <p class="auth-foot">Back to <a href="/login.html">Sign in</a></p>
+    </div>
+  </div>
+</div>
+<div class="toast-host" id="toasts"></div>
+<script src="/js/app.js"></script>
+<script>
+document.getElementById('forgotForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const btn = e.target.querySelector('button[type="submit"]');
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ Sending…';
+  try {
+    const r = await api('/api/auth/forgot', { method: 'POST', body: { email: fd.get('email') } });
+    if (r.reset_url) {
+      // No email service yet — surface the link directly
+      const card = document.querySelector('.auth-card');
+      card.innerHTML = `
+        <h2>Reset link generated</h2>
+        <p class="sub">We don't have email sending wired yet — click the link below to set a new password. It expires in ${r.expires_in_minutes || 60} minutes.</p>
+        <a href="${r.reset_url}" class="btn btn-primary btn-block btn-lg" style="margin-top:14px;">Continue to reset →</a>
+        <button class="btn btn-secondary btn-block btn-sm" style="margin-top:8px;" onclick="navigator.clipboard.writeText('${r.reset_url}');toast('Link copied');">📋 Copy link</button>
+        <p class="auth-foot" style="margin-top:18px;">Back to <a href="/login.html">Sign in</a></p>
+      `;
+    } else {
+      toast(r.message || 'If an account exists, a reset link has been issued.');
+    }
+  } catch (err) {
+    toast(err.message || 'Could not generate reset link', 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = orig;
+  }
+});
+</script>
+</body>
+</html>

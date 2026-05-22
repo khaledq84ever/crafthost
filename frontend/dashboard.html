@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Dashboard · CraftHost</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/css/theme.css" />
+<link rel="stylesheet" href="/css/dashboard.css" />
+<link rel="stylesheet" href="/css/wizard.css" />
+</head>
+<body>
+<div class="dash">
+
+  <!-- SIDEBAR -->
+  <aside class="side">
+    <a href="/" class="brand"><span class="brand-mark">C</span><span>CraftHost</span></a>
+
+    <nav class="side-nav">
+      <a href="/dashboard.html" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span data-i18n="nav_servers">My Servers</span>
+      </a>
+      <a href="/marketplace.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        <span data-i18n="nav_plugins">Plugins & Mods</span>
+      </a>
+      <a href="/files.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        <span data-i18n="nav_files">File Manager</span>
+      </a>
+      <a href="/jars.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span data-i18n="nav_jars">JAR Library</span>
+      </a>
+      <a href="/console.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        <span data-i18n="nav_console">Live Console</span>
+      </a>
+
+      <div class="side-section" data-i18n="nav_account">Account</div>
+      <a href="/settings.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span data-i18n="nav_settings">Settings</span>
+      </a>
+    </nav>
+
+    <div class="side-foot">
+      <strong id="planName" data-i18n="free_plan">Free</strong>
+      <div class="text-muted" style="font-size:12px;margin-top:4px;" id="planUsage">0 servers</div>
+      <a href="/pricing.html" class="badge badge-emerald" style="margin-top:8px;text-decoration:none;">⚡ Upgrade</a>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div>
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div class="topbar-title">
+        <h1>🖥 <span data-i18n="nav_servers">My Servers</span></h1>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-secondary btn-sm" id="logoutBtn" title="Sign out" data-i18n="sign_out">Sign out</button>
+        <div class="avatar" id="avatar">U</div>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <main class="main">
+      <div class="page-head">
+        <div>
+          <h1><span data-i18n="welcome_back">Welcome back</span>, <span id="userName">Builder</span> 👋</h1>
+          <p class="sub" data-i18n="manage_sub">Manage your Minecraft servers, plugins, and worlds.</p>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-ghost btn-lg" onclick="openHealthCheck()" title="Aggregate health of all your servers"><span style="margin-right:4px;">🩺</span> <span data-i18n="health_check">Health Check</span></button>
+          <button class="btn btn-primary btn-lg" onclick="openWizard()"><span style="margin-right:2px;">+</span> <span data-i18n="create_server">Create Server</span></button>
+        </div>
+      </div>
+
+      <!-- Stats row -->
+      <div class="stat-row">
+        <div class="stat-tile">
+          <div class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg> <span data-i18n="stat_active">Active servers</span></div>
+          <div class="val" id="statServers">0</div>
+          <div class="delta" id="statServersDelta">—</div>
+        </div>
+        <div class="stat-tile">
+          <div class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M12 11v10"/></svg> <span data-i18n="stat_players_online">Players online</span></div>
+          <div class="val" id="statPlayers">0</div>
+          <div class="delta" id="statPlayersDelta">across all servers</div>
+        </div>
+        <div class="stat-tile">
+          <div class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> <span data-i18n="stat_avg_tps">Avg. TPS</span></div>
+          <div class="val" id="statTps">—</div>
+          <div class="delta" id="statTpsDelta">target 20.0</div>
+        </div>
+        <div class="stat-tile">
+          <div class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> <span data-i18n="stat_plan">Plan</span></div>
+          <div class="val" id="statPlan">Free</div>
+          <div class="delta">10 GB volume · 24/7</div>
+        </div>
+      </div>
+
+      <!-- Quick deploy templates — 1-click create, skipping the wizard -->
+      <div class="qd-row">
+        <div class="qd-row-head">
+          <h3 data-i18n="quick_deploy">⚡ Quick Deploy</h3>
+          <p class="text-muted" data-i18n="quick_deploy_sub">Click any template to spin up a pre-configured server in seconds — no wizard.</p>
+        </div>
+        <div class="qd-grid">
+          <button class="qd-tile" onclick="quickDeploy('survival')" style="--c:#10B981;">
+            <div class="qd-icon">⛏️</div>
+            <div class="qd-name" data-i18n="qd_survival">Survival</div>
+            <div class="qd-meta">Paper 1.21.1 · normal · PvP</div>
+          </button>
+          <button class="qd-tile" onclick="quickDeploy('creative')" style="--c:#3B82F6;">
+            <div class="qd-icon">🏛️</div>
+            <div class="qd-name" data-i18n="qd_creative">Creative</div>
+            <div class="qd-meta">Paper 1.21.1 · peaceful · build</div>
+          </button>
+          <button class="qd-tile" onclick="quickDeploy('skyblock')" style="--c:#06B6D4;">
+            <div class="qd-icon">☁️</div>
+            <div class="qd-name" data-i18n="qd_skyblock">Skyblock</div>
+            <div class="qd-meta">Paper 1.21.1 · hard · island</div>
+          </button>
+          <button class="qd-tile" onclick="quickDeploy('modded')" style="--c:#A855F7;">
+            <div class="qd-icon">🐲</div>
+            <div class="qd-name" data-i18n="qd_modded">Modded</div>
+            <div class="qd-meta">Fabric 1.21.1 · survival</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Servers grid -->
+      <h2 style="font-size:18px;font-weight:700;margin-bottom:14px;" data-i18n="your_servers">Your Servers</h2>
+      <div class="servers-grid" id="serversGrid">
+        <!-- populated by JS -->
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Wizard modal (lazy loaded via wizard.html include) -->
+<div class="modal-bg" id="wizardModal"></div>
+<div class="toast-host" id="toasts"></div>
+
+<script src="/js/app.js"></script>
+<script src="/js/wizard.js"></script>
+<script src="/js/dashboard.js"></script>
+</body>
+</html>
