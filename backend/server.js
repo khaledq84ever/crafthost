@@ -825,6 +825,36 @@ server.listen(PORT, async () => {
     console.log(`⏰ Auto-backup scheduler enabled (every ${intervalHours}h, paid plans only)`);
   }
 
+  // Pre-warm the JAR cache in background so the FIRST user deploying any
+  // engine gets a cache HIT (5s boot) instead of a MISS (60s+ download).
+  // Re-runs every 24h to pick up new LATEST builds from Paper/Fabric/Purpur.
+  if (backend === 'jvm' && jvmCtl.prewarmJarCache) {
+    // Run after a short delay so it doesn't compete with auto-resume of
+    // existing servers for bandwidth.
+    setTimeout(() => { jvmCtl.prewarmJarCache().catch(err => console.warn('[prewarm] failed:', err.message)); }, 10_000);
+    setInterval(() => { jvmCtl.prewarmJarCache().catch(err => console.warn('[prewarm] failed:', err.message)); }, 24 * 60 * 60 * 1000);
+    console.log('📦 JAR pre-warm scheduled (10s + every 24h)');
+  }
+
+  // Auto-smoke-test scheduler — every 6h re-run the JAR cache prewarm.
+  // This proves: (a) the JAR resolver APIs (Paper/Vanilla/Purpur/Fabric)
+  // are reachable; (b) the cache layer still works; (c) any LATEST version
+  // bump is captured. If something breaks (rate limit, API change, disk
+  // full), the failure logs go to Railway where ops can see them.
+  // Disabled by setting AUTO_SMOKE=0 in env.
+  if (backend === 'jvm' && process.env.AUTO_SMOKE !== '0' && jvmCtl.prewarmJarCache) {
+    const runSmoke = async () => {
+      try {
+        await jvmCtl.prewarmJarCache();
+        console.log('🩺 Auto-smoke: JAR cache check OK');
+      } catch (err) {
+        console.error(`🚨 Auto-smoke FAILED: ${err.message}`);
+      }
+    };
+    setInterval(runSmoke, 6 * 60 * 60 * 1000);
+    console.log('🩺 Auto-smoke-test scheduled (every 6h)');
+  }
+
   // Clear stale tunnel rows on boot. Bore allocates a fresh remote port every
   // time, so cached values from before restart are guaranteed to be wrong.
   try { db.prepare('UPDATE servers SET tunnel_host = NULL, tunnel_port = NULL').run(); } catch {}

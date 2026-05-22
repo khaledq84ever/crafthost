@@ -843,6 +843,45 @@ function __getState(id) { return running.get(id) || null; }
 function getCrashes() { return Array.from(crashes.entries()); }
 function clearCrash(id) { crashes.delete(id); }
 
+// Pre-warm the JAR cache with popular versions so the FIRST user to deploy
+// any of these gets a cache HIT (instant boot) instead of a 30-90s download.
+// Runs in background — never blocks startup. Skips anything already cached.
+// Errors are non-fatal: if a download fails, log it and move on.
+async function prewarmJarCache() {
+  const STABLE = '1.20.1';
+  const targets = [
+    { type: 'paper',   version: STABLE,  resolve: paperJarUrl   },
+    { type: 'paper',   version: 'LATEST', resolve: paperJarUrl   },
+    { type: 'vanilla', version: STABLE,  resolve: vanillaJarUrl },
+    { type: 'vanilla', version: 'LATEST', resolve: vanillaJarUrl },
+    { type: 'purpur',  version: STABLE,  resolve: purpurJarUrl  },
+    { type: 'purpur',  version: 'LATEST', resolve: purpurJarUrl  },
+    { type: 'fabric',  version: STABLE,  resolve: fabricJarUrl  },
+    { type: 'fabric',  version: 'LATEST', resolve: fabricJarUrl  },
+  ];
+  try { fs.mkdirSync(JAR_CACHE_DIR, { recursive: true }); } catch {}
+
+  let hits = 0, misses = 0, errors = 0, mb = 0;
+  for (const t of targets) {
+    try {
+      const info = await t.resolve(t.version);
+      const cachePath = cachedJarPath(t.type, info.version, info);
+      if (fs.existsSync(cachePath) && fs.statSync(cachePath).size > 100000) {
+        hits++;
+        continue;
+      }
+      console.log(`[jar-cache/prewarm] ${t.type}-${info.version} → downloading`);
+      const size = await downloadFile(info.url, cachePath, `${t.type} ${info.version} prewarm`);
+      misses++;
+      mb += size / 1024 / 1024;
+    } catch (err) {
+      errors++;
+      console.warn(`[jar-cache/prewarm] ${t.type}-${t.version} failed: ${err.message.slice(0, 100)}`);
+    }
+  }
+  console.log(`📦 JAR cache prewarmed: ${hits} hit · ${misses} downloaded (${mb.toFixed(0)}MB) · ${errors} errors`);
+}
+
 module.exports = {
   isAvailable,
   makeRconPassword,
@@ -851,6 +890,7 @@ module.exports = {
   stopServer,
   restartServer,
   removeServer,
+  prewarmJarCache,
   getStats,
   attachLogStream,
   sendRcon,
