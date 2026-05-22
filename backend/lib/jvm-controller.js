@@ -849,14 +849,17 @@ function clearCrash(id) { crashes.delete(id); }
 // Errors are non-fatal: if a download fails, log it and move on.
 async function prewarmJarCache() {
   const STABLE = '1.20.1';
+  const QUICK  = '1.21.1';   // version used by all 4 quick-deploy presets
   const targets = [
     { type: 'paper',   version: STABLE,  resolve: paperJarUrl   },
+    { type: 'paper',   version: QUICK,   resolve: paperJarUrl   },
     { type: 'paper',   version: 'LATEST', resolve: paperJarUrl   },
     { type: 'vanilla', version: STABLE,  resolve: vanillaJarUrl },
     { type: 'vanilla', version: 'LATEST', resolve: vanillaJarUrl },
     { type: 'purpur',  version: STABLE,  resolve: purpurJarUrl  },
     { type: 'purpur',  version: 'LATEST', resolve: purpurJarUrl  },
     { type: 'fabric',  version: STABLE,  resolve: fabricJarUrl  },
+    { type: 'fabric',  version: QUICK,   resolve: fabricJarUrl  },
     { type: 'fabric',  version: 'LATEST', resolve: fabricJarUrl  },
   ];
   try { fs.mkdirSync(JAR_CACHE_DIR, { recursive: true }); } catch {}
@@ -893,42 +896,97 @@ function saveJarState(s) {
   try { fs.writeFileSync(JAR_STATE_FILE, JSON.stringify(s, null, 2)); } catch {}
 }
 
-// Real-test a freshly-downloaded JAR by running `java -jar X.jar --version`
-// (or equivalent) with a 15s timeout. If it exits 0 OR prints recognizable
-// launcher banner, the JAR is runnable. Otherwise we treat it as broken,
-// rename to .broken, and keep the previous known-good version.
+// REAL boot test for a freshly-downloaded JAR — actually starts a Minecraft
+// server in a throwaway temp dir, waits for "Done (Xs)!" boot-complete marker
+// in stdout, then cleanly stops it. Proves the JAR will boot for a real user.
 //
-// This catches: corrupt downloads, upstream API changes that ship a bad
-// build, JAR signature mismatches, JDK incompatibilities.
-async function realTestJar(jarPath, type) {
-  return new Promise((resolve) => {
-    const args = ['-jar', jarPath, '--version'];
-    const proc = spawn('java', args, { stdio: ['ignore', 'pipe', 'pipe'], timeout: 15_000 });
-    let out = '', err = '';
-    proc.stdout.on('data', d => { out += d.toString('utf8').slice(0, 8000); });
-    proc.stderr.on('data', d => { err += d.toString('utf8').slice(0, 8000); });
-    let done = false;
-    const finish = (ok, reason) => { if (done) return; done = true; resolve({ ok, reason, stdout: out.slice(0, 400), stderr: err.slice(0, 400) }); };
-    proc.on('error', e => finish(false, `spawn: ${e.message}`));
-    proc.on('exit', (code, signal) => {
-      // Successful launcher: exit code 0, OR exit non-zero but with output
-      // matching known good patterns (some launchers exit 1 from --version
-      // because they don't implement the flag but print enough to identify).
-      const launcherOk = code === 0
-        || /(paperclip|paper|spigot|bukkit|fabric|forge|neoforge|net\.minecraft|java\s+\d+\.\d+|Minecraft\s+server)/i.test(out + err);
-      if (launcherOk) finish(true, `exit ${code}/${signal}`);
-      else finish(false, `exit ${code}/${signal} — unrecognized output`);
-    });
-    setTimeout(() => {
-      // Some launchers don't honor --version and start a server. Killing
-      // after 15s with no exit is OK if we got launcher-banner output.
-      if (!done) {
+// Uses minimal RAM (512MB heap), a flat world (instant gen), tiny view
+// distance, no plugins, no RCON, no compression init — strips the boot
+// down to the JAR's core. Caps at 90s total.
+//
+// Catches: corrupt downloads, upstream broken builds, JAR signature mismatch,
+// JDK incompatibility, missing libraries, world-gen errors, port conflicts.
+async function realTestJar(jarPath, type, version) {
+  const testDir = path.join(JAR_CACHE_DIR, `.boottest-${Date.now()}-${type}`);
+  const port = 26800 + Math.floor(Math.random() * 199); // 26800-26998
+  let stdout = '', stderr = '';
+
+  try {
+    fs.mkdirSync(testDir, { recursive: true });
+    // Hardlink the JAR (or copy if cross-fs) so we don't touch the cache copy
+    const localJar = path.join(testDir, 'server.jar');
+    try { fs.linkSync(jarPath, localJar); }
+    catch { fs.copyFileSync(jarPath, localJar); }
+
+    // EULA + minimal properties for fastest possible boot
+    fs.writeFileSync(path.join(testDir, 'eula.txt'), 'eula=true\n');
+    fs.writeFileSync(path.join(testDir, 'server.properties'), [
+      `server-port=${port}`,
+      'online-mode=false',
+      'motd=boot-test',
+      'max-players=1',
+      'level-name=world',
+      'level-type=minecraft\\:flat',     // flat = instant world gen
+      'view-distance=2',
+      'simulation-distance=2',
+      'spawn-protection=0',
+      'network-compression-threshold=-1', // skip compression init
+      'enable-rcon=false',
+      'broadcast-rcon-to-ops=false',
+      'enable-status=false',
+    ].join('\n'));
+
+    return await new Promise((resolve) => {
+      const proc = spawn('java', ['-Xms256M', '-Xmx512M', '-jar', 'server.jar', 'nogui'], {
+        cwd: testDir,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env, JAVA_TOOL_OPTIONS: '' },
+      });
+      let done = false, booted = false;
+      const finish = (ok, reason) => {
+        if (done) return; done = true;
+        // Force-cleanup the temp dir, fire-and-forget
         try { proc.kill('SIGKILL'); } catch {}
-        const launcherOk = /(paperclip|paper|spigot|bukkit|fabric|forge|neoforge|net\.minecraft|Minecraft\s+server)/i.test(out + err);
-        finish(launcherOk, launcherOk ? 'timed out but banner detected' : 'timed out, no banner');
-      }
-    }, 15_500);
-  });
+        setTimeout(() => { try { fs.rmSync(testDir, { recursive: true, force: true }); } catch {} }, 1500);
+        resolve({ ok, reason, stdout: stdout.slice(-400), stderr: stderr.slice(-400) });
+      };
+      proc.on('error', err => finish(false, `spawn err: ${err.message}`));
+      proc.stdout.on('data', d => {
+        const s = d.toString('utf8');
+        stdout += s;
+        if (stdout.length > 12000) stdout = stdout.slice(-12000);
+        if (!booted && /Done \(\d+\.\d+s\)!/i.test(s)) {
+          booted = true;
+          // Issue graceful shutdown — server quits cleanly in ~2s
+          try { proc.stdin.write('stop\n'); } catch {}
+          setTimeout(() => finish(true, 'booted + Done marker + clean stop'), 4000);
+        }
+        // Fast-fail on known JVM/startup errors
+        if (/OutOfMemoryError|Could not find or load main class|Invalid or corrupt jarfile|UnsupportedClassVersionError|Address already in use/i.test(s)) {
+          finish(false, 'fatal startup error in stdout');
+        }
+      });
+      proc.stderr.on('data', d => {
+        const s = d.toString('utf8');
+        stderr += s;
+        if (stderr.length > 12000) stderr = stderr.slice(-12000);
+        if (/OutOfMemoryError|Could not find or load main class|Invalid or corrupt jarfile|UnsupportedClassVersionError/i.test(s)) {
+          finish(false, 'fatal startup error in stderr');
+        }
+      });
+      proc.on('exit', (code, signal) => {
+        if (!done) {
+          // Process exited before we saw "Done" — failure unless it was our stop
+          finish(booted, booted ? 'exited after stop' : `exited code=${code} signal=${signal} before Done marker`);
+        }
+      });
+      // Overall timeout — 90s is generous for a flat-world Paper boot
+      setTimeout(() => { if (!done) finish(false, 'timed out at 90s — never reached Done marker'); }, 90_000);
+    });
+  } catch (err) {
+    try { fs.rmSync(testDir, { recursive: true, force: true }); } catch {}
+    return { ok: false, reason: `setup err: ${err.message}` };
+  }
 }
 
 // Lightweight JAR cache health check — verifies every cached JAR is still
@@ -942,14 +1000,21 @@ async function checkJarCacheHealth() {
   const out = { healthy: 0, repaired: 0, real_tested: 0, real_failed: 0, errors: 0, scanned: 0, new_versions: [] };
   if (!fs.existsSync(JAR_CACHE_DIR)) return out;
   const expected = [
-    { type: 'paper',   version: '1.20.1',  resolve: paperJarUrl,   stable: true },
-    { type: 'paper',   version: 'LATEST',  resolve: paperJarUrl                 },
-    { type: 'vanilla', version: '1.20.1',  resolve: vanillaJarUrl, stable: true },
-    { type: 'vanilla', version: 'LATEST',  resolve: vanillaJarUrl               },
-    { type: 'purpur',  version: '1.20.1',  resolve: purpurJarUrl,  stable: true },
-    { type: 'purpur',  version: 'LATEST',  resolve: purpurJarUrl                },
-    { type: 'fabric',  version: '1.20.1',  resolve: fabricJarUrl,  stable: true },
-    { type: 'fabric',  version: 'LATEST',  resolve: fabricJarUrl                },
+    { type: 'paper',    version: '1.20.1', resolve: paperJarUrl,    stable: true },
+    { type: 'paper',    version: '1.21.1', resolve: paperJarUrl,    stable: true }, // ← used by Survival/Creative/Skyblock quick-deploys
+    { type: 'paper',    version: 'LATEST', resolve: paperJarUrl                  },
+    { type: 'vanilla',  version: '1.20.1', resolve: vanillaJarUrl,  stable: true },
+    { type: 'vanilla',  version: 'LATEST', resolve: vanillaJarUrl                },
+    { type: 'purpur',   version: '1.20.1', resolve: purpurJarUrl,   stable: true },
+    { type: 'purpur',   version: 'LATEST', resolve: purpurJarUrl                 },
+    { type: 'fabric',   version: '1.20.1', resolve: fabricJarUrl,   stable: true },
+    { type: 'fabric',   version: '1.21.1', resolve: fabricJarUrl,   stable: true }, // ← used by Modded quick-deploy
+    { type: 'fabric',   version: 'LATEST', resolve: fabricJarUrl                 },
+    // NeoForge: existence + size only (no boot test). The installer flow is
+    // ~3 min cold and the boot can't run inside the same temp-dir pattern
+    // because NeoForge mutates the dir on install. Existence proves the
+    // upstream Maven URL is reachable + the JAR file is intact.
+    { type: 'neoforge', version: 'LATEST', resolve: neoforgeJarUrl, skipBootTest: true },
   ];
   const state = loadJarState();
   for (const t of expected) {
@@ -974,14 +1039,16 @@ async function checkJarCacheHealth() {
       // 2) Real-test ONLY when LATEST resolves to a NEW version we haven't
       // verified before. Stable versions don't change, so they're verified
       // once and trusted forever (we'd notice via the existence check above).
-      if (t.version === 'LATEST') {
+      // skipBootTest engines (NeoForge) get version tracking without the
+      // expensive boot.
+      if (t.version === 'LATEST' && !t.skipBootTest) {
         const key = `${t.type}_latest`;
         const lastVerified = state[key];
         if (lastVerified !== info.version) {
-          console.log(`[jar-health] NEW VERSION detected: ${t.type} ${lastVerified || '(none)'} → ${info.version}`);
+          console.log(`[jar-health] NEW VERSION detected: ${t.type} ${lastVerified || '(none)'} → ${info.version} — running boot test (~30-60s)`);
           out.new_versions.push(`${t.type}-${info.version}`);
           out.real_tested++;
-          const test = await realTestJar(cachePath, t.type);
+          const test = await realTestJar(cachePath, t.type, info.version);
           if (test.ok) {
             console.log(`[jar-health] ✓ ${t.type}-${info.version} real-test passed (${test.reason})`);
             state[key] = info.version;
