@@ -104,7 +104,14 @@ body { background: var(--slate-900); }
 .balance-chip .text-gold { font-weight: 800; }
 
 /* Main */
-.main { padding: 32px; }
+.main {
+  padding: 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+@media (max-width: 1100px) {
+  .main { padding: 24px; }
+}
 .page-head {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 28px;

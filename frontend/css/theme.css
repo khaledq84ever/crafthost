@@ -57,7 +57,13 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;      /* iOS Safari: no auto-zoom on text */
+  -moz-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overflow-x: hidden;                  /* belt-and-braces against horizontal scroll bugs */
+}
 
 body {
   font-family: var(--font);
@@ -76,7 +82,30 @@ body {
     radial-gradient(ellipse 80% 60% at 10% -10%, rgba(16, 185, 129, 0.10) 0%, transparent 60%),
     radial-gradient(ellipse 70% 50% at 90% 100%, rgba(167, 139, 250, 0.08) 0%, transparent 60%);
   background-attachment: fixed;
+  overflow-x: hidden;                  /* no horizontal scroll on any page */
 }
+
+/* Media defaults — fluid by default so phone screenshots/images never overflow */
+img, video, svg, canvas { max-width: 100%; height: auto; }
+
+/* Keyboard-only focus ring — accessible, doesn't show on mouse click */
+:focus-visible {
+  outline: 2px solid var(--emerald);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+button:focus-visible, .btn:focus-visible, a:focus-visible {
+  outline-offset: 3px;
+}
+
+/* Selection — branded */
+::selection { background: var(--emerald); color: white; }
+
+/* Form controls inherit body font (Inter), Safari sometimes uses system font */
+input, select, textarea, button { font-family: inherit; }
+
+/* Long URLs / IPs / inline code wrap instead of overflowing card */
+code, kbd, .ip, .mono { word-break: break-word; overflow-wrap: anywhere; }
 
 /* Safari needs the -webkit prefix for backdrop-filter */
 .card, .toast, .glass, .modal, .player-menu, .mobile-nav, .topbar {
@@ -115,6 +144,13 @@ input, select, textarea { font-family: inherit; }
   max-width: 1240px;
   margin: 0 auto;
   padding: 0 24px;
+  width: 100%;
+}
+@media (max-width: 640px) {
+  .container { padding: 0 16px; }
+}
+@media (max-width: 400px) {
+  .container { padding: 0 12px; }
 }
 
 /* Nav */
