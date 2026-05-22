@@ -228,9 +228,14 @@ window.applyLang = (lang) => {
     else document.addEventListener('DOMContentLoaded', fn);
   }
   ready(() => {
-    // Credit footer removed per user request — also clean up any cached
-    // .site-credit nodes that might still be in the DOM from prior loads.
-    document.querySelectorAll('.site-credit').forEach(n => n.remove());
+    // Credit footer — single shared element across every page, links to
+    // the author's X/Twitter account.
+    if (!document.querySelector('.site-credit')) {
+      const f = document.createElement('div');
+      f.className = 'site-credit';
+      f.innerHTML = `<span data-i18n="footer_credit">Programmed by</span> <a href="https://x.com/KhaledQ84Ever" target="_blank" rel="noopener noreferrer" aria-label="@KhaledQ84Ever on X">@KhaledQ84Ever</a>`;
+      document.body.appendChild(f);
+    }
     // Home icon — fixed top-left circular button on every page so users can
     // always return to the marketing homepage with one tap. Idempotent —
     // skips injection if the page already has a brand-link to "/" visible
@@ -320,14 +325,43 @@ window.applyLang = (lang) => {
       }
       return window.isSignedIn;
     })();
-    // Logout button — clear cache on click (find any element with id=logoutBtn
-    // or class=logout-link). The actual logout request happens in the page's
-    // own handler; we just hook in to clean localStorage.
+    // Global logout — any element with id=logoutBtn / id=logoutLink /
+    // class=logout-link triggers a full sign-out (clear cache + DELETE
+    // session + redirect to /login.html). Page-specific handlers can
+    // pre-empt by stopping propagation if they want different behavior.
     document.querySelectorAll('#logoutBtn, #logoutLink, .logout-link').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
         try { localStorage.removeItem('crafthost.user'); } catch {}
+        try {
+          await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+        } catch {}
+        location.href = '/login.html';
       });
     });
+
+    // Inject Sign out into the sidebar of every .dash page that doesn't
+    // already have one. Appears under Settings.
+    (function injectSidebarSignOut() {
+      const sideNav = document.querySelector('.side-nav');
+      if (!sideNav) return;
+      if (sideNav.querySelector('#logoutLink, .logout-link')) return;
+      const a = document.createElement('a');
+      a.href = '#';
+      a.id = 'logoutLink';
+      a.className = 'logout-link';
+      a.textContent = window.t ? window.t('sign_out') : 'Sign out';
+      a.setAttribute('data-i18n', 'sign_out');
+      // Re-bind global handler since this element didn't exist when the
+      // outer forEach ran.
+      a.addEventListener('click', async (e) => {
+        e.preventDefault();
+        try { localStorage.removeItem('crafthost.user'); } catch {}
+        try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); } catch {}
+        location.href = '/login.html';
+      });
+      sideNav.appendChild(a);
+    })();
 
     // Sidebar icons — auto-inject the same SVGs the dashboard uses into the
     // sidebar of every .dash page (billing/settings/files/etc), keyed by href.
