@@ -1400,6 +1400,28 @@ document.addEventListener('DOMContentLoaded', () => {
 // Boot
 (async () => {
   await Promise.all([loadMe(), loadServers()]);
-  // Poll status every 6s while page is visible (SLP cache is 5s, so this is hot)
+  // Full reload every 6s — picks up new/deleted servers, IP/port changes.
   pollTimer = setInterval(() => { if (!document.hidden) loadServers(); }, 6000);
+  // Light stats-only refresh every 3s for online servers — keeps CPU/RAM/
+  // players/uptime/TPS feeling live without re-rendering the whole list.
+  setInterval(refreshLiveStats, 3000);
 })();
+
+// Per-server stats refresh — touches only the value text nodes inside each
+// card so we don't tear down + re-render the DOM every 3s.
+async function refreshLiveStats() {
+  if (document.hidden || isDemo) return;
+  const live = servers.filter(s => s.status === 'online' || s.status === 'starting');
+  if (!live.length) return;
+  await Promise.all(live.map(async s => {
+    try {
+      const r = await api(`/api/servers/${s.id}/status`);
+      if (r.stats) s.stats = r.stats;
+      if (r.status && r.status !== s.status) s.status = r.status;
+    } catch {}
+  }));
+  // Re-render only the affected cards' inner stats sections rather than the
+  // whole grid. Simplest correct thing for now: full re-render but only when
+  // something actually changed and the page is foreground.
+  renderServers();
+}

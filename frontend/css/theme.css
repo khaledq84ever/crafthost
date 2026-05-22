@@ -107,6 +107,47 @@ input, select, textarea, button { font-family: inherit; }
 /* Long URLs / IPs / inline code wrap instead of overflowing card */
 code, kbd, .ip, .mono { word-break: break-word; overflow-wrap: anywhere; }
 
+/* ── Android Chrome / mobile browser polish ───────────────────────────────── */
+/* Safe-area insets for phones with rounded corners or notches (Android + iOS). */
+@supports (padding: env(safe-area-inset-top)) {
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* Native-feeling momentum scroll on overflowing containers (Android Chrome). */
+.fm-tree, .fm-body, .term, .players-panel .pp-list,
+.metrics-panel, .topbar-actions, .mobile-nav-inner,
+.tabs, .term-quick {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* GPU-accelerate cards + buttons so transitions are 60fps on mid-range Androids. */
+.card, .server-card, .mp-card, .jar-card, .help-card, .stat-tile,
+.btn, .mobile-nav a, .side-nav a {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Pull-to-refresh disabled on dashboard-style pages (avoids the rubber-band
+   "refresh" gesture mis-triggering inside the file manager / console). */
+html, body { overscroll-behavior-y: none; }
+
+/* iPhone X / Pixel 6+ notch — push the mobile-nav above the gesture bar. */
+.mobile-nav {
+  padding-bottom: max(6px, env(safe-area-inset-bottom));
+}
+
+/* Larger tap targets on links inside the sidebar drawer on touch devices. */
+@media (hover: none) and (pointer: coarse) {
+  .side-nav a { min-height: 44px; }
+  .topbar-actions .btn-sm { min-height: 36px; }
+  .mobile-nav a { min-height: 44px; }
+}
+
 /* Safari needs the -webkit prefix for backdrop-filter */
 .card, .toast, .glass, .modal, .player-menu, .mobile-nav, .topbar {
   -webkit-backdrop-filter: blur(20px);
