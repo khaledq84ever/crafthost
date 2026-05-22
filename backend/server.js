@@ -819,6 +819,34 @@ server.listen(PORT, async () => {
   // time, so cached values from before restart are guaranteed to be wrong.
   try { db.prepare('UPDATE servers SET tunnel_host = NULL, tunnel_port = NULL').run(); } catch {}
 
+  // One-shot cleanup of orphan test users (qt-*, tx-*, smoke-*) — these come
+  // from smoke-test runs whose own cleanup got interrupted by a Railway edge
+  // hiccup. Always-on, idempotent. Costs ~5ms per boot if there's nothing to do.
+  try {
+    const fs = require('fs');
+    const DATA_DIR = process.env.DATA_DIR || path.resolve(__dirname, '../data/servers');
+    const orphans = db.prepare(`
+      SELECT id, username FROM users
+       WHERE username LIKE 'qt%' OR username LIKE 'tx%' OR username LIKE 'smoke%'
+          OR email LIKE 'qt-%@crafthost.local'
+          OR email LIKE 'tx-%@crafthost.local'
+          OR email LIKE 'smoke-%@crafthost.local'
+    `).all();
+    if (orphans.length) {
+      let dirs = 0, srvs = 0;
+      for (const u of orphans) {
+        const ss = db.prepare('SELECT id FROM servers WHERE user_id = ?').all(u.id);
+        for (const s of ss) {
+          const dir = path.join(DATA_DIR, s.id);
+          if (fs.existsSync(dir)) { try { fs.rmSync(dir, { recursive: true, force: true }); dirs++; } catch {} }
+          db.prepare('DELETE FROM servers WHERE id = ?').run(s.id); srvs++;
+        }
+        db.prepare('DELETE FROM users WHERE id = ?').run(u.id);
+      }
+      console.log(`🧹 Cleaned ${orphans.length} test-user orphans (${srvs} servers, ${dirs} data dirs)`);
+    }
+  } catch (err) { console.warn('[orphan-cleanup] failed:', err.message); }
+
   // Auto-resume any server that was online/starting before the container restarted.
   // Cap at MAX_AUTO_RESUME so free-tier RAM doesn't get crushed by stale tests.
   if (backend === 'jvm' && process.env.JVM_AUTO_RESUME !== '0') {
