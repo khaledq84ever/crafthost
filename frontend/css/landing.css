@@ -287,39 +287,57 @@
   transition: color .15s;
 }
 .footer a:hover { color: var(--emerald); }
+
+/* Modern, bold footer typography (replaces inline style soup). */
+.ft-pad { text-align: center; padding-top: 4px; padding-bottom: 4px; }
+.ft-brand {
+  justify-content: center;
+  margin-bottom: 12px;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+.ft-tagline {
+  font-size: 14.5px;
+  font-weight: 500;
+  max-width: 360px;
+  margin: 0 auto;
+  color: var(--slate-300);
+  letter-spacing: -0.005em;
+  line-height: 1.5;
+}
+.ft-links {
+  margin-top: 16px;
+  display: flex; gap: 22px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.ft-links a {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--slate-400);
+  letter-spacing: -0.005em;
+  transition: color .15s;
+}
+.ft-links a:hover { color: var(--text-strong); }
+
 .footer-bottom {
   display: flex; justify-content: space-between; align-items: center;
   padding-top: 22px;
+  margin-top: 22px;
   border-top: 1px solid var(--glass-border);
-  color: var(--slate-400); font-size: 12.5px;
+  color: var(--slate-500);
+  font-size: 12px;
+  font-weight: 500;
   letter-spacing: -0.005em;
 }
-/* "Programmed by @KhaledQ84Ever" — make it the standout last line. */
-.footer-credit {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--glass-border);
-  text-align: center;
-  font-size: 13px;
-  color: var(--slate-400);
-  letter-spacing: 0.01em;
+@media (max-width: 600px) {
+  .ft-brand { font-size: 19px; margin-bottom: 10px; }
+  .ft-tagline { font-size: 13px; }
+  .ft-links { gap: 16px; margin-top: 12px; }
+  .ft-links a { font-size: 12px; }
+  .footer-bottom { font-size: 11px; padding-top: 18px; margin-top: 18px; }
 }
-.footer-credit .by { opacity: 0.75; margin-right: 6px; }
-.footer-credit a,
-.footer-credit .me {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-weight: 800;
-  font-size: 14px;
-  background: linear-gradient(135deg, var(--emerald), var(--gold));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  text-decoration: none;
-  letter-spacing: -0.01em;
-  transition: opacity .18s;
-}
-.footer-credit a:hover { opacity: 0.85; }
-
 /* RESPONSIVE */
 @media (max-width: 1024px) {
   .features-grid, .pricing-grid, .testimonials { grid-template-columns: repeat(2, 1fr); }
