@@ -198,8 +198,10 @@ p { color: var(--text); }
     overflow-wrap: anywhere;
     word-break: break-word;
   }
-  /* Ensure the right column of .dash never exceeds viewport */
-  .dash > div { max-width: 100vw; min-width: 0; overflow-x: hidden; }
+  /* Ensure the right column of .dash never exceeds viewport. Use 'clip'
+     instead of 'hidden' — 'hidden' creates a new scroll container that
+     breaks the sticky topbar AND can lock vertical scroll on Android. */
+  .dash > div { max-width: 100vw; min-width: 0; overflow-x: clip; }
 }
 @media (max-width: 480px) {
   body { font-size: 13px; line-height: 1.45; }
