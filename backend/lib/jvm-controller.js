@@ -20,10 +20,13 @@ const PUBLIC_PORT = parseInt(process.env.MC_PORT || '25565', 10);
 // Cap heap to stay under Railway's container memory. Paper 1.21+ needs ~500MB
 // during DataFixers static init or it throws OutOfMemoryError. 480 is the
 // sweet spot for free tier (leaves ~64MB for the Node parent + JVM overhead).
-// Heap cap per server. Plan is 3 GB RAM. 2.4 GB heap leaves 0.6 GB JVM overhead
-// — fits Paper 1.21+, heavier modpacks, Fabric/NeoForge with ~50 mods. Override
-// via MAX_HEAP_MB env per-deploy if needed.
-const MAX_HEAP_MB = parseInt(process.env.MAX_HEAP_MB || '2456', 10);
+// Heap cap per server. Was 2456 (2.4GB heap from a 3GB plan) but combined
+// with Aikar's +AlwaysPreTouch that forced 2.4GB to be allocated upfront on
+// every server boot — so 2 servers = 5GB, more than the Railway container's
+// memory limit, and the new JVM got OOM-killed silently (no logs survive).
+// Drop to 1024 MB heap so 3-4 small servers can coexist on the same container.
+// Override via MAX_HEAP_MB env per-deploy if heavier mod-packs need it.
+const MAX_HEAP_MB = parseInt(process.env.MAX_HEAP_MB || '1024', 10);
 const INTERNAL_PORT_BASE = 26000;
 const LOG_RING_SIZE = 1000;
 
@@ -354,14 +357,17 @@ async function startServer(containerId, server) {
   // Result: smoother TPS, lower GC pause spikes, fewer stalls under load.
   // -XX:+UnlockExperimentalVMOptions MUST precede any experimental flag.
   const args = [
-    `-Xms${heap}M`,                    // Aikar: start = max so G1 sizes properly
+    // Start small, grow to max — opposite of vanilla Aikar's which pretouches
+    // the whole heap on boot. Pretouching is great for dedicated single-tenant
+    // boxes, terrible for multi-tenant where it OOM-kills the container.
+    `-Xms${Math.min(256, heap)}M`,
     `-Xmx${heap}M`,
     '-XX:+UnlockExperimentalVMOptions',
     '-XX:+UseG1GC',
     '-XX:+ParallelRefProcEnabled',
     '-XX:MaxGCPauseMillis=200',
     '-XX:+DisableExplicitGC',
-    '-XX:+AlwaysPreTouch',
+    // AlwaysPreTouch intentionally REMOVED — see comment above.
     '-XX:G1NewSizePercent=30',
     '-XX:G1MaxNewSizePercent=40',
     '-XX:G1HeapRegionSize=8M',
@@ -394,11 +400,17 @@ async function startServer(containerId, server) {
   // the previous state (which we just deleted via stop/restart) get carried over
   // so their stream continues uninterrupted into the new process's output.
   const carryListeners = (persistentListeners.get(id) || new Set());
+  // Carry over the last 200 lines from the previous run so users (and the
+  // smoke test) can still see "java.lang.OutOfMemoryError…" or stack traces
+  // that the now-dead process emitted before the restart loop wiped them.
+  const prev = running.get(id);
+  const carryLogs = prev?.logs?.slice(-200) || [];
+  if (carryLogs.length) carryLogs.push('────── previous run ended; restart attempt ──────');
   const state = {
     proc,
     pid: proc.pid,
     hostPort,
-    logs: [],
+    logs: carryLogs,
     listeners: carryListeners,
     ready: false,
     startedAt: Date.now(),
@@ -413,6 +425,10 @@ async function startServer(containerId, server) {
   for (const fn of carryListeners) {
     try { fn(`[jvm] new process spawned (pid=${proc.pid})`); } catch {}
   }
+  // Also push to the persistent ring so /api/logs sees it even with no live WS clients.
+  state.logs.push(`[jvm] spawned pid=${proc.pid} heap=${heap}MB jar=${path.basename(jarPath)}`);
+  // Mirror to Railway logs too — invaluable when the JVM dies before writing anything.
+  console.log(`[jvm/${id}] spawn pid=${proc.pid} heap=${heap}MB type=${(server.type||'paper')} ver=${server.version}`);
   // Clear any prior crash record — a successful restart resets the trigger.
   crashes.delete(id);
 
@@ -423,6 +439,17 @@ async function startServer(containerId, server) {
     if (state.logs.length > LOG_RING_SIZE) state.logs.shift();
     if (!state.ready && /Done \([\d.]+s\)!/i.test(stamped)) {
       state.ready = true;
+      // CRITICAL: flip DB status starting → online so the dashboard, smoke
+      // tests, and tight-poll mechanisms see the server as ready. Without
+      // this the row stayed at 'starting' forever even though the JVM was
+      // accepting connections.
+      try {
+        const db = require('../db');
+        db.prepare('UPDATE servers SET status = ? WHERE id = ?').run('online', id);
+      } catch (err) {
+        console.warn(`[jvm/${id}] status→online DB update failed: ${err.message}`);
+      }
+      console.log(`[jvm/${id}] ✓ READY — Done marker detected, status → online`);
     }
     // Detect Java heap OOM during boot. Multiple message formats are possible:
     //   • "java.lang.OutOfMemoryError: Java heap space"
@@ -470,6 +497,9 @@ async function startServer(containerId, server) {
   proc.on('exit', (code, signal) => {
     state.exitCode = code;
     state.exitSignal = signal;
+    // Mirror to Railway logs so post-mortem diagnosis works even when the
+    // per-server log ring gets reset on the next restart attempt.
+    console.log(`[jvm/${id}] exit code=${code} signal=${signal || 'none'} after ${((Date.now() - state.startedAt) / 1000).toFixed(1)}s`);
     let msg = `[jvm] process exited (code=${code}, signal=${signal || 'none'})`;
     const isOom = signal === 'SIGKILL' || code === 137;
     if (isOom) {

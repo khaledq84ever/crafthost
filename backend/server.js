@@ -174,6 +174,16 @@ app.get('/api/health', async (req, res) => {
         inodes_free:  stat.ffree,
       };
     }
+    // List the JAR cache so we can spot a truncated download.
+    const CACHE_DIR = path.join(path.dirname(DATA_DIR), '.jar-cache');
+    if (fs.existsSync(CACHE_DIR)) {
+      disk.jar_cache = fs.readdirSync(CACHE_DIR).map(f => {
+        try {
+          const st = fs.statSync(path.join(CACHE_DIR, f));
+          return { name: f, mb: Math.round(st.size / 1024 / 1024 * 10) / 10 };
+        } catch { return { name: f, mb: 0 }; }
+      });
+    }
   } catch (err) { disk = { error: err.message }; }
 
   res.json({
