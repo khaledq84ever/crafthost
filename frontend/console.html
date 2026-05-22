@@ -188,25 +188,45 @@
   .lbl-short { display: inline; font-size: 14px; }
   .topbar-actions .btn-sm { padding: 4px 8px; min-width: 32px; }
 
-  /* Tighter terminal + side panels on phones — text was too big to read */
-  .pp-head { padding: 10px 12px; font-size: 11.5px; }
-  .player { padding: 6px 12px; gap: 8px; }
-  .player-avatar { width: 26px; height: 26px; font-size: 12px; }
-  .player-name { font-size: 12px; }
-  .player-ping { font-size: 10px; }
-  .term-head { padding: 8px 12px; font-size: 12px; }
-  .term { font-size: 11.5px; padding: 10px; line-height: 1.5; }
-  .term-input-wrap { padding: 8px 10px; }
-  .term-quick button { font-size: 10px; padding: 3px 8px; }
-  .term-input { padding: 6px 10px; }
-  .term-input input { font-size: 13px; }
-  .metric { margin-bottom: 12px; }
-  .metric-lbl { font-size: 11px; }
-  .metric-lbl strong { font-size: 12.5px; }
-  .tps-gauge { padding: 8px 0; margin-bottom: 10px; }
-  .tps-gauge .v { font-size: 26px; }
-  .tps-gauge .l { font-size: 10px; }
-  .metrics-panel { padding: 10px; }
+  /* Aggressive compact pass for console page on phones — text was unreadable
+     and the terminal eats too much height. !important needed because the
+     base .pp-head etc rules are also class-targeted (same specificity, but
+     they win over plain media queries when written second in the file). */
+  .console-grid { grid-template-columns: 1fr !important; height: auto !important; gap: 8px !important; }
+  .players-panel { max-height: 160px !important; order: 2; }
+  .terminal-panel { order: 1; min-height: 55vh; }
+  .metrics-panel { order: 3; max-height: none !important; padding: 8px !important; }
+
+  .pp-head { padding: 7px 10px !important; font-size: 10.5px !important; }
+  .player { padding: 5px 10px !important; gap: 6px !important; }
+  .player-avatar { width: 22px !important; height: 22px !important; font-size: 10.5px !important; border-radius: 5px; }
+  .player-name { font-size: 11.5px !important; }
+  .player-ping { font-size: 9.5px !important; }
+
+  .term-head { padding: 6px 10px !important; font-size: 11px !important; }
+  .term-head .dot { width: 6px; height: 6px; }
+  .term { font-size: 11px !important; padding: 8px 10px !important; line-height: 1.45 !important; }
+  .term .ts { font-size: 10px; }
+  .term-input-wrap { padding: 6px 8px !important; }
+  .term-quick { gap: 4px !important; margin-bottom: 6px !important; }
+  .term-quick button { font-size: 9.5px !important; padding: 2px 7px !important; }
+  .term-input { padding: 5px 9px !important; }
+  .term-input input { font-size: 13px !important; }
+
+  .metric { margin-bottom: 10px !important; }
+  .metric-lbl { font-size: 10.5px !important; margin-bottom: 4px !important; }
+  .metric-lbl strong { font-size: 11.5px !important; }
+  .metric-bar { height: 6px !important; }
+  .tps-gauge { padding: 6px 0 !important; margin-bottom: 8px !important; border-radius: 6px; }
+  .tps-gauge .v { font-size: 22px !important; }
+  .tps-gauge .l { font-size: 9.5px !important; }
+  .chart-canvas { height: 44px !important; }
+}
+@media (max-width: 480px) {
+  .pp-head, .term-head { font-size: 10px !important; padding: 6px 9px !important; }
+  .player-name { font-size: 11px !important; }
+  .term { font-size: 10.5px !important; padding: 7px 9px !important; }
+  .tps-gauge .v { font-size: 20px !important; }
 }
 </style>
 </head>
