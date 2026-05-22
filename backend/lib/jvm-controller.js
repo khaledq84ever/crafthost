@@ -189,6 +189,19 @@ async function vanillaJarUrl(version) {
   return { url: v.downloads.server.url, version: target.id };
 }
 
+// Global JAR cache. Instead of downloading server.jar fresh into every
+// server's dir (~50 MB × N servers), download it ONCE per type+version into
+// /data/.jar-cache/, then hardlink into each server's directory. Same on-disk
+// blob shared across all servers running that type+version — saves bandwidth
+// (no re-download), boot time (no wait), and disk (1 inode reuse, not N copies).
+const JAR_CACHE_DIR = path.join(DATA_DIR, '..', '.jar-cache');
+
+function cachedJarPath(type, version, info) {
+  const safeType = String(type || 'paper').replace(/[^a-z0-9]/gi, '');
+  const safeVer  = String(version || info.version || 'unknown').replace(/[^a-zA-Z0-9._-]/g, '');
+  return path.join(JAR_CACHE_DIR, `${safeType}-${safeVer}.jar`);
+}
+
 async function ensureJar(server) {
   const dir = serverDir(server.id);
   const jarPath = path.join(dir, 'server.jar');
@@ -203,6 +216,40 @@ async function ensureJar(server) {
   // paper/spigot fall back to Paper (Spigot needs BuildTools — Paper is a drop-in)
   else                        info = await paperJarUrl(server.version);
 
+  // NeoForge is a per-server installer that mutates the directory — skip cache
+  // for it. All other engines are a single self-contained launcher JAR that
+  // can be safely hardlinked across servers.
+  const cacheable = t !== 'neoforge';
+  const cachePath = cachedJarPath(t || 'paper', server.version, info);
+  if (cacheable) {
+    try { fs.mkdirSync(JAR_CACHE_DIR, { recursive: true }); } catch {}
+    if (fs.existsSync(cachePath) && fs.statSync(cachePath).size > 100000) {
+      // ── CACHE HIT — hardlink from the shared cache into this server's dir.
+      // Hardlink keeps a single on-disk blob; deleting either path doesn't
+      // affect the other. Falls back to a regular copy if hardlink fails
+      // (different filesystem / EXDEV).
+      try { fs.linkSync(cachePath, jarPath); }
+      catch (err) {
+        if (err.code === 'EXDEV' || err.code === 'EPERM') {
+          fs.copyFileSync(cachePath, jarPath);
+        } else { throw err; }
+      }
+      console.log(`[jar-cache] HIT  ${t}-${server.version}  (no download)`);
+      return jarPath;
+    }
+    // ── CACHE MISS — download to cache first, then hardlink to server dir.
+    console.log(`[jar-cache] MISS ${t}-${server.version}  → downloading once`);
+    await downloadFile(info.url, cachePath, `${t || 'paper'} ${info.version} (cache)`);
+    try { fs.linkSync(cachePath, jarPath); }
+    catch (err) {
+      if (err.code === 'EXDEV' || err.code === 'EPERM') {
+        fs.copyFileSync(cachePath, jarPath);
+      } else { throw err; }
+    }
+    return jarPath;
+  }
+
+  // NeoForge — download directly into the server dir (installer runs in-place).
   await downloadFile(info.url, jarPath, `${t || 'paper'} ${info.version}`);
 
   // NeoForge ships an installer JAR — running it generates the actual server

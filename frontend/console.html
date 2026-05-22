@@ -196,9 +196,38 @@
   .players-panel { max-height: 120px !important; order: 2; }
   .terminal-panel { order: 1; min-height: 32vh !important; }
   .terminal-panel .term { min-height: 22vh !important; max-height: 38vh !important; }
-  .metrics-panel { order: 3; max-height: none !important; padding: 6px !important; }
+  .metrics-panel { order: 3; max-height: none !important; padding: 8px !important; }
   /* shrink the main padding too — every pixel counts on a phone */
   .main { padding: 8px 8px 60px !important; }
+
+  /* Metrics: pack 4 metric blocks into 2x2 grid + hide the CPU sparkline
+     (canvas takes 44px, doesn't add much info on a phone). The bottom info
+     rows (Uptime/MC ver/Host port/Exit) also go 2-col so they don't add
+     4 separate lines. */
+  .metrics-panel > .metric {
+    margin-bottom: 0 !important;
+  }
+  .metrics-panel .chart-canvas { display: none !important; }
+  /* Group the 3 .metric blocks (RAM/CPU/MSPT) into a 2x2 grid via wrapper-less
+     CSS: make the parent metrics-panel a grid for the 4 children, but keep
+     the gauge + hr full-width. */
+  .metrics-panel {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px !important;
+  }
+  .metrics-panel > .tps-gauge,
+  .metrics-panel > hr,
+  .metrics-panel > div:last-child { grid-column: 1 / -1; }
+  .metrics-panel > hr { margin: 6px 0 !important; }
+  /* The bottom info section (Uptime / MC ver / Host port / Exit) also 2-col */
+  .metrics-panel > div:last-child {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 10px;
+    font-size: 10.5px !important;
+  }
+  .metrics-panel > div:last-child .flex { padding: 2px 0 !important; }
 
   .pp-head { padding: 7px 10px !important; font-size: 10.5px !important; }
   .player { padding: 5px 10px !important; gap: 6px !important; }
