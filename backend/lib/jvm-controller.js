@@ -440,6 +440,38 @@ async function startServer(containerId, server) {
       crashes.set(id, { when: Date.now(), code, signal });
     }
     onLine(msg);
+
+    // Immediate Paperclip-libs fix — Paperclip exits cleanly (code 0) when any
+    // extracted library has a hash mismatch. Without this, recovery waits up to
+    // 20s for the auto-heal loop. Here we detect it on exit, wipe libraries/ +
+    // versions/ RIGHT AWAY, emit a visible console line, and restart in ~2s.
+    // We also stamp last_auto_fix_* so the 20s loop doesn't double-trigger.
+    if (!state.intentional && !isOom && code === 0 &&
+        state.logs.some(l => /Hash check failed for extract|paperclip\.Paperclip\.extractEntries|FileEntry\.extractFile/i.test(l))) {
+      (async () => {
+        try {
+          for (const sub of ['libraries', 'versions']) {
+            await fsp.rm(path.join(dir, sub), { recursive: true, force: true });
+          }
+          onLine('[jvm] ✓ Auto-fix: corrupt Paperclip libs wiped — re-extracting on restart…');
+          try {
+            const db = require('../db');
+            const now = Date.now();
+            db.prepare('UPDATE servers SET last_auto_fix_kind = ?, last_auto_fix_at = ? WHERE id = ?')
+              .run('libs', now, id);
+          } catch {}
+          await new Promise(r => setTimeout(r, 2000));
+          const fresh = state.server;
+          await startServer(containerId, fresh);
+          try {
+            const db = require('../db');
+            db.prepare('UPDATE servers SET status = ? WHERE id = ?').run('starting', id);
+          } catch {}
+        } catch (err) {
+          onLine(`[jvm] libs auto-fix failed: ${err.message}`);
+        }
+      })();
+    }
   });
   proc.on('error', (err) => {
     onLine(`[jvm] spawn error: ${err.message}`);
