@@ -145,14 +145,9 @@
     word-break: keep-all !important;
     overflow-wrap: normal !important;
   }
-  .mp-pick-desc, .mp-feed-desc {
-    font-size: 10px;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    word-break: keep-all !important;
-    overflow-wrap: normal !important;
-  }
+  /* Hide descriptions entirely on mobile — too much vertical space.
+     Icon + name + downloads is enough info to recognize a mod. */
+  .mp-pick-desc, .mp-feed-desc { display: none !important; }
   .mp-feed-meta { font-size: 9.5px; }
   .mp-pick-btn { font-size: 10.5px; padding: 3px 8px; min-height: 24px; }
   .mp-lead { font-size: 11.5px; }
@@ -305,10 +300,10 @@ function fmtDownloads(n) {
 async function loadFeed(targetId, sort) {
   const row = document.getElementById(targetId);
   if (!row) return;
-  // Mobile gets 6 items per feed; desktop gets 12. Saves ~600px of scroll
+  // Mobile gets 4 items per feed; desktop gets 12. Saves vertical scroll
   // on phones where the curated Top Picks already gives plenty to browse.
   const isMobile = window.matchMedia && window.matchMedia('(max-width: 700px)').matches;
-  const limit = isMobile ? 6 : 12;
+  const limit = isMobile ? 4 : 12;
   try {
     const r = await fetch(`/api/modrinth/search?type=mod&sort=${sort}&limit=${limit}`, { credentials: 'include' });
     const data = await r.json();
@@ -318,12 +313,13 @@ async function loadFeed(targetId, sort) {
       const icon = m.icon_url
         ? `<img class="mp-feed-icon" src="${escapeHtml(m.icon_url)}" loading="lazy" alt="" />`
         : `<div class="mp-feed-icon"></div>`;
+      // Compact card: icon + name + downloads only. Description removed
+      // because it's pure clutter at this density on mobile.
       return `
         <a class="mp-feed-card" href="https://modrinth.com/mod/${escapeHtml(m.slug || m.project_id)}" target="_blank" rel="noopener">
           ${icon}
           <div class="mp-feed-text">
             <div class="mp-feed-name">${escapeHtml(m.title || '?')}</div>
-            <div class="mp-feed-desc">${escapeHtml(m.description || '')}</div>
             <div class="mp-feed-meta">⬇ ${fmtDownloads(m.downloads)}</div>
           </div>
         </a>
