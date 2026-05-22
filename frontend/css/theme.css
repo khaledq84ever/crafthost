@@ -301,6 +301,14 @@ input, select, textarea { font-family: inherit; }
 .btn-sm { padding: 8px 14px; font-size: 13px; }
 .btn-danger { background: linear-gradient(135deg, var(--red), var(--red-dark)); color: white; box-shadow: 0 4px 14px -2px rgba(244, 63, 94, 0.3); }
 .btn-danger:hover { transform: translateY(-1px); box-shadow: 0 8px 20px -4px rgba(244, 63, 94, 0.35); }
+/* Yellow / warning — used for the Restart button so it visually sits
+   between green (Start) and red (Stop). */
+.btn-warning {
+  background: linear-gradient(135deg, var(--gold), #c98500);
+  color: #0B1220; font-weight: 700;
+  box-shadow: 0 4px 14px -2px rgba(245, 158, 11, 0.3);
+}
+.btn-warning:hover { transform: translateY(-1px); box-shadow: 0 8px 20px -4px rgba(245, 158, 11, 0.4); }
 .btn-block { width: 100%; }
 .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--emerald-glow); }
 

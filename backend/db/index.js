@@ -107,6 +107,12 @@ if (!hasColumn('servers', 'last_idle_stop_at')) {
 if (!hasColumn('servers', 'scheduled_restart_at')) {
   db.exec(`ALTER TABLE servers ADD COLUMN scheduled_restart_at TEXT`);
 }
+
+// Optional Discord webhook URL — fires on player join/leave for this server.
+// User sets it in settings; NULL means no webhook.
+if (!hasColumn('servers', 'discord_webhook')) {
+  db.exec(`ALTER TABLE servers ADD COLUMN discord_webhook TEXT`);
+}
 if (!hasColumn('servers', 'last_scheduled_restart_at')) {
   db.exec(`ALTER TABLE servers ADD COLUMN last_scheduled_restart_at INTEGER`);
 }

@@ -907,6 +907,33 @@ router.get('/:id/logs', (req, res) => {
   }
 });
 
+// GET /api/servers/:id/events — last 50 player join/leave/chat events.
+// Parsed live from the JVM stdout ring; persists across log-ring rotation.
+router.get('/:id/events', (req, res) => {
+  const s = getOwnedServer(req, res); if (!s) return;
+  const n = Math.min(parseInt(req.query.limit || '50', 10), 200);
+  try {
+    const id = String(s.container_id || '').replace(/^jvm-/, '') || s.id;
+    const state = require('../lib/jvm-controller').__getState(id);
+    res.json({ events: state?.events ? state.events.slice(-n) : [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/servers/:id/webhook — set or clear the Discord webhook URL for
+// this server. Owner-only. Body: { url: "https://discord.com/api/webhooks/..." | "" }
+router.patch('/:id/webhook', (req, res) => {
+  const s = getOwnedServer(req, res); if (!s) return;
+  const url = String(req.body?.url || '').trim();
+  if (url && !/^https:\/\/(discord(app)?\.com|ptb\.discord\.com)\/api\/webhooks\//i.test(url)) {
+    return res.status(400).json({ error: 'Must be a https://discord.com/api/webhooks/... URL or empty to clear' });
+  }
+  db.prepare('UPDATE servers SET discord_webhook = ? WHERE id = ?').run(url || null, s.id);
+  audit(req.user.id, 'server.discord_webhook', s.id, req.ip, { set: !!url });
+  res.json({ ok: true, set: !!url });
+});
+
 // GET /api/servers/:id/diag — live debug snapshot: tunnel state, JVM port
 // reachability, DNS, etc. Owner-only.
 router.get('/:id/diag', async (req, res) => {

@@ -214,7 +214,7 @@ function renderServer(s) {
       <div class="sc-primary-row">
         ${isOnline
           ? `<button class="btn btn-danger sc-primary" onclick="serverAction('${escapeHtml(s.id)}', 'stop')">■ Stop Server</button>
-             <button class="btn btn-secondary sc-icon-btn" onclick="serverAction('${escapeHtml(s.id)}', 'restart')" title="Restart server" aria-label="Restart server">⟳</button>`
+             <button class="btn btn-warning sc-icon-btn" onclick="serverAction('${escapeHtml(s.id)}', 'restart')" title="Restart server" aria-label="Restart server">⟳</button>`
           : `<button class="btn btn-primary sc-primary" onclick="serverAction('${escapeHtml(s.id)}', 'start')">▶ Start Server</button>`
         }
         <button class="btn btn-secondary sc-icon-btn sc-console-btn" onclick="goToConsole('${escapeHtml(s.id)}')" title="Open console" aria-label="Open console">

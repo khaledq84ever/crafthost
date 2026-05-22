@@ -437,6 +437,34 @@ async function startServer(containerId, server) {
     if (!stamped) return;
     state.logs.push(stamped);
     if (state.logs.length > LOG_RING_SIZE) state.logs.shift();
+
+    // ── Player join / leave events ────────────────────────────────────
+    // Paper / Spigot / Vanilla all use the same log line format. Track in
+    // a per-server event ring (last 50) and fire optional Discord webhook.
+    const join  = stamped.match(/\[[^\]]+\]:\s+(\w+) joined the game\s*$/i);
+    const leave = stamped.match(/\[[^\]]+\]:\s+(\w+) left the game\s*$/i);
+    const chat  = stamped.match(/\[[^\]]+\]:\s+<(\w+)>\s+(.+)$/);
+    if (join || leave || chat) {
+      if (!state.events) state.events = [];
+      const ev = join ? { type: 'join', player: join[1], at: Date.now() }
+              : leave ? { type: 'leave', player: leave[1], at: Date.now() }
+              :         { type: 'chat', player: chat[1], message: chat[2], at: Date.now() };
+      state.events.push(ev);
+      if (state.events.length > 50) state.events.shift();
+      // Optional Discord webhook — column added below, NULL if not set
+      if ((ev.type === 'join' || ev.type === 'leave') && server.discord_webhook) {
+        const emoji = ev.type === 'join' ? '🟢' : '🔴';
+        const verb  = ev.type === 'join' ? 'joined' : 'left';
+        const body  = JSON.stringify({
+          content: `${emoji} **${ev.player}** ${verb} **${server.name}**`,
+          username: 'CraftHost',
+        });
+        // Fire-and-forget, never block the log pipeline
+        fetch(server.discord_webhook, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
+        }).catch(() => {});
+      }
+    }
     if (!state.ready && /Done \([\d.]+s\)!/i.test(stamped)) {
       state.ready = true;
       // CRITICAL: flip DB status starting → online so the dashboard, smoke
