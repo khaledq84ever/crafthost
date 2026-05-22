@@ -182,18 +182,33 @@ p { color: var(--text); }
 /* Mobile typography scale-down — applies to EVERY page. Browser-grade
    density for Android Chrome / Safari (iOS) / Edge mobile. */
 @media (max-width: 700px) {
-  h1 { font-size: 22px; }
-  h2 { font-size: 18px; }
-  h3 { font-size: 15px; }
-  .sub { font-size: 13px; }
-  p { font-size: 14px; line-height: 1.5; }
-}
-@media (max-width: 480px) {
+  /* Shrink the base font so every relative size on the page comes down
+     proportionally — this is more effective than overriding individual
+     elements one-by-one. */
+  body { font-size: 14px; line-height: 1.5; }
   h1 { font-size: 19px; }
   h2 { font-size: 16px; }
   h3 { font-size: 14px; }
+  h4 { font-size: 13px; }
   .sub { font-size: 12px; }
-  p { font-size: 13.5px; }
+  p { font-size: 13px; line-height: 1.45; }
+  /* Force-wrap anything that could push width on a narrow phone (long
+     URLs, hex tokens, stack traces, log lines without spaces). */
+  body, .card, .term, .fm-row, .mp-feed-card, .mp-pick {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  /* Ensure the right column of .dash never exceeds viewport */
+  .dash > div { max-width: 100vw; min-width: 0; overflow-x: hidden; }
+}
+@media (max-width: 480px) {
+  body { font-size: 13px; line-height: 1.45; }
+  h1 { font-size: 17px; }
+  h2 { font-size: 15px; }
+  h3 { font-size: 13.5px; }
+  h4 { font-size: 12.5px; }
+  .sub { font-size: 11.5px; }
+  p { font-size: 12.5px; }
 }
 ::selection { background: var(--emerald); color: var(--slate-900); }
 

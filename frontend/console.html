@@ -237,7 +237,17 @@
 
   .term-head { padding: 6px 10px !important; font-size: 11px !important; }
   .term-head .dot { width: 6px; height: 6px; }
-  .term { font-size: 11px !important; padding: 8px 10px !important; line-height: 1.45 !important; }
+  .term {
+    font-size: 10.5px !important;
+    padding: 8px 10px !important;
+    line-height: 1.45 !important;
+    /* Force long log lines (Java stack traces, paths, URLs) to wrap instead
+       of pushing the panel wider than viewport. */
+    word-break: break-all !important;
+    overflow-wrap: anywhere !important;
+    overflow-x: hidden !important;
+    max-width: 100% !important;
+  }
   .term .ts { font-size: 10px; }
   .term-input-wrap { padding: 6px 8px !important; }
   .term-quick { gap: 4px !important; margin-bottom: 6px !important; }
