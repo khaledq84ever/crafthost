@@ -838,6 +838,12 @@ body.is-home .lang-toggle { display: none; }
    home button there so it doesn't overlap the topbar. */
 body:has(.dash) .ch-home-btn { display: none !important; }
 
+/* Any page that already has a visible brand mark — pricing/marketing pages
+   with a top nav, auth pages with the brand inside the card — also hide
+   the floating button to avoid double-branding the same corner. */
+body:has(.nav .brand) .ch-home-btn,
+body:has(.auth-brand)  .ch-home-btn { display: none !important; }
+
 /* Mobile: keep BOTH the mark AND the "CraftHost" text — just tighten spacing.
    The user explicitly wants the wordmark on every page, not just desktop. */
 @media (max-width: 600px) {
