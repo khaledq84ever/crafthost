@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#0B1220" media="(prefers-color-scheme: dark)" />
-<meta name="theme-color" content="#0B1220" />
+<meta name="theme-color" content="#07090F" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#07090F" />
 <meta name="color-scheme" content="dark" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -18,7 +18,7 @@
 <meta name="description" content="Free Minecraft server hosting. One-click deploy in 60 seconds." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/css/theme.css" />
 <link rel="stylesheet" href="/css/landing.css" />
 </head>
@@ -38,17 +38,48 @@
 </nav>
 
 <section class="hero">
-  <div class="hero-blocks" id="heroBlocks"></div>
   <div class="container hero-inner">
-    <h1 class="hero-title">
-      <span data-i18n="hero_title">Your Minecraft Server.</span><br />
-      <span class="grad-text" data-i18n="hero_title_line2">Live in 60 Seconds.</span>
-    </h1>
-    <p class="hero-sub" data-i18n="hero_sub_free">
-      Deploy vanilla, modded, or custom-JAR Minecraft servers in one click. Completely free.
-    </p>
-    <div class="hero-cta">
-      <a href="/dashboard.html" class="btn btn-primary btn-lg" data-i18n="hero_cta_deploy">Deploy My Server →</a>
+    <div>
+      <div class="hero-eyebrow"><span class="dot"></span> Now in production</div>
+      <h1 class="hero-title">
+        <span data-i18n="hero_title">Your Minecraft server.</span><br />
+        <span class="grad-text" data-i18n="hero_title_line2">Live in 60 seconds.</span>
+      </h1>
+      <p class="hero-sub" data-i18n="hero_sub_free">
+        Deploy vanilla, Paper, Fabric, NeoForge, or any custom JAR in one click. Built-in console, file manager, plugins. Free.
+      </p>
+      <div class="hero-cta">
+        <a href="/dashboard.html" class="btn btn-primary btn-lg" data-i18n="hero_cta_deploy">Deploy your server →</a>
+        <a href="/pricing.html" class="btn btn-secondary btn-lg" data-i18n="hero_cta_pricing">View pricing</a>
+      </div>
+      <div class="hero-meta">
+        <span>5 engines</span>
+        <span>18 versions</span>
+        <span>60s boot</span>
+        <span>0 config</span>
+      </div>
+    </div>
+
+    <div class="hero-term">
+      <div class="term-block">
+        <div class="term-chrome">
+          <span class="tc-dot r"></span><span class="tc-dot y"></span><span class="tc-dot g"></span>
+          <span class="tc-title">~/crafthost</span>
+          <span class="tc-spacer"></span>
+          <span>bash</span>
+        </div>
+        <div class="term-body">
+          <span class="ln"><span class="comment"># spin up a Paper 1.21.11 server</span></span>
+          <span class="ln"><span class="prompt">$</span>crafthost deploy paper:1.21.11 --ram <span class="num">2g</span></span>
+          <span class="ln"><span class="ok">✓</span> jar resolved <span class="comment">(cached: paper-1.21.11.jar · 52.3MB)</span></span>
+          <span class="ln"><span class="ok">✓</span> world prepared <span class="comment">(seed: -3517892413784085336)</span></span>
+          <span class="ln"><span class="ok">✓</span> port assigned <span class="num">25604</span></span>
+          <span class="ln"><span class="ok">✓</span> bore tunnel open <span class="num">→</span> mc.crafthost.gg:<span class="num">25604</span></span>
+          <span class="ln"><span class="ok">✓</span> done in <span class="num">6.7s</span></span>
+          <span class="ln">&nbsp;</span>
+          <span class="ln"><span class="prompt">$</span>crafthost status<span class="caret"></span></span>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -64,8 +95,8 @@
     </div>
   </div>
   <div class="footer-bottom container">
-    <span>© 2026 CraftHost · Not affiliated with Mojang AB</span>
-    <span>Made with ❤️ in Kuwait</span>
+    <span>© 2026 CRAFTHOST · NOT AFFILIATED WITH MOJANG AB</span>
+    <span>BUILT IN KUWAIT</span>
   </div>
 </footer>
 

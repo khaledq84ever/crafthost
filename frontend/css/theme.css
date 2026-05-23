@@ -1,58 +1,84 @@
-/* CraftHost — shared theme (v2: refined, eye-friendly palette) */
+/* CraftHost — Premium Console design system
+   Aesthetic: Vercel / Linear / Railway. Deep ink black, hairline borders, mono numerics,
+   tight grid, electric emerald accent. No gradients on UI chrome. */
 :root {
-  /* Brand — refined emerald (was neon #00C853) */
-  --emerald: #10B981;
-  --emerald-dark: #059669;
-  --emerald-light: #34D399;
-  --emerald-glow: rgba(16, 185, 129, 0.28);
+  /* Brand — electric emerald, used sparingly */
+  --emerald: #34D399;
+  --emerald-deep: #10B981;
+  --emerald-dim: #059669;
+  --emerald-glow: rgba(52, 211, 153, 0.18);
 
-  /* Surfaces — softer, slightly warm darks; pure black causes eye strain */
-  --slate-950: #060a14;
-  --slate-900: #0B1220;
-  --slate-800: #161F32;
-  --slate-700: #243049;
-  --slate-600: #3B4866;
-  --slate-500: #64748B;
-  --slate-400: #94A3B8;
-  --slate-300: #CBD5E1;
-  --slate-200: #E2E8F0;
-  --slate-100: #F1F5F9;
+  /* Ink surfaces — deep, slightly cool */
+  --ink-950: #050709;
+  --ink-900: #07090F;
+  --ink-850: #0A0D17;
+  --ink-800: #0E1320;
+  --ink-700: #161C2C;
+  --ink-600: #1E2538;
 
-  /* Accents — sophisticated, not neon */
-  --gold: #F59E0B;
+  /* Hairlines — borders carry the whole UI; keep them subtle */
+  --line: rgba(255, 255, 255, 0.06);
+  --line-strong: rgba(255, 255, 255, 0.10);
+  --line-stronger: rgba(255, 255, 255, 0.16);
+
+  /* Text */
+  --text-strong: #FFFFFF;
+  --text: #E8ECF3;
+  --text-muted: #8B92A7;
+  --text-faint: #5A6178;
+  --text-disabled: #3E4458;
+
+  /* Status accents */
   --red: #F43F5E;
-  --red-dark: #E11D48;
-  --blue: #38BDF8;
-  --purple: #A78BFA;
+  --red-dim: #BE123C;
+  --amber: #F59E0B;
+  --amber-dim: #B45309;
   --cyan: #22D3EE;
+  --violet: #A78BFA;
+  --blue: #60A5FA;
 
-  /* Surfaces (frosted glass) */
-  --glass: rgba(22, 31, 50, 0.65);
-  --glass-strong: rgba(22, 31, 50, 0.9);
-  --glass-border: rgba(148, 163, 184, 0.12);
-  --glass-border-strong: rgba(148, 163, 184, 0.2);
+  /* Legacy aliases — keep existing rules working without rewriting every selector */
+  --slate-950: var(--ink-950);
+  --slate-900: var(--ink-900);
+  --slate-800: var(--ink-800);
+  --slate-700: var(--ink-700);
+  --slate-600: var(--ink-600);
+  --slate-500: var(--text-faint);
+  --slate-400: var(--text-muted);
+  --slate-300: var(--text);
+  --slate-200: var(--text);
+  --slate-100: var(--text-strong);
+  --emerald-light: var(--emerald);
+  --emerald-dark: var(--emerald-deep);
+  --gold: var(--amber);
+  --purple: var(--violet);
+  --red-dark: var(--red-dim);
+  --glass: var(--ink-800);
+  --glass-strong: var(--ink-850);
+  --glass-border: var(--line);
+  --glass-border-strong: var(--line-strong);
 
-  /* Shadows — softer, more refined */
-  --shadow-sm: 0 2px 8px -2px rgba(0, 0, 0, 0.35);
-  --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 24px 60px -20px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 32px var(--emerald-glow);
+  /* Elevation — no big drop shadows. Use 1px inset highlight + hairline border. */
+  --elev-1: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 1px 2px rgba(0, 0, 0, 0.4);
+  --elev-2: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 4px 16px -4px rgba(0, 0, 0, 0.5);
+  --elev-3: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 12px 32px -12px rgba(0, 0, 0, 0.6);
+  --glow-emerald: 0 0 0 1px var(--emerald-glow), 0 0 28px -4px var(--emerald-glow);
+  --shadow-sm: var(--elev-1);
+  --shadow-md: var(--elev-2);
+  --shadow-lg: var(--elev-3);
+  --shadow-glow: var(--glow-emerald);
 
-  /* Radii — slightly larger for friendliness */
-  --radius: 14px;
-  --radius-sm: 10px;
-  --radius-lg: 20px;
+  /* Radii — tighter, more architectural */
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
 
   /* Type */
-  --font: 'Inter', 'Tajawal', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, 'Cascadia Mono', monospace;
-  --font-display: 'Inter', var(--font);
-
-  /* Text colors */
-  --text: #E5EAF2;            /* body — easier than pure white */
-  --text-strong: #F8FAFC;     /* headings */
-  --text-muted: var(--slate-400);
-  --text-faint: var(--slate-500);
+  --font: 'Inter Tight', 'Inter', 'Tajawal', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, 'SF Mono', 'Cascadia Mono', monospace;
+  --font-display: 'Inter Tight', var(--font);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -70,25 +96,31 @@ html {
 
 body {
   font-family: var(--font);
-  background: var(--slate-900);
+  background: var(--ink-900);
   color: var(--text);
-  line-height: 1.6;
+  line-height: 1.55;
   min-height: 100vh;
   min-height: 100dvh; /* dynamic vh — handles iOS Safari URL bar */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
-  letter-spacing: -0.005em;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'ss01', 'ss03';
+  letter-spacing: -0.011em;
   -webkit-tap-highlight-color: transparent; /* no blue flash on Android tap */
   overscroll-behavior-y: contain; /* no pull-to-refresh on Chrome mobile */
+  /* Subtle dot-grid texture — gives the page a sense of a designed surface
+     without the AI-slop look of huge color blobs. */
   background-image:
-    radial-gradient(ellipse 80% 60% at 10% -10%, rgba(16, 185, 129, 0.10) 0%, transparent 60%),
-    radial-gradient(ellipse 70% 50% at 90% 100%, rgba(167, 139, 250, 0.08) 0%, transparent 60%);
-  background-attachment: fixed;
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.025) 1px, transparent 0),
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(52, 211, 153, 0.04) 0%, transparent 60%);
+  background-size: 24px 24px, auto;
+  background-attachment: fixed, fixed;
   overflow-x: clip;                    /* prevent horizontal scroll without
                                           breaking sticky positioning or
                                           vertical scroll on Android Chrome */
 }
+
+/* Mono numerics — show real, tabular figures wherever we display numbers. */
+.mono, code, kbd, pre, .num, .ip, .port, [data-mono] { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 /* Media defaults — fluid by default so phone screenshots/images never overflow */
 img, video, svg, canvas { max-width: 100%; height: auto; }
@@ -238,124 +270,151 @@ input, select, textarea { font-family: inherit; }
   position: sticky;
   top: 0;
   z-index: 100;
-  backdrop-filter: blur(20px);
-  background: rgba(15, 23, 42, 0.7);
-  border-bottom: 1px solid var(--glass-border);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: rgba(7, 9, 15, 0.72);
+  border-bottom: 1px solid var(--line);
 }
 .nav-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
+  padding: 14px 24px;
   max-width: 1240px;
   margin: 0 auto;
 }
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-weight: 900;
-  font-size: 20px;
-  letter-spacing: -0.025em;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -0.022em;
+  color: var(--text-strong);
 }
 .brand-mark {
-  width: 32px; height: 32px;
-  background: linear-gradient(135deg, var(--emerald), var(--emerald-dark));
-  border-radius: 8px;
+  width: 28px; height: 28px;
+  background: var(--ink-800);
+  border: 1px solid var(--line-stronger);
+  border-radius: 7px;
   display: grid; place-items: center;
-  color: white; font-weight: 900;
-  box-shadow: 0 4px 20px var(--emerald-glow);
+  color: var(--emerald);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+  box-shadow: 0 0 0 1px var(--ink-900), inset 0 0 12px var(--emerald-glow);
+  position: relative;
+}
+.brand-mark::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 4px;
+  background: radial-gradient(circle at 30% 30%, var(--emerald-glow), transparent 60%);
+  pointer-events: none;
+  opacity: .6;
 }
 .nav-links { display: flex; gap: 28px; align-items: center; }
-.nav-links a { color: var(--slate-300); font-size: 14px; font-weight: 500; transition: color .2s; }
-.nav-links a:hover { color: white; }
-.nav-cta { display: flex; gap: 12px; align-items: center; }
+.nav-links a { color: var(--text-muted); font-size: 14px; font-weight: 500; transition: color .15s; }
+.nav-links a:hover { color: var(--text-strong); }
+.nav-cta { display: flex; gap: 8px; align-items: center; }
 
-/* Buttons */
+/* ── Buttons ────────────────────────────────────────────────────────────────
+   Three core variants: primary (emerald-fill), secondary (outlined), ghost (text).
+   No gradients. One pixel border. Tight padding. 36/40/48px heights. */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  padding: 12px 22px;
+  height: 36px;
+  padding: 0 14px;
   border-radius: var(--radius-sm);
-  font-weight: 600;
-  font-size: 14px;
-  transition: all .2s;
+  border: 1px solid transparent;
+  font-family: var(--font);
+  font-weight: 500;
+  font-size: 13.5px;
+  letter-spacing: -0.005em;
+  line-height: 1;
+  transition: background .12s ease, border-color .12s ease, color .12s ease, transform .08s ease;
   white-space: nowrap;
+  cursor: pointer;
 }
 .btn-primary {
-  background: linear-gradient(135deg, var(--emerald), var(--emerald-dark));
-  color: white;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.1) inset, 0 4px 14px -2px var(--emerald-glow);
+  background: var(--emerald);
+  color: #052017;
+  font-weight: 600;
+  border-color: var(--emerald-deep);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.3);
 }
-.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 1px 0 rgba(255,255,255,0.1) inset, 0 8px 22px -4px var(--emerald-glow); }
-.btn-primary:active { transform: translateY(0); }
+.btn-primary:hover { background: var(--emerald-deep); }
+.btn-primary:active { transform: translateY(0.5px); }
 .btn-secondary {
-  background: var(--glass);
-  border: 1px solid var(--glass-border-strong);
+  background: var(--ink-800);
+  border-color: var(--line-strong);
   color: var(--text);
-  backdrop-filter: blur(10px);
 }
-.btn-secondary:hover { background: var(--slate-700); border-color: var(--glass-border-strong); color: var(--text-strong); }
+.btn-secondary:hover { background: var(--ink-700); border-color: var(--line-stronger); color: var(--text-strong); }
 .btn-ghost { background: transparent; color: var(--text-muted); }
-.btn-ghost:hover { color: var(--text-strong); background: var(--glass); }
-.btn-lg { padding: 16px 28px; font-size: 15px; }
-.btn-sm { padding: 8px 14px; font-size: 13px; }
-.btn-danger { background: linear-gradient(135deg, var(--red), var(--red-dark)); color: white; box-shadow: 0 4px 14px -2px rgba(244, 63, 94, 0.3); }
-.btn-danger:hover { transform: translateY(-1px); box-shadow: 0 8px 20px -4px rgba(244, 63, 94, 0.35); }
-/* Yellow / warning — used for the Restart button so it visually sits
-   between green (Start) and red (Stop). */
-.btn-warning {
-  background: linear-gradient(135deg, var(--gold), #c98500);
-  color: #0B1220; font-weight: 700;
-  box-shadow: 0 4px 14px -2px rgba(245, 158, 11, 0.3);
-}
-.btn-warning:hover { transform: translateY(-1px); box-shadow: 0 8px 20px -4px rgba(245, 158, 11, 0.4); }
+.btn-ghost:hover { color: var(--text-strong); background: var(--ink-800); }
+.btn-lg { height: 44px; padding: 0 20px; font-size: 14.5px; }
+.btn-sm { height: 30px; padding: 0 10px; font-size: 12.5px; }
+.btn-danger { background: var(--red); color: white; border-color: var(--red-dim); }
+.btn-danger:hover { background: var(--red-dim); }
+.btn-warning { background: var(--amber); color: #1a0f00; font-weight: 600; border-color: var(--amber-dim); }
+.btn-warning:hover { background: var(--amber-dim); color: white; }
 .btn-block { width: 100%; }
-.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--emerald-glow); }
+.btn:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--ink-900), 0 0 0 3px var(--emerald-glow); }
+.btn[disabled], .btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn .kbd { font-family: var(--font-mono); font-size: 11px; opacity: .7; padding: 1px 5px; border: 1px solid var(--line-strong); border-radius: 3px; }
 
-/* Cards */
+/* Cards — flat, hairline-bordered. No backdrop blur. */
 .card {
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
+  background: var(--ink-800);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 24px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  transition: transform .25s, box-shadow .25s, border-color .25s;
+  padding: 20px;
+  transition: border-color .15s, background .15s;
 }
 .card-hover:hover {
-  transform: translateY(-3px);
-  border-color: var(--glass-border-strong);
-  box-shadow: var(--shadow-md);
+  border-color: var(--line-stronger);
+  background: var(--ink-700);
+}
+.card-glow {
+  border-color: var(--line-strong);
+  box-shadow: 0 0 0 1px var(--emerald-glow), 0 0 32px -8px var(--emerald-glow);
 }
 
-/* Inputs */
+/* Inputs — ink-700, hairline border, focus = emerald ring. */
 .input, .select, .textarea {
   width: 100%;
-  background: rgba(11, 18, 32, 0.5);
-  border: 1px solid var(--glass-border-strong);
+  background: var(--ink-850);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
-  padding: 12px 14px;
+  padding: 10px 12px;
   color: var(--text-strong);
+  font-family: var(--font);
   font-size: 14px;
-  transition: border-color .15s, box-shadow .15s, background .15s;
+  line-height: 1.3;
+  transition: border-color .12s, box-shadow .12s, background .12s;
 }
 .input::placeholder, .textarea::placeholder { color: var(--text-faint); }
-.input:hover, .select:hover, .textarea:hover { border-color: var(--slate-600); }
+.input:hover, .select:hover, .textarea:hover { border-color: var(--line-stronger); background: var(--ink-800); }
 .input:focus, .select:focus, .textarea:focus {
   outline: none;
   border-color: var(--emerald);
   box-shadow: 0 0 0 3px var(--emerald-glow);
-  background: rgba(11, 18, 32, 0.7);
+  background: var(--ink-800);
 }
+/* Mono numerics inside inputs that show ports, IPs, IDs */
+.input.mono { font-family: var(--font-mono); letter-spacing: -0.01em; }
 .label {
   display: block;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--text-muted);
-  margin-bottom: 8px;
-  letter-spacing: 0.01em;
+  margin-bottom: 6px;
+  letter-spacing: 0.005em;
 }
-.field { margin-bottom: 16px; }
+.field { margin-bottom: 14px; }
 
 /* Utilities */
 .text-center { text-align: center; }
@@ -374,36 +433,72 @@ input, select, textarea { font-family: inherit; }
 .mt-2 { margin-top: 8px; } .mt-4 { margin-top: 16px; } .mt-6 { margin-top: 24px; } .mt-8 { margin-top: 32px; }
 .mb-2 { margin-bottom: 8px; } .mb-4 { margin-bottom: 16px; } .mb-6 { margin-bottom: 24px; } .mb-8 { margin-bottom: 32px; }
 
-/* Badges */
+/* Badges / status pills — mono caps, hairline border, dot prefix optional. */
 .badge {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 600;
+  height: 22px;
+  padding: 0 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   border-radius: 999px;
-  background: var(--slate-700);
-  color: var(--text);
-  letter-spacing: 0.01em;
+  background: var(--ink-700);
+  color: var(--text-muted);
+  border: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
 }
-.badge-emerald { background: rgba(16, 185, 129, 0.12); color: var(--emerald-light); border: 1px solid rgba(16, 185, 129, 0.2); }
-.badge-gold { background: rgba(245, 158, 11, 0.12); color: var(--gold); border: 1px solid rgba(245, 158, 11, 0.2); }
-.badge-red { background: rgba(244, 63, 94, 0.12); color: var(--red); border: 1px solid rgba(244, 63, 94, 0.2); }
-.badge-blue { background: rgba(56, 189, 248, 0.12); color: var(--blue); border: 1px solid rgba(56, 189, 248, 0.2); }
+.badge-emerald { background: rgba(52, 211, 153, 0.08); color: var(--emerald); border-color: rgba(52, 211, 153, 0.18); }
+.badge-gold,
+.badge-amber  { background: rgba(245, 158, 11, 0.08); color: var(--amber); border-color: rgba(245, 158, 11, 0.18); }
+.badge-red    { background: rgba(244, 63, 94, 0.08);  color: var(--red);    border-color: rgba(244, 63, 94, 0.18); }
+.badge-blue,
+.badge-cyan   { background: rgba(34, 211, 238, 0.08); color: var(--cyan);   border-color: rgba(34, 211, 238, 0.18); }
+.badge-violet { background: rgba(167, 139, 250, 0.08); color: var(--violet); border-color: rgba(167, 139, 250, 0.18); }
 
-/* Status dot */
+/* Status dot — small, color-coded, glow on active states. */
 .dot {
   display: inline-block;
-  width: 8px; height: 8px;
+  width: 7px; height: 7px;
   border-radius: 50%;
-  background: var(--slate-600);
+  background: var(--text-disabled);
+  flex-shrink: 0;
 }
-.dot.online { background: var(--emerald); box-shadow: 0 0 10px var(--emerald-glow); animation: pulse 2s infinite; }
-.dot.starting { background: var(--gold); animation: pulse 1s infinite; }
-.dot.offline { background: var(--red); }
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+.dot.online   { background: var(--emerald); box-shadow: 0 0 0 3px var(--emerald-glow); }
+.dot.starting { background: var(--amber);   box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18); animation: dotPulse 1.2s ease-in-out infinite; }
+.dot.offline  { background: var(--red);     box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.14); }
+.dot.idle     { background: var(--text-faint); }
+@keyframes dotPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .7; transform: scale(.85); } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } } /* legacy alias */
+
+/* Status pill — dot + mono label, used in server rows. */
+.status-pill { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+.status-pill.online   { color: var(--emerald); }
+.status-pill.starting { color: var(--amber); }
+.status-pill.offline  { color: var(--red); }
+
+/* Data row — key/value list used in dashboard, status, billing, settings. */
+.data-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13.5px;
 }
+.data-row:last-child { border-bottom: none; }
+.data-row > .k { color: var(--text-muted); font-weight: 500; }
+.data-row > .v { color: var(--text-strong); font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+
+/* KBD — keyboard hint for shortcuts. */
+kbd, .kbd { font-family: var(--font-mono); font-size: 11px; padding: 1px 6px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--ink-850); color: var(--text-muted); }
+
+/* Section heading prefix — "// section name" eyebrow for premium-console pages. */
+.eyebrow { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11.5px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--emerald); margin-bottom: 12px; }
+.eyebrow::before { content: '//'; opacity: .5; }
+
+/* Hairline divider */
+.hr { height: 1px; background: var(--line); border: 0; margin: 24px 0; }
+.hr-strong { height: 1px; background: var(--line-strong); border: 0; margin: 24px 0; }
 
 /* Toast */
 .toast-host { position: fixed; top: 20px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
@@ -426,6 +521,52 @@ input, select, textarea { font-family: inherit; }
 .toast.error { border-left-color: var(--red); }
 .toast.warn { border-left-color: var(--gold); }
 @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* ── Terminal / console block ───────────────────────────────────────────────
+   Used by homepage hero preview AND the full console page. Pure mono,
+   line-numbered, with a faux chrome header. */
+.term-block {
+  background: var(--ink-950);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--elev-3);
+  font-family: var(--font-mono);
+}
+.term-chrome {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px;
+  background: var(--ink-850);
+  border-bottom: 1px solid var(--line);
+  font-size: 11.5px;
+  color: var(--text-faint);
+  letter-spacing: 0.02em;
+}
+.term-chrome .tc-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--text-disabled); }
+.term-chrome .tc-dot.r { background: #ff5f57; }
+.term-chrome .tc-dot.y { background: #febc2e; }
+.term-chrome .tc-dot.g { background: #28c840; }
+.term-chrome .tc-title { margin-left: 8px; opacity: .8; font-family: var(--font-mono); }
+.term-chrome .tc-spacer { flex: 1; }
+.term-body {
+  padding: 16px 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+  overflow-x: auto;
+}
+.term-body .ln { display: block; white-space: pre; }
+.term-body .prompt { color: var(--emerald); user-select: none; margin-right: 8px; }
+.term-body .comment { color: var(--text-faint); }
+.term-body .ok { color: var(--emerald); }
+.term-body .warn { color: var(--amber); }
+.term-body .err { color: var(--red); }
+.term-body .num { color: var(--cyan); }
+.term-body .caret { display: inline-block; width: 8px; height: 14px; background: var(--emerald); margin-left: 2px; vertical-align: -2px; animation: blink 1.1s steps(2, start) infinite; }
+@keyframes blink { to { visibility: hidden; } }
+
+/* ── Section eyebrow + heading combo ───────────────────────────────────── */
+.section-eyebrow { font-family: var(--font-mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--emerald); margin-bottom: 14px; }
 
 /* Skeleton */
 .skel {
@@ -564,25 +705,28 @@ body.lang-ar button,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 30px;
-  min-width: 42px;
+  height: 28px;
+  min-width: 40px;
   padding: 0 10px;
-  border-radius: 999px;
-  background: var(--slate-800);
-  border: 1px solid var(--glass-border);
-  color: var(--text-strong);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
+  border-radius: 6px;
+  background: var(--ink-800);
+  border: 1px solid var(--line-strong);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   cursor: pointer;
-  transition: background .15s, border-color .15s, transform .1s;
+  transition: background .12s, border-color .12s, color .12s;
   margin-left: 4px;
   flex-shrink: 0;
 }
 [dir="rtl"] .lang-toggle { margin-left: 0; margin-right: 4px; }
 .lang-toggle:hover {
-  background: var(--slate-700);
-  border-color: var(--glass-border-strong);
+  background: var(--ink-700);
+  border-color: var(--line-stronger);
+  color: var(--text-strong);
 }
 .lang-toggle:active { transform: scale(0.96); }
 /* Pin to top-right on pages without a topbar */
@@ -607,10 +751,12 @@ body:not(:has(header)) > .lang-toggle {
   margin-top: 48px;
   padding: 18px 16px 22px;
   text-align: center;
-  font-size: 12.5px;
-  color: var(--slate-400);
-  border-top: 1px solid var(--glass-border);
-  background: rgba(0,0,0,0.15);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+  border-top: 1px solid var(--line);
+  background: var(--ink-950);
 }
 .site-credit a {
   color: var(--emerald);
@@ -651,34 +797,26 @@ body:not(:has(header)) > .lang-toggle {
   position: fixed;
   top: max(14px, env(safe-area-inset-top));
   left: 14px;
-  display: inline-flex; align-items: center; gap: 10px;
-  padding: 6px 14px 6px 6px;
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 36px;
+  padding: 0 12px 0 4px;
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.85); /* slate-900-ish */
-  border: 1px solid var(--glass-border);
+  background: rgba(14, 19, 32, 0.85);
+  border: 1px solid var(--line-strong);
   color: var(--text-strong);
-  font-size: 15px; font-weight: 800; line-height: 1;
-  letter-spacing: -0.01em;
+  font-size: 14px; font-weight: 600; line-height: 1;
+  letter-spacing: -0.012em;
   text-decoration: none;
   z-index: 900;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
-  transition: background .15s, transform .1s, border-color .15s;
+  box-shadow: var(--elev-2);
+  transition: background .12s, border-color .12s;
   user-select: none;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
-.ch-home-btn:hover { background: rgba(15, 23, 42, 1); border-color: var(--emerald); transform: translateY(-1px); }
-.ch-home-btn:active { transform: scale(0.97); }
-.ch-home-btn .brand-mark {
-  /* Re-use the index's brand-mark sizing for visual consistency */
-  width: 28px; height: 28px;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, var(--emerald), var(--emerald-dark));
-  color: white;
-  border-radius: 8px;
-  font-size: 14px; font-weight: 900;
-  flex-shrink: 0;
-}
+.ch-home-btn:hover { background: rgba(14, 19, 32, 1); border-color: var(--emerald-glow); }
+.ch-home-btn:active { transform: translateY(0.5px); }
+.ch-home-btn .brand-mark { width: 26px; height: 26px; font-size: 13px; }
 .ch-home-btn .ch-home-label { padding-right: 4px; }
 [dir="rtl"] .ch-home-btn { left: auto; right: 14px; padding: 6px 6px 6px 14px; }
 [dir="rtl"] .ch-home-btn .ch-home-label { padding-right: 0; padding-left: 4px; }
@@ -725,11 +863,8 @@ body:has(.dash) .ch-home-btn { display: none !important; }
 :focus-visible { outline: 2px solid var(--emerald); outline-offset: 2px; border-radius: 4px; }
 button:focus-visible, .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--emerald-glow); }
 
-/* Brand mark refresh — softer shadow */
-.brand-mark {
-  background: linear-gradient(135deg, var(--emerald), var(--emerald-dark)) !important;
-  box-shadow: 0 4px 14px -2px var(--emerald-glow), 0 1px 0 rgba(255,255,255,0.1) inset !important;
-}
+/* Brand mark — single source of truth (the upstream definition is canonical;
+   no overrides here). */
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {

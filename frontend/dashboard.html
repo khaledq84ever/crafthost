@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#0B1220" media="(prefers-color-scheme: dark)" />
-<meta name="theme-color" content="#0B1220" />
+<meta name="theme-color" content="#07090F" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#07090F" />
 <meta name="color-scheme" content="dark" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -15,7 +15,9 @@
 <link rel="apple-touch-icon" href="/icon.svg" />
 <link rel="manifest" href="/manifest.json" />
 <title>Dashboard · CraftHost</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/css/theme.css" />
 <link rel="stylesheet" href="/css/dashboard.css" />
 <link rel="stylesheet" href="/css/wizard.css" />
@@ -58,8 +60,8 @@
 
     <div class="side-foot">
       <strong id="planName" data-i18n="free_plan">Free</strong>
-      <div class="text-muted" style="font-size:12px;margin-top:4px;" id="planUsage">0 servers</div>
-      <a href="/pricing.html" class="badge badge-emerald" style="margin-top:8px;text-decoration:none;">⚡ Upgrade</a>
+      <div class="text-muted" id="planUsage">0 servers</div>
+      <a href="/pricing.html" class="badge badge-emerald sf-upgrade" data-i18n="upgrade">Upgrade</a>
     </div>
   </aside>
 
@@ -68,7 +70,7 @@
     <!-- TOPBAR -->
     <div class="topbar">
       <div class="topbar-title">
-        <h1>🖥 <span data-i18n="nav_servers">My Servers</span></h1>
+        <h1 data-i18n="nav_servers">My Servers</h1>
       </div>
       <div class="topbar-actions">
         <button class="btn btn-secondary btn-sm" id="logoutBtn" title="Sign out" data-i18n="sign_out">Sign out</button>
@@ -80,12 +82,12 @@
     <main class="main">
       <div class="page-head">
         <div>
-          <h1><span data-i18n="welcome_back">Welcome back</span>, <span id="userName">Builder</span> 👋</h1>
+          <h1><span data-i18n="welcome_back">Welcome back</span>, <span id="userName">Builder</span></h1>
           <p class="sub" data-i18n="manage_sub">Manage your Minecraft servers, plugins, and worlds.</p>
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <button class="btn btn-ghost btn-lg" onclick="openHealthCheck()" title="Aggregate health of all your servers"><span style="margin-right:4px;">🩺</span> <span data-i18n="health_check">Health Check</span></button>
-          <button class="btn btn-primary btn-lg" onclick="openWizard()"><span style="margin-right:2px;">+</span> <span data-i18n="create_server">Create Server</span></button>
+        <div class="page-head-actions">
+          <button class="btn btn-secondary btn-lg" onclick="openHealthCheck()" title="Aggregate health of all your servers"><span data-i18n="health_check">Health check</span></button>
+          <button class="btn btn-primary btn-lg" onclick="openWizard()">+ <span data-i18n="create_server">Create server</span></button>
         </div>
       </div>
 
@@ -116,35 +118,35 @@
       <!-- Quick deploy templates — 1-click create, skipping the wizard -->
       <div class="qd-row">
         <div class="qd-row-head">
-          <h3 data-i18n="quick_deploy">⚡ Quick Deploy</h3>
-          <p class="text-muted" data-i18n="quick_deploy_sub">Click any template to spin up a pre-configured server in seconds — no wizard.</p>
+          <h3 data-i18n="quick_deploy">Quick Deploy</h3>
+          <p class="text-muted" data-i18n="quick_deploy_sub">One-click templates — preconfigured server in seconds, no wizard.</p>
         </div>
         <div class="qd-grid">
-          <button class="qd-tile" onclick="quickDeploy('survival')" style="--c:#10B981;">
-            <div class="qd-icon">⛏️</div>
+          <button class="qd-tile" onclick="quickDeploy('survival')" style="--c:#34D399;">
+            <div class="qd-icon">S</div>
             <div class="qd-name" data-i18n="qd_survival">Survival</div>
-            <div class="qd-meta">Paper 1.21.1 · normal · PvP</div>
+            <div class="qd-meta">paper 1.21.1 · normal · pvp</div>
           </button>
-          <button class="qd-tile" onclick="quickDeploy('creative')" style="--c:#3B82F6;">
-            <div class="qd-icon">🏛️</div>
+          <button class="qd-tile" onclick="quickDeploy('creative')" style="--c:#60A5FA;">
+            <div class="qd-icon">C</div>
             <div class="qd-name" data-i18n="qd_creative">Creative</div>
-            <div class="qd-meta">Paper 1.21.1 · peaceful · build</div>
+            <div class="qd-meta">paper 1.21.1 · peaceful · build</div>
           </button>
-          <button class="qd-tile" onclick="quickDeploy('skyblock')" style="--c:#06B6D4;">
-            <div class="qd-icon">☁️</div>
+          <button class="qd-tile" onclick="quickDeploy('skyblock')" style="--c:#22D3EE;">
+            <div class="qd-icon">K</div>
             <div class="qd-name" data-i18n="qd_skyblock">Skyblock</div>
-            <div class="qd-meta">Paper 1.21.1 · hard · island</div>
+            <div class="qd-meta">paper 1.21.1 · hard · island</div>
           </button>
-          <button class="qd-tile" onclick="quickDeploy('modded')" style="--c:#A855F7;">
-            <div class="qd-icon">🐲</div>
+          <button class="qd-tile" onclick="quickDeploy('modded')" style="--c:#A78BFA;">
+            <div class="qd-icon">M</div>
             <div class="qd-name" data-i18n="qd_modded">Modded</div>
-            <div class="qd-meta">Fabric 1.21.1 · survival</div>
+            <div class="qd-meta">fabric 1.21.1 · survival</div>
           </button>
         </div>
       </div>
 
       <!-- Servers grid -->
-      <h2 style="font-size:18px;font-weight:700;margin-bottom:14px;" data-i18n="your_servers">Your Servers</h2>
+      <h2 class="section-h2" data-i18n="your_servers">Your servers</h2>
       <div class="servers-grid" id="serversGrid">
         <!-- populated by JS -->
       </div>

@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#0B1220" media="(prefers-color-scheme: dark)" />
-<meta name="theme-color" content="#0B1220" />
+<meta name="theme-color" content="#07090F" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#07090F" />
 <meta name="color-scheme" content="dark" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -15,30 +15,19 @@
 <link rel="apple-touch-icon" href="/icon.svg" />
 <link rel="manifest" href="/manifest.json" />
 <title>Create account · CraftHost</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/css/theme.css" />
 <link rel="stylesheet" href="/css/auth.css" />
 </head>
 <body>
 <div class="auth-wrap">
-  <div class="auth-side">
-    <a href="/" class="brand"><span class="brand-mark">C</span><span>CraftHost</span></a>
-    <div>
-      <h1 data-i18n="auth_signup_title">Start crafting today.</h1>
-      <p data-i18n="auth_signup_sub">Spin up your first server in under a minute. No credit card needed.</p>
-      <div class="auth-feats">
-        <div class="auth-feat"><span>✓</span> Free 7-day trial</div>
-        <div class="auth-feat"><span>✓</span> 1-click modpack installs</div>
-        <div class="auth-feat"><span>✓</span> Live console + file manager</div>
-        <div class="auth-feat"><span>✓</span> Cancel anytime</div>
-      </div>
-    </div>
-    <div style="color:var(--slate-500);font-size:13px;">© 2026 CraftHost</div>
-  </div>
   <div class="auth-main">
     <div class="auth-card">
+      <a href="/" class="auth-brand"><span class="brand-mark">C</span><span>CraftHost</span></a>
       <h2 data-i18n="auth_signup_title">Create your account</h2>
-      <p class="sub" data-i18n="auth_signup_sub">Free 7-day trial · No credit card required.</p>
+      <p class="sub" data-i18n="auth_signup_sub">Free forever for the starter plan. No card required.</p>
 
       <form id="regForm">
         <div class="field">
@@ -57,7 +46,7 @@
         <button type="submit" class="btn btn-primary btn-block btn-lg" data-i18n="sign_up">Create account →</button>
       </form>
 
-      <p class="auth-foot"><span data-i18n="auth_have_account">Already have an account?</span> <a href="/login.html" data-i18n="sign_in">Sign in</a></p>
+      <p class="auth-foot"><span data-i18n="auth_have_account">Already have an account?</span><a href="/login.html" data-i18n="sign_in">Sign in</a></p>
     </div>
   </div>
 </div>
@@ -73,7 +62,7 @@ pw.addEventListener('input', () => {
   if (/[A-Z]/.test(pw.value)) s++;
   if (/[0-9]/.test(pw.value)) s++;
   if (/[^A-Za-z0-9]/.test(pw.value)) s++;
-  const colors = ['#EF4444','#F59E0B','#FFB300','#84CC16','#00C853'];
+  const colors = ['#F43F5E','#F59E0B','#F59E0B','#34D399','#34D399'];
   bar.style.width = (s * 25) + '%';
   bar.style.background = colors[s];
 });
@@ -88,13 +77,11 @@ document.getElementById('regForm').addEventListener('submit', async (e) => {
       password: fd.get('password')
     } });
     if (r.token) {
-      // Same hydration as login — cache full user object so every page shows
-      // the user instantly without an API roundtrip flash.
       try {
         localStorage.setItem('crafthost.lastEmail', fd.get('email'));
         if (r.user) localStorage.setItem('crafthost.user', JSON.stringify(r.user));
       } catch {}
-      toast('Account created! Redirecting...');
+      toast('Account created. Redirecting…');
       const next = new URLSearchParams(location.search).get('next') || '/dashboard.html';
       const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard.html';
       setTimeout(() => location.href = safeNext, 700);

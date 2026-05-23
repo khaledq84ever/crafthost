@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#0B1220" media="(prefers-color-scheme: dark)" />
-<meta name="theme-color" content="#0B1220" />
+<meta name="theme-color" content="#07090F" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#07090F" />
 <meta name="color-scheme" content="dark" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -15,24 +15,19 @@
 <link rel="apple-touch-icon" href="/icon.svg" />
 <link rel="manifest" href="/manifest.json" />
 <title>Reset password · CraftHost</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/css/theme.css" />
 <link rel="stylesheet" href="/css/auth.css" />
 </head>
 <body>
 <div class="auth-wrap">
-  <div class="auth-side">
-    <a href="/" class="brand"><span class="brand-mark">C</span><span>CraftHost</span></a>
-    <div>
-      <h1>Forgot your password?</h1>
-      <p>No worries — we'll send you a link to set a new one.</p>
-    </div>
-    <div style="color:var(--slate-500);font-size:13px;">© 2026 CraftHost</div>
-  </div>
   <div class="auth-main">
     <div class="auth-card">
+      <a href="/" class="auth-brand"><span class="brand-mark">C</span><span>CraftHost</span></a>
       <h2>Reset password</h2>
-      <p class="sub">Enter the email tied to your account and we'll send a reset link.</p>
+      <p class="sub">Enter your account email and we'll send a reset link.</p>
       <form id="forgotForm">
         <div class="field">
           <label class="label">Email</label>
@@ -40,7 +35,7 @@
         </div>
         <button type="submit" class="btn btn-primary btn-block btn-lg">Send reset link →</button>
       </form>
-      <p class="auth-foot">Back to <a href="/login.html">Sign in</a></p>
+      <p class="auth-foot">Back to<a href="/login.html">Sign in</a></p>
     </div>
   </div>
 </div>
@@ -52,18 +47,18 @@ document.getElementById('forgotForm').addEventListener('submit', async (e) => {
   const fd = new FormData(e.target);
   const btn = e.target.querySelector('button[type="submit"]');
   const orig = btn.textContent;
-  btn.disabled = true; btn.textContent = '⏳ Sending…';
+  btn.disabled = true; btn.textContent = 'Sending…';
   try {
     const r = await api('/api/auth/forgot', { method: 'POST', body: { email: fd.get('email') } });
     if (r.reset_url) {
       // No email service yet — surface the link directly
       const card = document.querySelector('.auth-card');
       card.innerHTML = `
-        <h2>Reset link generated</h2>
-        <p class="sub">We don't have email sending wired yet — click the link below to set a new password. It expires in ${r.expires_in_minutes || 60} minutes.</p>
-        <a href="${r.reset_url}" class="btn btn-primary btn-block btn-lg" style="margin-top:14px;">Continue to reset →</a>
-        <button class="btn btn-secondary btn-block btn-sm" style="margin-top:8px;" onclick="navigator.clipboard.writeText('${r.reset_url}');toast('Link copied');">📋 Copy link</button>
-        <p class="auth-foot" style="margin-top:18px;">Back to <a href="/login.html">Sign in</a></p>
+        <h2>Reset link ready</h2>
+        <p class="sub">Email isn't wired yet — open the link below to set a new password. Expires in ${r.expires_in_minutes || 60} minutes.</p>
+        <a href="${r.reset_url}" class="btn btn-primary btn-block btn-lg">Continue to reset →</a>
+        <button class="btn btn-secondary btn-block btn-sm" onclick="navigator.clipboard.writeText('${r.reset_url}');toast('Link copied');">Copy link</button>
+        <p class="auth-foot">Back to<a href="/login.html">Sign in</a></p>
       `;
     } else {
       toast(r.message || 'If an account exists, a reset link has been issued.');
