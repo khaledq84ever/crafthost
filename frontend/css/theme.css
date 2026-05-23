@@ -870,3 +870,203 @@ button:focus-visible, .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px 
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   MOBILE BROWSER POLISH
+   Hits every page. Three breakpoints: 768 (tablets/large phones), 480
+   (most phones), 360 (small phones / iPhone SE 1st gen).
+
+   Goals:
+     1. Zero horizontal scroll on any page
+     2. Touch targets ≥ 44×44 on coarse pointers
+     3. Inputs stay 16px so iOS Safari doesn't zoom on focus
+     4. Grid/flex children don't push parents wider (min-width: 0)
+     5. Stack action button groups vertically when they'd otherwise wrap
+     6. Modals go full-screen on phones
+     7. Long mono content (IPs, IDs, log lines) wraps instead of overflowing
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Global lockdown — every direct grid/flex child should be allowed to
+   shrink. This is the single biggest fix for "card-makes-page-wider" bugs. */
+.dash > *, .main > *, .hero-inner > *, .stat-row > *, .servers-grid > *,
+.features-grid > *, .pricing-grid > *, .types-grid > *, .testimonials > *,
+.qd-grid > *, .footer-inner > *, .stats > *, .status-grid > * { min-width: 0; }
+
+/* Tablet & large phones (≤ 768px) */
+@media (max-width: 768px) {
+  /* Container: shrink padding, never wider than viewport */
+  .container { padding-left: 16px; padding-right: 16px; max-width: 100vw; }
+  body, html { overflow-x: clip; max-width: 100vw; }
+
+  /* Nav: allow wrap if CTAs don't fit */
+  .nav-inner { padding: 12px 14px; gap: 10px; flex-wrap: wrap; }
+  .nav-cta { gap: 6px; flex-wrap: wrap; }
+  .nav-cta .btn { height: 34px; padding: 0 12px; font-size: 13px; }
+
+  /* Section padding tighter */
+  .section { padding: 48px 0 !important; }
+
+  /* Card padding tighter */
+  .card, .feature, .plan, .testimonial,
+  .server-card, .stat-tile, .qd-tile, .type-card { padding: 16px; }
+
+  /* Hero: tighter, terminal wraps */
+  .hero { padding: 40px 0 36px; }
+  .hero-cta { width: 100%; }
+  .hero-cta .btn { flex: 1 1 140px; }
+  .hero-eyebrow { font-size: 11px; }
+  .hero-meta { gap: 10px; font-size: 11px; }
+  .term-block { border-radius: var(--radius); }
+  .term-body { padding: 12px 14px; font-size: 11.5px; line-height: 1.5; }
+  .term-chrome { padding: 8px 12px; font-size: 11px; }
+  .term-chrome .tc-title { font-size: 11px; }
+
+  /* Page head action group stacks vertically */
+  .page-head { flex-direction: column; align-items: stretch; gap: 14px; }
+  .page-head-actions { width: 100%; }
+  .page-head-actions .btn { flex: 1 1 140px; }
+
+  /* Stat tiles 2-up */
+  .stat-row { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .stat-tile { padding: 14px 16px; }
+  .stat-tile .val { font-size: 24px; }
+
+  /* Dashboard main padding */
+  .main { padding: 20px 16px; }
+
+  /* Topbar: tighter */
+  .topbar { padding: 10px 14px; min-height: 52px; }
+  .topbar-actions .btn-sm { height: 30px; padding: 0 10px; font-size: 12px; }
+  .topbar-actions .select { max-width: 50vw; }
+
+  /* Auth card */
+  .auth-card { padding: 26px 22px; }
+  .auth-wrap { padding: 24px 16px; }
+
+  /* Forms — make labels less crowded */
+  .label { font-size: 13px; }
+  .field { margin-bottom: 12px; }
+
+  /* Data rows on narrow: allow stack */
+  .data-row { flex-wrap: wrap; gap: 4px 12px; }
+
+  /* Footer */
+  .footer-inner { grid-template-columns: 1fr 1fr; gap: 20px; }
+  .footer-bottom { flex-direction: column; gap: 10px; text-align: center; }
+}
+
+/* Most phones (≤ 480px) */
+@media (max-width: 480px) {
+  /* Container: even tighter */
+  .container { padding-left: 14px; padding-right: 14px; }
+  .main { padding: 16px 14px; }
+
+  /* Cards tighter */
+  .card, .feature, .plan, .testimonial,
+  .server-card, .stat-tile, .qd-tile, .type-card { padding: 14px; }
+
+  /* Hero terminal — make it look right at this size */
+  .hero-title { font-size: clamp(28px, 9vw, 40px) !important; line-height: 1.05 !important; }
+  .hero-sub { font-size: 14px; max-width: 100%; }
+  .hero-cta .btn { flex: 1 1 100%; max-width: 100%; }
+  .term-body { font-size: 11px; padding: 10px 12px; }
+
+  /* Full-width buttons in action groups */
+  .page-head-actions { flex-direction: column; }
+  .page-head-actions .btn { width: 100%; flex: none; }
+
+  /* Stats single column */
+  .stat-row { grid-template-columns: 1fr; }
+  .stat-tile { padding: 14px 16px; }
+
+  /* Status tiles 2-up min */
+  .status-grid { grid-template-columns: 1fr 1fr; }
+
+  /* Auth card edge-to-edge feel */
+  .auth-card { padding: 22px 18px; border-radius: var(--radius-lg); }
+
+  /* Pricing plan price scale */
+  .plan-price span { font-size: 30px !important; }
+  .plan { padding: 22px 18px !important; }
+
+  /* Modal goes full-screen */
+  .modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    inset: 0 !important;
+  }
+  .modal-bg { padding: 0 !important; align-items: stretch !important; justify-content: stretch !important; }
+
+  /* Wizard modal — handled above too; keep step labels readable */
+  .wiz-step-labels { font-size: 10.5px; padding: 6px 14px 0; }
+
+  /* Sidebar drawer (mobile): kept by app.js — ensure brand text fits */
+  .side .brand { font-size: 14px; gap: 8px; }
+  .side .brand .brand-mark { width: 24px; height: 24px; font-size: 12px; }
+
+  /* Long IPs / IDs / file paths wrap */
+  .sc-ip, .ip, .port, .data-row .v,
+  .term-body, code, .mono { word-break: break-all; overflow-wrap: anywhere; }
+
+  /* Mobile bottom nav: a bit more breathing room */
+  .mobile-nav { padding-top: 4px; }
+  .mobile-nav a { font-size: 9px; min-height: 44px; }
+
+  /* Floating home button doesn't crowd page on top */
+  .ch-home-btn { height: 32px; font-size: 12.5px; padding: 0 10px 0 4px; top: 10px; left: 10px; }
+  .ch-home-btn .brand-mark { width: 24px; height: 24px; font-size: 12px; }
+}
+
+/* Tiny phones (≤ 360px) — iPhone SE 1st gen, older Androids */
+@media (max-width: 360px) {
+  .container { padding-left: 12px; padding-right: 12px; }
+  .main { padding: 14px 12px; }
+  .hero-title { font-size: clamp(24px, 9vw, 32px) !important; }
+  .nav-inner { padding: 10px 12px; gap: 8px; }
+  .nav-cta .btn { font-size: 12px; padding: 0 10px; }
+  /* Only mark on tiny screens to save space in the nav */
+  .nav .brand span:not(.brand-mark) { display: none; }
+  .auth-card { padding: 20px 16px; }
+  .qd-grid { grid-template-columns: 1fr; }
+}
+
+/* Coarse-pointer (touch) — guarantee 44×44 targets per WCAG */
+@media (pointer: coarse) {
+  .btn { min-height: 40px; }
+  .btn-sm { min-height: 36px; }
+  .btn-lg { min-height: 48px; }
+  .qd-tile, .type-card, .feature, .stat-tile, .server-card { min-height: 44px; }
+  .side-nav a, .mobile-nav a, .nav-links a { min-height: 44px; }
+  /* iOS Safari font-zoom-prevention — inputs must be 16px+ on focus */
+  input, select, textarea { font-size: 16px !important; }
+  /* Tap highlight subdued; we have focus-visible rings for accessibility */
+  * { -webkit-tap-highlight-color: rgba(52, 211, 153, 0.12); }
+}
+
+/* iOS Safari: address bar hides → URL bar fills the bottom — use dvh */
+@supports (height: 100dvh) {
+  .auth-wrap, .dash, body { min-height: 100dvh; }
+}
+
+/* Safari bottom-toolbar overlap on form submit screens — extra padding */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .auth-wrap, body { padding-bottom: max(0px, env(safe-area-inset-bottom)); }
+}
+
+/* Landscape phone — keep some breathing room top/bottom */
+@media (max-height: 480px) and (orientation: landscape) {
+  .hero { padding: 24px 0; }
+  .auth-wrap { padding: 16px 20px; }
+  .auth-card { padding: 18px 22px; }
+}
+
+/* Print: tasteful */
+@media print {
+  .nav, .ch-home-btn, .mobile-nav, .lang-toggle, .site-credit, .topbar { display: none !important; }
+  body { background: white; color: black; }
+  .card, .server-card, .stat-tile { border: 1px solid #ccc; background: white; color: black; }
+}
