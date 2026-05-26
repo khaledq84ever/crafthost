@@ -300,7 +300,7 @@ function openDeleteConfirm(sid, name) {
           ${escapeHtml(name)}
         </div>
         <p class="text-muted" style="font-size:13px;margin-bottom:14px;">
-          This stops the JVM, removes the world data, releases the bore tunnel, and erases all backups. There is no undo.
+          This stops the JVM, removes the world data, releases the public tunnel, and erases all backups. There is no undo.
         </p>
         <div class="field">
           <label class="label">Type the server name to confirm</label>
