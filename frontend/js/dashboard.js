@@ -1571,19 +1571,18 @@ async function renderBedrockStatus(sid, sname) {
 // (backend replies 503) do we fall back to the per-server playit.gg claim flow.
 async function enableBedrock(sid, sname) {
   const btn = document.getElementById('bedrockEnableBtn');
-  // Shared-secret limit: one playit agent can hold one tunnel at a time.
-  // If another server already has Bedrock on, enabling here would steal the
-  // tunnel from it — warn before proceeding. (Removed once multi-tunnel lands.)
-  try {
-    const list = await api('/api/servers');
-    const other = (list.servers || []).find(s => s.id !== sid && s.playit_enabled);
-    if (other && !confirm(`"${other.name}" already has Bedrock cross-play on. The current shared tunnel supports one server at a time, so enabling it here will disconnect Bedrock players on "${other.name}". Continue?`)) {
-      return;
-    }
-  } catch { /* non-fatal — proceed */ }
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Enabling…'; }
+  return doEnableBedrock(sid, sname, false);
+}
+
+// The single shared playit tunnel serves one server at a time. The backend is
+// authoritative: it returns 409 (code: bedrock_in_use) if another server holds
+// it. We surface that and offer a take-over, which re-calls with takeover:true
+// and the backend disables the other holder so state never goes inconsistent.
+async function doEnableBedrock(sid, sname, takeover) {
+  const btn = document.getElementById('bedrockEnableBtn');
   try {
-    const r = await api(`/api/servers/${sid}/playit/auto-enable`, { method: 'POST' });
+    const r = await api(`/api/servers/${sid}/playit/auto-enable`, { method: 'POST', body: { takeover } });
     toast('✓ Bedrock cross-play enabled');
     if (r.restart_required) toast(r.restart_reason || 'Restart the server to load the new plugins.', 'info');
     renderBedrockStatus(sid, sname); // re-renders into the "connecting → address" view
@@ -1591,6 +1590,13 @@ async function enableBedrock(sid, sname) {
     if (err?.status === 503) {
       // No shared secret on this deployment — use the manual claim flow instead.
       return startBedrockClaim(sid, sname);
+    }
+    if (err?.status === 409) {
+      const other = err.data?.conflict;
+      const move = confirm(`${err.message}\n\nMove Bedrock to "${sname}" now? This turns it off on "${other?.name || 'the other server'}".`);
+      if (move) return doEnableBedrock(sid, sname, true);
+      if (btn) { btn.disabled = false; btn.textContent = '⚡ Enable Bedrock cross-play'; }
+      return;
     }
     if (btn) { btn.disabled = false; btn.textContent = '⚡ Enable Bedrock cross-play'; }
     toast(err.message, 'error');

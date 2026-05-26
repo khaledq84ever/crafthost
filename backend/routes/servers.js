@@ -1107,7 +1107,33 @@ router.post('/:id/playit/auto-enable', (req, res) => {
   if (!playit.isAvailable()) {
     return res.status(503).json({ error: 'playit agent not installed' });
   }
+  // Single shared playit tunnel = platform-wide one-at-a-time. The whole platform
+  // shares ONE playit agent identity, and only one Geyser can bind UDP 19132 in
+  // the container — so only ONE server can hold Bedrock at a time. Block (409)
+  // unless the caller explicitly opts to take over, in which case we disable the
+  // other holders (clear secret + stop their agent) so state stays consistent.
+  const takeover = req.body && req.body.takeover === true;
+  const others = db.prepare(
+    'SELECT id, name, status FROM servers WHERE playit_secret IS NOT NULL AND id != ?'
+  ).all(s.id);
+  if (others.length && !takeover) {
+    const active = others.find(o => ['online', 'running', 'starting'].includes(o.status)) || others[0];
+    return res.status(409).json({
+      error: `Bedrock cross-play is already active on "${active.name}". The shared tunnel serves one server at a time — disable it there, or take over to move it here.`,
+      code: 'bedrock_in_use',
+      conflict: { server_id: active.id, name: active.name, online: ['online', 'running', 'starting'].includes(active.status) },
+    });
+  }
   try {
+    if (takeover && others.length) {
+      for (const o of others) {
+        try {
+          db.prepare('UPDATE servers SET playit_secret = NULL, playit_host = NULL, playit_port = NULL WHERE id = ?').run(o.id);
+          playit.stop(o.id);
+        } catch (e) { console.warn('[playit auto-enable] takeover stop:', e.message); }
+      }
+      audit(req.user.id, 'server.playit_takeover', s.id, req.ip, { from: others.map(o => o.id) });
+    }
     db.prepare('UPDATE servers SET playit_secret = ? WHERE id = ?').run(sharedSecret, s.id);
     audit(req.user.id, 'server.playit_auto_enable', s.id, req.ip);
     // Hot-start agent if server is running

@@ -221,6 +221,17 @@ async function start(serverId, localPort, secret) {
   }
   if (existing) agents.delete(serverId);
 
+  // Single shared tunnel: never run two agents concurrently. The same secret =
+  // the same playit agent identity, and only one Geyser can bind 19132 in this
+  // container — a second agent would fight the first. Belt-and-suspenders behind
+  // the auto-enable 409 guard (covers stale DB state / direct restarts).
+  for (const [otherId, a] of agents) {
+    if (otherId !== serverId && a.proc && !a.proc.killed) {
+      console.warn(`[playit] ${serverId}: agent already running for ${otherId} — refusing second (single shared tunnel)`);
+      return null;
+    }
+  }
+
   // Agent log → /tmp (kept for debugging; the address comes from the API now).
   const logDir = path.join('/tmp', `playit-${serverId}`);
   try { fs.mkdirSync(logDir, { recursive: true }); } catch {}

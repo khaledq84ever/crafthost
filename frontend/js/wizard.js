@@ -467,6 +467,9 @@ async function wizDeploy() {
       } catch (err) {
         if (err?.status === 503) {
           toast('Geyser installed — finish Bedrock setup from the server\'s ⋮ menu', 'info');
+        } else if (err?.status === 409) {
+          // Bedrock already active on another server (single shared tunnel).
+          toast('Geyser installed — Bedrock is in use on another server; take it over from the ⋮ menu', 'info');
         } else {
           toast(`Bedrock setup deferred: ${err.message}`, 'warn');
         }

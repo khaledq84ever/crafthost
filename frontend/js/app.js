@@ -433,6 +433,7 @@ window.api = async (path, opts = {}) => {
     const err = new Error(data.error || `HTTP ${r.status}`);
     err.status = r.status;            // 401 = unauth, 5xx = server, etc.
     err.transient = r.status >= 500;  // server-side issue, retry is reasonable
+    err.data = data;                  // full response body (e.g. conflict details)
     throw err;
   }
   return data;
