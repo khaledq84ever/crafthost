@@ -188,11 +188,28 @@ function renderServer(s) {
       </div>
     </div>
 
-    <div class="sc-ip" title="Click to copy" onclick="copyText('${escapeHtml(ip)}')" style="cursor:pointer;">
+    <div class="sc-ip" title="Java Edition · click to copy" onclick="copyText('${escapeHtml(ip)}')" style="cursor:pointer;">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
-      <span style="flex:1;">${escapeHtml(ip)}</span>
+      <span style="flex:1;">🖥️ <span style="font-weight:600;">Java:</span> ${escapeHtml(ip)}</span>
       <span class="sc-copy">📋 Copy</span>
     </div>
+    ${s.playit_host && s.playit_port ? `
+    <div class="sc-ip" title="Bedrock Edition (mobile / console) · click to copy" onclick="copyText('${escapeHtml(s.playit_host + ':' + s.playit_port)}')" style="cursor:pointer;border-color:rgba(255,107,53,0.35);background:rgba(255,107,53,0.05);">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ff6b35" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
+      <span style="flex:1;">📱 <span style="font-weight:600;">Bedrock:</span> ${escapeHtml(s.playit_host + ':' + s.playit_port)}</span>
+      <span class="sc-copy">📋 Copy</span>
+    </div>`
+    : s.playit_enabled ? `
+    <div class="sc-ip" title="Bedrock cross-play is on — waiting for tunnel address" onclick="openBedrockModal('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')" style="cursor:pointer;border-color:rgba(255,107,53,0.35);background:rgba(255,107,53,0.05);">
+      <span style="flex:1;">📱 <span style="font-weight:600;">Bedrock:</span> on — connecting…</span>
+      <span class="sc-copy">Details</span>
+    </div>`
+    : ['paper','spigot','purpur'].includes((s.type || '').toLowerCase()) ? `
+    <div class="sc-ip sc-bedrock-enable" title="Enable Bedrock cross-play — mobile / Xbox / Switch / PS players" onclick="openBedrockModal('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')" style="cursor:pointer;border-style:dashed;border-color:rgba(255,107,53,0.5);background:rgba(255,107,53,0.04);">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ff6b35" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
+      <span style="flex:1;">📱 <span style="font-weight:600;">Enable Bedrock cross-play</span> <span style="opacity:.65;font-size:11px;">mobile / console</span></span>
+      <span class="sc-copy" style="background:rgba(255,107,53,0.18);color:#ff6b35;">Enable →</span>
+    </div>` : ''}
     ${motdLine}
     ${sampleLine}
     ${crashHint}
@@ -237,6 +254,10 @@ function renderServer(s) {
         <button role="menuitem" onclick="closeCardMenu();copyText('${escapeHtml(ip)}')">
           <span class="sc-menu-icon">📋</span><span>Copy address</span>
         </button>
+        ${['paper','spigot','purpur'].includes((s.type || '').toLowerCase()) ? `
+        <button role="menuitem" onclick="closeCardMenu();openBedrockModal('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')">
+          <span class="sc-menu-icon">📱</span><span>${s.playit_enabled ? 'Bedrock cross-play (ON)' : 'Enable Bedrock cross-play'}</span>
+        </button>` : ''}
         ${!s.is_public ? `<button role="menuitem" onclick="closeCardMenu();promoteServer('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')">
           <span class="sc-menu-icon">🌍</span><span>Make Public</span>
         </button>` : ''}
@@ -1387,6 +1408,229 @@ function wiSetFile(file) {
 }
 window.openWorldImport = openWorldImport;
 window.closeWorldImport = closeWorldImport;
+
+// ── Bedrock cross-play modal (playit.gg agent) ─────────────────────────────
+let bedrockPollTimer = null;
+
+async function openBedrockModal(sid, sname) {
+  // Inject the modal markup if it's not already in the DOM
+  if (!document.getElementById('bedrockModal')) {
+    const div = document.createElement('div');
+    div.id = 'bedrockModal';
+    div.className = 'modal-host';
+    div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.65);display:none;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(4px);padding:16px;';
+    div.innerHTML = `
+      <div class="modal" style="max-width:520px;width:100%;background:var(--slate-800);border:1px solid var(--glass-border);border-radius:14px;overflow:hidden;">
+        <div class="modal-head" style="padding:16px 20px;border-bottom:1px solid var(--glass-border);display:flex;justify-content:space-between;align-items:center;">
+          <h3 style="margin:0;font-size:16px;font-weight:700;">📱 Bedrock cross-play</h3>
+          <button class="close-btn" onclick="closeBedrockModal()" style="background:none;border:none;color:var(--slate-400);cursor:pointer;padding:4px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body" id="bedrockBody" style="padding:18px 20px;font-size:13px;line-height:1.55;"></div>
+      </div>`;
+    document.body.appendChild(div);
+  }
+  const modal = document.getElementById('bedrockModal');
+  modal.style.display = 'flex';
+  modal.dataset.sid = sid;
+  modal.dataset.sname = sname;
+  modal.onclick = e => { if (e.target === modal) closeBedrockModal(); };
+  renderBedrockStatus(sid, sname);
+}
+
+function closeBedrockModal() {
+  const modal = document.getElementById('bedrockModal');
+  if (modal) modal.style.display = 'none';
+  if (bedrockPollTimer) { clearInterval(bedrockPollTimer); bedrockPollTimer = null; }
+}
+
+async function renderBedrockStatus(sid, sname) {
+  const body = document.getElementById('bedrockBody');
+  if (!body) return;
+  body.innerHTML = `<div style="color:var(--slate-400);text-align:center;padding:16px 0;">Loading…</div>`;
+  try {
+    // Get server (for playit_enabled + host/port)
+    const list = await api('/api/servers');
+    const srv = (list.servers || []).find(s => s.id === sid);
+    if (!srv) { body.innerHTML = '<div style="color:var(--rose);">Server not found.</div>'; return; }
+    const status = await api(`/api/servers/${sid}/playit/claim/status`).catch(() => ({ status: 'none' }));
+
+    if (srv.playit_enabled && srv.playit_host && srv.playit_port) {
+      // Connected + agent running with assigned address
+      const bp = status.bedrock_plugins || {};
+      const pluginsReady = bp.geyser && bp.floodgate;
+      const pluginsRow = pluginsReady
+        ? `<div style="font-size:12px;color:var(--emerald);margin-bottom:14px;">✓ Geyser + Floodgate installed</div>`
+        : bp.installing
+        ? `<div style="font-size:12px;color:var(--slate-300);margin-bottom:14px;">⏳ Installing Geyser + Floodgate from cache…</div>`
+        : `<div style="font-size:12px;color:var(--slate-400);margin-bottom:14px;">Geyser ${bp.geyser ? '✓' : '○'} · Floodgate ${bp.floodgate ? '✓' : '○'}</div>`;
+      const restartHint = status.restart_required
+        ? `<div style="background:rgba(245,158,11,0.10);border:1px solid rgba(245,158,11,0.3);border-radius:9px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#fbbf24;">
+             ⟳ ${escapeHtml(status.restart_reason || 'Restart the server to apply changes.')}
+           </div>` : '';
+      body.innerHTML = `
+        <div style="background:rgba(16,185,129,0.10);border:1px solid rgba(16,185,129,0.3);border-radius:9px;padding:12px;margin-bottom:14px;">
+          <div style="font-weight:700;color:var(--emerald);margin-bottom:4px;">✓ Bedrock cross-play active</div>
+          <div style="font-size:12px;color:var(--slate-400);">Mobile / Xbox / Switch / PS players can connect using:</div>
+        </div>
+        <div class="sc-ip" onclick="copyText('${escapeHtml(srv.playit_host + ':' + srv.playit_port)}')" style="cursor:pointer;margin-bottom:14px;border-color:rgba(255,107,53,0.4);">
+          <span style="flex:1;font-family:monospace;font-size:14px;">📱 ${escapeHtml(srv.playit_host)}:${escapeHtml(String(srv.playit_port))}</span>
+          <span class="sc-copy">📋 Copy</span>
+        </div>
+        ${pluginsRow}
+        ${restartHint}
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          ${status.restart_required ? `<button class="btn btn-warning btn-sm" onclick="serverAction('${escapeHtml(sid)}', 'restart'); closeBedrockModal();">⟳ Restart now</button>` : ''}
+          <button class="btn btn-secondary btn-sm" onclick="closeBedrockModal()">Close</button>
+          <button class="btn btn-danger btn-sm" onclick="disableBedrock('${escapeHtml(sid)}')">Disable</button>
+        </div>`;
+      return;
+    }
+
+    if (srv.playit_enabled) {
+      // Secret set but no address yet — agent is connecting
+      body.innerHTML = `
+        <div style="text-align:center;padding:18px 0;">
+          <div style="font-weight:700;margin-bottom:8px;">⏳ Connecting to playit.gg…</div>
+          <div style="color:var(--slate-400);font-size:12px;">The agent is starting. Address will appear here within ~20s.</div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button class="btn btn-secondary btn-sm" onclick="renderBedrockStatus('${escapeHtml(sid)}', '${escapeHtml(sname)}')">↻ Refresh</button>
+          <button class="btn btn-secondary btn-sm" onclick="closeBedrockModal()">Close</button>
+        </div>`;
+      // Auto-refresh every 3s
+      if (bedrockPollTimer) clearInterval(bedrockPollTimer);
+      bedrockPollTimer = setInterval(() => renderBedrockStatus(sid, sname), 3000);
+      return;
+    }
+
+    if (status.status === 'pending' && status.claim_url) {
+      // Claim in progress — show the URL + poll
+      body.innerHTML = `
+        <div style="margin-bottom:14px;">
+          <strong>Step 1 of 2: Link your playit.gg account</strong>
+          <div style="color:var(--slate-400);font-size:12px;margin-top:4px;">Free signup. Lets Bedrock players (mobile / Xbox / Switch / PS) connect to this server.</div>
+        </div>
+        <a href="${escapeHtml(status.claim_url)}" target="_blank" rel="noopener" class="btn btn-primary" style="display:block;text-align:center;text-decoration:none;margin-bottom:10px;">
+          🔗 Open playit.gg to approve
+        </a>
+        <div style="font-size:11px;color:var(--slate-500);text-align:center;margin-bottom:14px;font-family:monospace;">
+          ${escapeHtml(status.claim_url)}
+        </div>
+        <div id="bedrockPoll" style="text-align:center;color:var(--slate-400);font-size:12px;padding:8px 0;">
+          <span class="ed-spin" style="display:inline-block;width:12px;height:12px;border:2px solid var(--slate-600);border-top-color:var(--emerald);border-radius:50%;animation:ed-spin 0.7s linear infinite;vertical-align:middle;margin-right:6px;"></span>
+          Waiting for approval… (${status.elapsed_sec || 0}s)
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
+          <button class="btn btn-secondary btn-sm" onclick="cancelBedrockClaim('${escapeHtml(sid)}', '${escapeHtml(sname)}')">Cancel</button>
+        </div>`;
+      if (bedrockPollTimer) clearInterval(bedrockPollTimer);
+      bedrockPollTimer = setInterval(async () => {
+        const s2 = await api(`/api/servers/${sid}/playit/claim/status`).catch(() => null);
+        if (!s2) return;
+        if (s2.status === 'connected') {
+          clearInterval(bedrockPollTimer); bedrockPollTimer = null;
+          toast('✓ Bedrock cross-play connected');
+          renderBedrockStatus(sid, sname);
+        } else if (s2.status === 'expired' || s2.status === 'failed') {
+          clearInterval(bedrockPollTimer); bedrockPollTimer = null;
+          const node = document.getElementById('bedrockPoll');
+          if (node) node.innerHTML = `<span style="color:var(--rose);">✗ Claim ${s2.status}. Click "Connect" to try again.</span>`;
+        } else {
+          const node = document.getElementById('bedrockPoll');
+          if (node) node.innerHTML = `<span class="ed-spin" style="display:inline-block;width:12px;height:12px;border:2px solid var(--slate-600);border-top-color:var(--emerald);border-radius:50%;animation:ed-spin 0.7s linear infinite;vertical-align:middle;margin-right:6px;"></span>Waiting for approval… (${s2.elapsed_sec || 0}s)`;
+        }
+      }, 2500);
+      return;
+    }
+
+    // Not connected, no claim — show the initial "Enable" prompt.
+    // One click tries the operator's shared playit secret (auto, zero setup).
+    // Only if that's not configured does it fall back to the per-server claim flow.
+    body.innerHTML = `
+      <div style="margin-bottom:16px;">
+        Bedrock Edition players (mobile / Xbox / Switch / PlayStation) need a <strong>UDP-capable tunnel</strong> to connect.
+        One click turns it on — no signup, no extra tabs.
+      </div>
+      <div style="background:var(--slate-700);border-radius:9px;padding:12px;margin-bottom:14px;font-size:12px;color:var(--slate-300);">
+        Click <em>Enable</em> and CraftHost provisions a <code>xxx.gl.ply.gg:&lt;port&gt;</code> address, then
+        auto-installs Geyser + Floodgate so Java and Bedrock players share the same world.
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-secondary btn-sm" onclick="closeBedrockModal()">Cancel</button>
+        <button class="btn btn-primary btn-sm" id="bedrockEnableBtn" onclick="enableBedrock('${escapeHtml(sid)}', '${escapeHtml(sname)}')">⚡ Enable Bedrock cross-play</button>
+      </div>`;
+  } catch (err) {
+    body.innerHTML = `<div style="color:var(--rose);">Error: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+// One-click enable. Tries the operator's shared playit secret first (no signup,
+// no extra tabs). Only if the operator hasn't configured PLAYIT_SHARED_SECRET
+// (backend replies 503) do we fall back to the per-server playit.gg claim flow.
+async function enableBedrock(sid, sname) {
+  const btn = document.getElementById('bedrockEnableBtn');
+  // Shared-secret limit: one playit agent can hold one tunnel at a time.
+  // If another server already has Bedrock on, enabling here would steal the
+  // tunnel from it — warn before proceeding. (Removed once multi-tunnel lands.)
+  try {
+    const list = await api('/api/servers');
+    const other = (list.servers || []).find(s => s.id !== sid && s.playit_enabled);
+    if (other && !confirm(`"${other.name}" already has Bedrock cross-play on. The current shared tunnel supports one server at a time, so enabling it here will disconnect Bedrock players on "${other.name}". Continue?`)) {
+      return;
+    }
+  } catch { /* non-fatal — proceed */ }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Enabling…'; }
+  try {
+    const r = await api(`/api/servers/${sid}/playit/auto-enable`, { method: 'POST' });
+    toast('✓ Bedrock cross-play enabled');
+    if (r.restart_required) toast(r.restart_reason || 'Restart the server to load the new plugins.', 'info');
+    renderBedrockStatus(sid, sname); // re-renders into the "connecting → address" view
+  } catch (err) {
+    if (err?.status === 503) {
+      // No shared secret on this deployment — use the manual claim flow instead.
+      return startBedrockClaim(sid, sname);
+    }
+    if (btn) { btn.disabled = false; btn.textContent = '⚡ Enable Bedrock cross-play'; }
+    toast(err.message, 'error');
+  }
+}
+
+async function startBedrockClaim(sid, sname) {
+  try {
+    await api(`/api/servers/${sid}/playit/claim/start`, { method: 'POST' });
+    renderBedrockStatus(sid, sname);
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+async function cancelBedrockClaim(sid, sname) {
+  try { await api(`/api/servers/${sid}/playit/claim/cancel`, { method: 'POST' }); } catch {}
+  if (bedrockPollTimer) { clearInterval(bedrockPollTimer); bedrockPollTimer = null; }
+  renderBedrockStatus(sid, sname);
+}
+
+async function disableBedrock(sid) {
+  if (!confirm('Disable Bedrock cross-play? The playit tunnel will close. Your Java address (bore.pub) stays unchanged.')) return;
+  try {
+    await api(`/api/servers/${sid}/playit`, { method: 'POST', body: { secret: null } });
+    toast('Bedrock cross-play disabled');
+    closeBedrockModal();
+    if (typeof loadServers === 'function') loadServers();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+window.openBedrockModal = openBedrockModal;
+window.closeBedrockModal = closeBedrockModal;
+window.renderBedrockStatus = renderBedrockStatus;
+window.enableBedrock = enableBedrock;
+window.startBedrockClaim = startBedrockClaim;
+window.cancelBedrockClaim = cancelBedrockClaim;
+window.disableBedrock = disableBedrock;
 
 // Logout
 document.addEventListener('DOMContentLoaded', () => {

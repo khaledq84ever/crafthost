@@ -86,27 +86,61 @@ async function downloadFile(url, dest, label) {
   return buf.length;
 }
 
-// Resolve the URL to a Paper server JAR for a given MC version.
+// Resolve the URL to a Paper server JAR for a given MC version. Paper migrated
+// from the v2 API (api.papermc.io) to the v3 API (fill.papermc.io) — only v3
+// carries the new year-based versions (26.1.2 etc). We try v3 first since it
+// covers EVERY published Paper version (1.7 → 26.x), then fall back to v2 if
+// v3 is unreachable for some reason.
+const PAPER_V3 = process.env.PAPER_V3_API || 'https://fill.papermc.io/v3';
 async function paperJarUrl(version) {
-  const v = version && version !== 'LATEST' ? version : null;
-  let mcVersion = v;
-  if (!mcVersion) {
-    const r = await fetch(`${PAPER_API}/projects/paper`, { headers: { 'User-Agent': 'CraftHost/1.0' } });
-    const data = await r.json();
-    mcVersion = data.versions[data.versions.length - 1];
+  const want = version && version !== 'LATEST' ? version : null;
+  try {
+    // ── v3 path ─────────────────────────────────────────────────────────────
+    let mcVersion = want;
+    if (!mcVersion) {
+      const r = await fetch(`${PAPER_V3}/projects/paper`, { headers: { 'User-Agent': 'CraftHost/1.0' } });
+      if (!r.ok) throw new Error(`v3 project list: HTTP ${r.status}`);
+      const data = await r.json();
+      // v3 shape: { project, versions: { "26.1": ["26.1.2",...], "1.21": [...] } }
+      const groups = Object.keys(data.versions || {});
+      // Pick the highest group, then the highest version inside (first element is newest)
+      const latestGroup = groups.sort((a, b) => {
+        const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
+        return (pb[0] - pa[0]) || ((pb[1] || 0) - (pa[1] || 0));
+      })[0];
+      mcVersion = data.versions[latestGroup][0];
+    }
+    const buildR = await fetch(`${PAPER_V3}/projects/paper/versions/${mcVersion}/builds/latest`, { headers: { 'User-Agent': 'CraftHost/1.0' } });
+    if (!buildR.ok) throw new Error(`v3 build lookup ${mcVersion}: HTTP ${buildR.status}`);
+    const detail = await buildR.json();
+    const dl = detail.downloads?.['server:default'];
+    if (!dl?.url) throw new Error(`v3 ${mcVersion}: no server:default download`);
+    return { url: dl.url, version: mcVersion, build: detail.id };
+  } catch (v3err) {
+    // ── v2 fallback ─────────────────────────────────────────────────────────
+    try {
+      let mcVersion = want;
+      if (!mcVersion) {
+        const r = await fetch(`${PAPER_API}/projects/paper`, { headers: { 'User-Agent': 'CraftHost/1.0' } });
+        const data = await r.json();
+        mcVersion = data.versions[data.versions.length - 1];
+      }
+      const buildsR = await fetch(`${PAPER_API}/projects/paper/versions/${mcVersion}`, { headers: { 'User-Agent': 'CraftHost/1.0' } });
+      if (!buildsR.ok) throw new Error(`v2 version ${mcVersion} not found (v3 err: ${v3err.message.slice(0,80)})`);
+      const buildsData = await buildsR.json();
+      const build = buildsData.builds[buildsData.builds.length - 1];
+      const detailR = await fetch(`${PAPER_API}/projects/paper/versions/${mcVersion}/builds/${build}`, { headers: { 'User-Agent': 'CraftHost/1.0' } });
+      const detail = await detailR.json();
+      const fileName = detail.downloads.application.name;
+      return {
+        url: `${PAPER_API}/projects/paper/versions/${mcVersion}/builds/${build}/downloads/${fileName}`,
+        version: mcVersion,
+        build,
+      };
+    } catch (v2err) {
+      throw new Error(`Paper ${want || 'LATEST'} unavailable on both APIs: v3=${v3err.message.slice(0,60)} v2=${v2err.message.slice(0,60)}`);
+    }
   }
-  const buildsR = await fetch(`${PAPER_API}/projects/paper/versions/${mcVersion}`, { headers: { 'User-Agent': 'CraftHost/1.0' } });
-  if (!buildsR.ok) throw new Error(`Paper version ${mcVersion} not found`);
-  const buildsData = await buildsR.json();
-  const build = buildsData.builds[buildsData.builds.length - 1];
-  const detailR = await fetch(`${PAPER_API}/projects/paper/versions/${mcVersion}/builds/${build}`, { headers: { 'User-Agent': 'CraftHost/1.0' } });
-  const detail = await detailR.json();
-  const fileName = detail.downloads.application.name;
-  return {
-    url: `${PAPER_API}/projects/paper/versions/${mcVersion}/builds/${build}/downloads/${fileName}`,
-    version: mcVersion,
-    build,
-  };
 }
 
 // Purpur server JAR via api.purpurmc.org. Endpoint pattern:
@@ -389,6 +423,20 @@ async function startServer(containerId, server) {
     '-jar', jarPath,
     'nogui',
   ];
+
+  // One-shot recovery: if swap-jar dropped the safemode sentinel for a
+  // cross-engine swap into Vanilla, append --safeMode to bypass the broken
+  // worldgen-settings inherited from the previous Paper-family JAR. Consume
+  // the sentinel so subsequent boots run normally.
+  const t = String(server.type || '').toLowerCase();
+  if (t === 'vanilla') {
+    const sentinel = path.join(dir, '.crafthost-vanilla-safemode');
+    if (fs.existsSync(sentinel)) {
+      args.push('--safeMode');
+      try { fs.unlinkSync(sentinel); } catch {}
+      console.log(`[jvm/${id}] vanilla --safeMode (cross-engine swap recovery)`);
+    }
+  }
 
   const proc = spawn('java', args, {
     cwd: dir,
@@ -906,22 +954,29 @@ function clearCrash(id) { crashes.delete(id); }
 // Runs in background — never blocks startup. Skips anything already cached.
 // Errors are non-fatal: if a download fails, log it and move on.
 async function prewarmJarCache() {
-  // Popular MC versions worth caching upfront so users get instant boots.
-  // Heavier engines (Paper, Vanilla, Purpur, Fabric) × every common MC ver.
-  const PAPER_VERS   = ['1.19.4', '1.20.1', '1.20.4', '1.21.1', '1.21.4'];
-  const FABRIC_VERS  = ['1.19.4', '1.20.1', '1.20.4', '1.21.1', '1.21.4'];
-  const VANILLA_VERS = ['1.20.1', '1.21.1'];
-  const PURPUR_VERS  = ['1.20.1', '1.21.1'];
+  // Cover the FULL wizard version list × every cacheable engine. Users picking
+  // any (type, version) combo from the UI get a cache HIT (zero-wait boot)
+  // instead of a 30-90s download on server creation. Old/unsupported combos
+  // (e.g. Paper 1.12.2 — not on api.papermc.io) error non-fatally below.
+  //
+  // Must mirror MC_VERSIONS in frontend/js/wizard.js. Keep in sync when the
+  // wizard list changes.
+  const WIZARD_VERS = ['26.1.2', '1.21.11', '1.21.8', '1.21.5', '1.21.4', '1.21.1', '1.21', '1.20.6', '1.20.4', '1.20.1', '1.19.4', '1.18.2', '1.16.5', '1.12.2'];
+  // Engines whose launcher JAR is a single self-contained blob we can hardlink
+  // across servers. NeoForge is excluded — it ships an installer that mutates
+  // the per-server dir, so cache reuse doesn't apply.
+  const CACHEABLE_ENGINES = [
+    { type: 'paper',   resolve: paperJarUrl   },
+    { type: 'vanilla', resolve: vanillaJarUrl },
+    { type: 'purpur',  resolve: purpurJarUrl  },
+    { type: 'fabric',  resolve: fabricJarUrl  },
+  ];
   const targets = [];
-  for (const v of PAPER_VERS)   targets.push({ type: 'paper',   version: v, resolve: paperJarUrl   });
-  for (const v of FABRIC_VERS)  targets.push({ type: 'fabric',  version: v, resolve: fabricJarUrl  });
-  for (const v of VANILLA_VERS) targets.push({ type: 'vanilla', version: v, resolve: vanillaJarUrl });
-  for (const v of PURPUR_VERS)  targets.push({ type: 'purpur',  version: v, resolve: purpurJarUrl  });
-  // Plus LATEST per engine
-  targets.push({ type: 'paper',   version: 'LATEST', resolve: paperJarUrl   });
-  targets.push({ type: 'vanilla', version: 'LATEST', resolve: vanillaJarUrl });
-  targets.push({ type: 'purpur',  version: 'LATEST', resolve: purpurJarUrl  });
-  targets.push({ type: 'fabric',  version: 'LATEST', resolve: fabricJarUrl  });
+  for (const eng of CACHEABLE_ENGINES) {
+    for (const v of WIZARD_VERS) targets.push({ type: eng.type, version: v, resolve: eng.resolve });
+    // LATEST per engine — separate cache key so 'LATEST' picks also hit.
+    targets.push({ type: eng.type, version: 'LATEST', resolve: eng.resolve });
+  }
   try { fs.mkdirSync(JAR_CACHE_DIR, { recursive: true }); } catch {}
 
   let hits = 0, misses = 0, errors = 0, mb = 0;

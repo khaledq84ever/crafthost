@@ -37,6 +37,27 @@ RUN ARCH=$(uname -m); \
     chmod +x /usr/local/bin/bore && \
     bore --version
 
+# playit.gg agent + CLI: free TCP+UDP tunnel for Bedrock cross-play. Java
+# traffic still goes through bore (above) — playit handles the UDP that
+# Bedrock Edition (RakNet on 19132) needs and that bore can't relay.
+#
+# Two binaries:
+#   playit-cli   — claim/exchange/setup flow (one-time per server)
+#   playit-agent — the actual daemon, runs alongside the JVM when a server
+#                  has a playit secret stored. Supports --platform-docker
+#                  for clean registration as a containerized agent.
+RUN ARCH=$(uname -m); \
+    case "$ARCH" in \
+      x86_64) PLAYIT_ARCH=amd64 ;; \
+      aarch64) PLAYIT_ARCH=aarch64 ;; \
+      *) echo "Unsupported arch: $ARCH"; exit 1 ;; \
+    esac; \
+    PLAYIT_VER=1.0.4; \
+    curl -fsSL -o /usr/local/bin/playit-cli   "https://github.com/playit-cloud/playit-agent/releases/download/v${PLAYIT_VER}/playit-cli-linux-${PLAYIT_ARCH}" && \
+    curl -fsSL -o /usr/local/bin/playit-agent "https://github.com/playit-cloud/playit-agent/releases/download/v${PLAYIT_VER}/playit-linux-${PLAYIT_ARCH}" && \
+    chmod +x /usr/local/bin/playit-cli /usr/local/bin/playit-agent && \
+    /usr/local/bin/playit-cli version 2>&1 | head -1 || true
+
 COPY package*.json ./
 RUN npm install --omit=dev --no-audit --no-fund
 

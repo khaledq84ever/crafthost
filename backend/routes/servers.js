@@ -7,6 +7,7 @@ const { authMiddleware } = require('../lib/auth');
 const dc = require('../lib/controller');
 const railway = require('../lib/railway-api');
 const tunnel = require('../lib/tunnel');
+const playit = require('../lib/playit');
 
 const MAX_WORLD_ZIP_BYTES = 500 * 1024 * 1024; // 500MB cap for world.zip uploads
 const worldUpload = multer({
@@ -96,6 +97,15 @@ function publicHost() {
   return process.env.PUBLIC_MC_HOST || process.env.RAILWAY_PUBLIC_DOMAIN || 'mc.crafthost.gg';
 }
 
+// Strip sensitive fields from server rows before sending to the client.
+// Replaces playit_secret with a boolean playit_enabled flag — the actual
+// secret never leaves the database after it's set.
+function redact(row) {
+  if (!row) return row;
+  const { playit_secret, ...rest } = row;
+  return { ...rest, playit_enabled: !!playit_secret };
+}
+
 router.get('/', (req, res) => {
   const rows = db.prepare(`
     SELECT s.*, p.name as plan_name, p.ram_mb, p.cpu_cores, p.max_players as plan_max_players
@@ -104,15 +114,44 @@ router.get('/', (req, res) => {
     ORDER BY s.user_slot ASC, s.created_at ASC
   `).all(req.user.id);
   res.json({
-    servers: rows,
+    servers: rows.map(redact),
     public_host: publicHost(),
     proxy_enabled: railway.isConfigured(),
+    playit_available: playit.isAvailable(),
   });
 });
 
-// Maximum servers per user, per plan
-// Servers-per-user quota. Now on Railway Pro (1 TB RAM) so we can be generous.
-const MAX_SERVERS = { free: 10, dirt: 5, stone: 10, iron: 20, diamond: 40, netherite: 100 };
+// Per-user server cap. Every account may create up to MAX_SERVERS_PER_USER
+// servers total. Owner/admin accounts are exempt (unlimited): any user whose
+// role is 'admin', or whose username / email (or email local-part) is listed in
+// UNLIMITED_USERS (case-insensitive). Defaults: 3 per user, khaledq84ever unlimited.
+const MAX_SERVERS_PER_USER = parseInt(process.env.MAX_SERVERS_PER_USER || '3', 10);
+const UNLIMITED_USERS = (process.env.UNLIMITED_USERS || 'khaledq84ever')
+  .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+function isUnlimitedUser(user) {
+  if (user?.role === 'admin') return true;
+  const uname = (user?.username || '').toLowerCase();
+  const email = (user?.email || '').toLowerCase();
+  return UNLIMITED_USERS.includes(uname)
+      || UNLIMITED_USERS.includes(email)
+      || UNLIMITED_USERS.includes(email.split('@')[0]);
+}
+
+// Shared playit secret store — makes Bedrock one-click for EVERY server after the
+// owner approves playit.gg just ONCE. Resolution order: PLAYIT_SHARED_SECRET env
+// var first, then the secret captured from the owner's first successful claim
+// (persisted in app_settings). No env var or SSH needed — the system remembers it.
+db.exec(`CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT)`);
+function getSharedPlayitSecret() {
+  if (process.env.PLAYIT_SHARED_SECRET) return process.env.PLAYIT_SHARED_SECRET;
+  const row = db.prepare("SELECT value FROM app_settings WHERE key = 'playit_shared_secret'").get();
+  return row?.value || null;
+}
+function setSharedPlayitSecret(secret) {
+  if (!secret) return;
+  db.prepare(`INSERT INTO app_settings (key, value) VALUES ('playit_shared_secret', ?)
+              ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(secret);
+}
 
 // Shared server-creation logic. Used by POST /api/servers AND by the auto-starter
 // that fires on registration. `opts` is the deploy spec, `user` is { id, username }.
@@ -124,11 +163,12 @@ async function createServerForUser(user, opts, ip) {
   const planRow = db.prepare('SELECT * FROM plans WHERE id = ?').get(plan);
   if (!planRow) { const e = new Error('Invalid plan'); e.status = 400; throw e; }
 
-  const limit = MAX_SERVERS[plan] || 100;
-  const existing = db.prepare('SELECT COUNT(*) AS c FROM servers WHERE user_id = ? AND plan_id = ?').get(user.id, plan);
-  if (existing.c >= limit) {
-    const e = new Error(`${planRow.name} plan limit reached (${limit} server${limit === 1 ? '' : 's'}). Upgrade or delete an existing server.`);
-    e.status = 409; throw e;
+  if (!isUnlimitedUser(user)) {
+    const existing = db.prepare('SELECT COUNT(*) AS c FROM servers WHERE user_id = ?').get(user.id);
+    if (existing.c >= MAX_SERVERS_PER_USER) {
+      const e = new Error(`Server limit reached — you can create up to ${MAX_SERVERS_PER_USER} servers. Delete one to make room.`);
+      e.status = 409; throw e;
+    }
   }
 
   const slot = nextSlotFor(user.id);
@@ -216,9 +256,9 @@ async function createServerForUser(user, opts, ip) {
     //   seed_plugins: true            → install the LuckPerms default
     //   seed_plugins: [pid, pid, ...] → install each Modrinth project id (best-effort)
     if (Array.isArray(seed_plugins) && seed_plugins.length) {
-      seedDefaultPlugins(user.id, id, seed_plugins).catch(err => console.warn('[seed]', err.message));
+      seedDefaultPlugins(user.id, id, seed_plugins, version).catch(err => console.warn('[seed]', err.message));
     } else if (seed_plugins === true) {
-      seedDefaultPlugins(user.id, id, ['Vebnzrzj']).catch(err => console.warn('[seed]', err.message));
+      seedDefaultPlugins(user.id, id, ['Vebnzrzj'], version).catch(err => console.warn('[seed]', err.message));
     }
 
     let autoStarted = false;
@@ -580,37 +620,43 @@ router.get('/health-check', async (req, res) => {
   });
 });
 
-async function seedDefaultPlugins(userId, serverId, projectIds) {
+async function seedDefaultPlugins(userId, serverId, projectIds, mcVersion) {
   // Best-effort bulk install of Modrinth project IDs into <server>/plugins/.
-  // Each failure is logged but doesn't block server creation. The IDs we pass
-  // from the frontend are well-known plugins (LuckPerms, EssentialsX, WorldEdit,
-  // ViaVersion, CoreProtect, Spark).
+  // Tries the local plugin-cache first (instant hardlink, no network); falls
+  // back to a live Modrinth fetch filtered by THIS server's MC version, then
+  // populates the cache so future installs at the same MC version are HITs.
   const path = require('path');
   const fsp = require('fs/promises');
-  const MODRINTH = process.env.MODRINTH_API || 'https://api.modrinth.com/v2';
-  const UA = 'CraftHost/1.0 (crafthost.up.railway.app)';
+  const pluginCache = require('../lib/plugin-cache');
   const DATA_DIR = process.env.DATA_DIR || path.resolve(__dirname, '../../data/servers');
   const pluginsDir = path.join(DATA_DIR, serverId, 'plugins');
   await fsp.mkdir(pluginsDir, { recursive: true });
   const ids = (Array.isArray(projectIds) ? projectIds : [projectIds]).filter(Boolean);
   for (const pid of ids) {
     try {
-      // Prefer paper-loader version, fall back to any
-      const vr = await fetch(`${MODRINTH}/project/${encodeURIComponent(pid)}/version?loaders=%5B%22paper%22%2C%22spigot%22%2C%22bukkit%22%5D`, { headers: { 'User-Agent': UA } });
-      let versions = vr.ok ? await vr.json() : [];
-      if (!Array.isArray(versions) || !versions.length) {
-        const vr2 = await fetch(`${MODRINTH}/project/${encodeURIComponent(pid)}/version`, { headers: { 'User-Agent': UA } });
-        versions = vr2.ok ? await vr2.json() : [];
+      // ── CACHE FIRST — try exact-MC slot, then 'any' fallback
+      const hit = await pluginCache.copyFromCache(pid, pluginsDir, mcVersion);
+      if (hit) {
+        console.log(`[plugin-cache] HIT  ${pid}@${hit.mc} → ${hit.filename}`);
+        audit(userId, 'plugin.seed', serverId, null, { name: hit.filename, project: pid, cached: true, mc: hit.mc });
+        continue;
       }
-      const v = Array.isArray(versions) ? versions[0] : null;
-      const file = v?.files?.find(f => f.primary) || v?.files?.[0];
-      if (!file?.url) { console.warn(`[seed] no file for ${pid}`); continue; }
-      const dl = await fetch(file.url, { headers: { 'User-Agent': UA } });
+      // ── CACHE MISS — fetch from Modrinth/upstream filtered by MC version
+      const meta = await pluginCache.resolveLatestVersion(pid, mcVersion);
+      const dl = await fetch(meta.url, { headers: { 'User-Agent': 'CraftHost/1.0' } });
       if (!dl.ok) { console.warn(`[seed] download failed ${pid}: ${dl.status}`); continue; }
       const buf = Buffer.from(await dl.arrayBuffer());
-      const safe = String(file.filename).replace(/[^a-zA-Z0-9._-]/g, '_');
+      const safe = String(meta.filename).replace(/[^a-zA-Z0-9._-]/g, '_');
       await fsp.writeFile(path.join(pluginsDir, safe), buf);
-      audit(userId, 'plugin.seed', serverId, null, { name: safe, project: pid });
+      try {
+        await pluginCache.writeIntoCache(pid, meta.filename, buf, {
+          version_id: meta.version_id,
+          version_number: meta.version_number,
+          sha512: meta.sha512,
+        }, mcVersion);
+      } catch (err) { console.warn(`[plugin-cache] writeIntoCache ${pid}:`, err.message); }
+      console.log(`[plugin-cache] MISS ${pid}@${mcVersion || 'any'} → fetched + cached`);
+      audit(userId, 'plugin.seed', serverId, null, { name: safe, project: pid, cached: false, mc: mcVersion || 'any' });
     } catch (err) {
       console.warn(`[seed] ${pid} failed:`, err.message);
     }
@@ -660,6 +706,12 @@ router.post('/:id/start', async (req, res) => {
       tunnel.start(s.id, internalListenPort(s))
         .catch(err => console.warn('[start] tunnel:', err.message));
     }
+    // playit.gg agent (UDP — Bedrock cross-play via Geyser). Only if the user
+    // configured a playit secret on this server. Java still uses bore above.
+    if (s.playit_secret && playit.isAvailable()) {
+      playit.start(s.id, internalListenPort(s), s.playit_secret)
+        .catch(err => console.warn('[start] playit:', err.message));
+    }
     res.json(r);
   } catch (err) {
     res.status(500).json({ error: err.message || 'start failed' });
@@ -669,6 +721,7 @@ router.post('/:id/start', async (req, res) => {
 router.post('/:id/stop', async (req, res) => {
   const s = getOwnedServer(req, res); if (!s) return;
   tunnel.stop(s.id);
+  playit.stop(s.id);
   const r = await dc.stopServer(s);
   db.prepare('UPDATE servers SET status = ? WHERE id = ?').run('offline', s.id);
   audit(req.user.id, 'server.stop', s.id, req.ip);
@@ -679,12 +732,17 @@ router.post('/:id/restart', async (req, res) => {
   const s = getOwnedServer(req, res); if (!s) return;
   try {
     tunnel.stop(s.id);
+    playit.stop(s.id);
     const r = await dc.restartServer(s);
     db.prepare('UPDATE servers SET status = ? WHERE id = ?').run('starting', s.id);
     audit(req.user.id, 'server.restart', s.id, req.ip);
     if (tunnel.isAvailable()) {
       tunnel.start(s.id, internalListenPort(s))
         .catch(err => console.warn('[restart] tunnel:', err.message));
+    }
+    if (s.playit_secret && playit.isAvailable()) {
+      playit.start(s.id, internalListenPort(s), s.playit_secret)
+        .catch(err => console.warn('[restart] playit:', err.message));
     }
     res.json(r);
   } catch (err) {
@@ -695,6 +753,7 @@ router.post('/:id/restart', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   const s = getOwnedServer(req, res); if (!s) return;
   tunnel.stop(s.id);
+  playit.stop(s.id);
   await dc.removeServer(s);
   if (s.proxy_id && railway.isConfigured()) {
     try { await railway.deleteTcpProxy(s.proxy_id); }
@@ -1035,6 +1094,155 @@ router.get('/:id/properties', (req, res) => {
 });
 
 // Swap the server's JAR (paper/vanilla/purpur/fabric + version). Wipes server.jar then restarts.
+// POST /api/servers/:id/playit/auto-enable
+// One-click Bedrock enable using the OPERATOR's shared playit secret
+// (PLAYIT_SHARED_SECRET env var). Skips the per-server claim flow entirely.
+// If the env var isn't set, the UI falls back to the claim flow.
+router.post('/:id/playit/auto-enable', (req, res) => {
+  const s = getOwnedServer(req, res); if (!s) return;
+  const sharedSecret = getSharedPlayitSecret();
+  if (!sharedSecret) {
+    return res.status(503).json({ error: 'no shared playit secret yet — fall back to claim flow (the first owner claim captures it)' });
+  }
+  if (!playit.isAvailable()) {
+    return res.status(503).json({ error: 'playit agent not installed' });
+  }
+  try {
+    db.prepare('UPDATE servers SET playit_secret = ? WHERE id = ?').run(sharedSecret, s.id);
+    audit(req.user.id, 'server.playit_auto_enable', s.id, req.ip);
+    // Hot-start agent if server is running
+    if (['online', 'running', 'starting'].includes(s.status) && !playit.info(s.id)) {
+      playit.start(s.id, internalListenPort(s), sharedSecret)
+        .catch(err => console.warn('[playit auto-enable] hot-start:', err.message));
+    }
+    // Auto-install Geyser + Floodgate from cache
+    seedDefaultPlugins(req.user.id, s.id, ['wKkoqHrH', 'bWrNNfkb'], s.version)
+      .catch(err => console.warn('[playit auto-enable] plugin install:', err.message));
+    const restartRequired = ['online', 'running'].includes(s.status);
+    res.json({
+      ok: true,
+      mode: 'shared',
+      restart_required: restartRequired,
+      restart_reason: restartRequired ? 'Geyser + Floodgate installed — restart so the server loads them.' : null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'auto-enable failed' });
+  }
+});
+
+// POST /api/servers/:id/playit/claim/start
+// Kicks off the playit.gg claim flow for this server. Returns { code, url }
+// — the user visits the URL, signs into playit.gg, and approves. The agent
+// then receives a permanent secret which we store in servers.playit_secret.
+// The exchange runs in the background for up to 5 minutes.
+router.post('/:id/playit/claim/start', (req, res) => {
+  const s = getOwnedServer(req, res); if (!s) return;
+  if (!playit.isAvailable()) return res.status(503).json({ error: 'playit agent not installed' });
+  try {
+    const out = playit.claimStart(s.id, `CraftHost-${s.name || s.id.slice(0,8)}`);
+    audit(req.user.id, 'server.playit_claim_start', s.id, req.ip);
+    res.json({ ok: true, ...out });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'claim start failed' });
+  }
+});
+
+// GET /api/servers/:id/playit/claim/status
+// Polled by the UI while the user is approving the claim. Returns one of:
+//   { status: 'pending', claim_url, code, elapsed_sec }
+//   { status: 'connected', secret_set: true, plugins_installed: [...] }
+//   { status: 'expired' | 'failed', error?, claim_url, code }
+//   { status: 'none' } — no claim in flight, no secret saved
+//
+// On first 'connected' detection, auto-installs Geyser + Floodgate from the
+// plugin cache so Bedrock cross-play works without a separate trip to the
+// marketplace. Restart hint surfaced in the response.
+const BEDROCK_PLUGINS = ['wKkoqHrH', 'bWrNNfkb']; // Geyser, Floodgate
+router.get('/:id/playit/claim/status', (req, res) => {
+  const s = getOwnedServer(req, res); if (!s) return;
+  try {
+    const out = playit.claimStatus(s.id);
+    if (out.status === 'connected' && playit.isAvailable()) {
+      // Hot-start agent if server is running
+      const fresh = db.prepare('SELECT playit_secret FROM servers WHERE id = ?').get(s.id);
+      if (fresh?.playit_secret && ['online', 'running', 'starting'].includes(s.status) && !playit.info(s.id)) {
+        playit.start(s.id, internalListenPort(s), fresh.playit_secret)
+          .catch(err => console.warn('[playit claim] hot-start:', err.message));
+      }
+      // Capture the owner's secret as the shared one (once) so every future
+      // server can auto-enable Bedrock with no extra playit.gg approval.
+      if (fresh?.playit_secret && isUnlimitedUser(req.user) && !getSharedPlayitSecret()) {
+        setSharedPlayitSecret(fresh.playit_secret);
+        console.log('[playit] captured owner secret as shared — Bedrock is now one-click for all servers');
+      }
+      // Auto-install Geyser + Floodgate from the per-MC plugin cache. Idempotent —
+      // re-running is harmless (cache hardlink errors on EEXIST are swallowed).
+      // Done once per claim by tracking on the playit state via the request.
+      const path = require('path');
+      const fs = require('fs');
+      const DATA_DIR = process.env.DATA_DIR || path.resolve(__dirname, '../../data/servers');
+      const pluginsDir = path.join(DATA_DIR, s.id, 'plugins');
+      const geyserInstalled = fs.existsSync(pluginsDir) && fs.readdirSync(pluginsDir).some(f => /geyser/i.test(f));
+      const floodgateInstalled = fs.existsSync(pluginsDir) && fs.readdirSync(pluginsDir).some(f => /floodgate/i.test(f));
+      out.bedrock_plugins = { geyser: geyserInstalled, floodgate: floodgateInstalled };
+      if (!geyserInstalled || !floodgateInstalled) {
+        seedDefaultPlugins(req.user.id, s.id, BEDROCK_PLUGINS, s.version)
+          .then(() => console.log(`[playit claim] auto-installed Geyser+Floodgate for ${s.id}`))
+          .catch(err => console.warn(`[playit claim] plugin auto-install failed:`, err.message));
+        out.bedrock_plugins.installing = true;
+      }
+      // Restart hint — if server's online, plugins need a reload to take effect
+      if (['online', 'running'].includes(s.status)) {
+        out.restart_required = true;
+        out.restart_reason = 'Geyser + Floodgate plugins installed — restart the server so it loads them.';
+      }
+    }
+    res.json(out);
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'claim status failed' });
+  }
+});
+
+// POST /api/servers/:id/playit/claim/cancel
+router.post('/:id/playit/claim/cancel', (req, res) => {
+  const s = getOwnedServer(req, res); if (!s) return;
+  playit.claimCancel(s.id);
+  res.json({ ok: true });
+});
+
+// POST /api/servers/:id/playit  { secret: '<playit.gg secret>' | null }
+// Set or clear the playit.gg agent secret for this server. Storing a secret
+// enables Bedrock cross-play (UDP tunnel via playit.gg) the next time the
+// server starts. Setting null disables it + stops any running agent.
+router.post('/:id/playit', async (req, res) => {
+  const s = getOwnedServer(req, res); if (!s) return;
+  const { secret } = req.body || {};
+  if (secret && typeof secret !== 'string') {
+    return res.status(400).json({ error: 'secret must be a string or null' });
+  }
+  const cleaned = secret ? secret.trim() : null;
+  if (cleaned && (cleaned.length < 8 || cleaned.length > 512)) {
+    return res.status(400).json({ error: 'secret length out of range' });
+  }
+  try {
+    db.prepare('UPDATE servers SET playit_secret = ?, playit_host = NULL, playit_port = NULL WHERE id = ?')
+      .run(cleaned || null, s.id);
+    if (!cleaned) {
+      playit.stop(s.id);
+    } else if (s.status === 'online' || s.status === 'running' || s.status === 'starting') {
+      // Hot-start the agent if the server is already running
+      if (playit.isAvailable()) {
+        playit.start(s.id, internalListenPort(s), cleaned)
+          .catch(err => console.warn('[playit set] hot-start:', err.message));
+      }
+    }
+    audit(req.user.id, 'server.playit_set', s.id, req.ip, { enabled: !!cleaned });
+    res.json({ ok: true, enabled: !!cleaned, available: playit.isAvailable() });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'failed to update playit secret' });
+  }
+});
+
 router.post('/:id/swap-jar', async (req, res) => {
   const s = getOwnedServer(req, res); if (!s) return;
   const { type, version } = req.body || {};
@@ -1065,6 +1273,30 @@ router.post('/:id/swap-jar', async (req, res) => {
     for (const f of STALE_CONFIGS) {
       try { await fsp.rm(path.join(serverRoot, f), { recursive: true, force: true }); } catch {}
     }
+
+    // Cross-engine swap from a Paper-family engine to Vanilla: Paper writes a
+    // `paper` datapack reference into level.dat, and Vanilla refuses to boot
+    // with "Missing data pack paper / Overworld settings missing". Vanilla's
+    // own escape hatch is `--safeMode` (resets WorldGen settings, keeps chunks).
+    // Drop a one-shot sentinel that the controller consumes on next boot.
+    const PAPER_FAMILY = new Set(['paper', 'purpur', 'spigot', 'fabric']);
+    if (PAPER_FAMILY.has(s.type) && type === 'vanilla') {
+      // Paper writes its WorldGenSettings into level.dat with paper-namespace
+      // dimension references. Vanilla refuses to boot with "Overworld settings
+      // missing". --safeMode is not enough — it ignores datapacks but the
+      // level.dat references are still evaluated. The pragmatic fix: wipe
+      // level.dat so Vanilla regenerates clean defaults. CHUNKS (region/*.mca)
+      // and PLAYER DATA (playerdata/) are preserved — only the world seed,
+      // spawn point, game time, and gamerules reset to vanilla defaults.
+      try {
+        await fsp.writeFile(path.join(serverRoot, '.crafthost-vanilla-safemode'), String(Date.now()));
+      } catch {}
+      try { await fsp.rm(path.join(serverRoot, 'world', 'datapacks'),    { recursive: true, force: true }); } catch {}
+      try { await fsp.rm(path.join(serverRoot, 'world', 'data'),         { recursive: true, force: true }); } catch {}
+      try { await fsp.rm(path.join(serverRoot, 'world', 'level.dat'),    { recursive: true, force: true }); } catch {}
+      try { await fsp.rm(path.join(serverRoot, 'world', 'level.dat_old'),{ recursive: true, force: true }); } catch {}
+    }
+
     db.prepare('UPDATE servers SET type = ?, version = ?, status = ? WHERE id = ?')
       .run(type, version || null, 'starting', s.id);
     const updated = { ...s, type, version: version || null };

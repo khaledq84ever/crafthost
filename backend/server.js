@@ -192,6 +192,11 @@ app.get('/api/health', async (req, res) => {
         disk.verified_versions = state;
       } catch { /* state file may not exist yet */ }
     }
+    // Plugin cache — same idea, surfaces what's ready for instant install
+    try {
+      const pluginCache = require('./lib/plugin-cache');
+      disk.plugin_cache = pluginCache.listCache();
+    } catch { /* module load may fail in non-jvm mode */ }
   } catch (err) { disk = { error: err.message }; }
 
   res.json({
@@ -842,6 +847,18 @@ server.listen(PORT, async () => {
     setTimeout(() => { jvmCtl.prewarmJarCache().catch(err => console.warn('[prewarm] failed:', err.message)); }, 10_000);
     setInterval(() => { jvmCtl.prewarmJarCache().catch(err => console.warn('[prewarm] failed:', err.message)); }, 24 * 60 * 60 * 1000);
     console.log('📦 JAR pre-warm scheduled (10s + every 24h)');
+  }
+
+  // Pre-warm the PLUGIN cache (LuckPerms / EssentialsX / WorldEdit / etc.)
+  // Same shape as JAR prewarm: download once, hardlink into each new server's
+  // plugins/ dir. Eliminates the 2-8s Modrinth fetch per plugin at create time.
+  try {
+    const pluginCache = require('./lib/plugin-cache');
+    setTimeout(() => { pluginCache.prewarmPluginCache().catch(err => console.warn('[plugin-prewarm] failed:', err.message)); }, 12_000);
+    setInterval(() => { pluginCache.prewarmPluginCache().catch(err => console.warn('[plugin-prewarm] failed:', err.message)); }, 24 * 60 * 60 * 1000);
+    console.log('🧩 Plugin pre-warm scheduled (12s + every 24h)');
+  } catch (err) {
+    console.warn('[plugin-prewarm] init failed:', err.message);
   }
 
   // Continuous JAR health probe — every 10 min verifies every cached JAR

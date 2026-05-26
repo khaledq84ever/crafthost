@@ -10,7 +10,11 @@ const SERVER_TYPES = [
 ];
 
 const MC_VERSIONS = [
-  { id: '1.21.4', name: '1.21.4', date: '2024-12-03', latest: true },
+  { id: '26.1.2', name: '26.1.2', date: '2026-05-15', latest: true },
+  { id: '1.21.11', name: '1.21.11', date: '2026-05-22', stable: true },
+  { id: '1.21.8', name: '1.21.8', date: '2025-09-10', stable: true },
+  { id: '1.21.5', name: '1.21.5', date: '2025-03-20' },
+  { id: '1.21.4', name: '1.21.4', date: '2024-12-03' },
   { id: '1.21.1', name: '1.21.1', date: '2024-08-08', stable: true },
   { id: '1.21',   name: '1.21',   date: '2024-06-13' },
   { id: '1.20.6', name: '1.20.6', date: '2024-04-29' },
@@ -56,6 +60,7 @@ window.wizState = {
   customJar: null,
   starterPlugins: [], // Modrinth project IDs to pre-install
   seed: '',           // Optional world seed — pre-written to server.properties
+  bedrock: false,     // Bedrock cross-play: installs Geyser+Floodgate + opens playit tunnel
 };
 // Local alias for the rest of the file so unqualified `wizState` references
 // still work as before (they now read the same object from window).
@@ -66,12 +71,20 @@ const wizState = window.wizState;
 // server types (paper/spigot/purpur). Fabric/NeoForge use mods (different page).
 const STARTER_PLUGINS = [
   { id: 'Vebnzrzj', name: 'LuckPerms',  icon: '🔒', desc: 'Permissions manager — set roles + privileges.' },
-  { id: 'haFkXkpA', name: 'EssentialsX', icon: '⚙', desc: 'Server essentials — /home /tpa /kit /spawn.' },
+  { id: 'hXiIvTyT', name: 'EssentialsX', icon: '⚙', desc: 'Server essentials — /home /tpa /kit /spawn.' },
   { id: '1u6JkXh5', name: 'WorldEdit',  icon: '🗺',  desc: 'Terrain editor — copy, paste, fill, generate.' },
   { id: 'P1OZGk5p', name: 'ViaVersion', icon: '🔄', desc: 'Cross-version compatibility — older clients connect.' },
-  { id: 'Yh6Ud4LX', name: 'CoreProtect', icon: '🛡', desc: 'Block logging — roll back grief, audit changes.' },
+  { id: 'Lu3KuzdV', name: 'CoreProtect', icon: '🛡', desc: 'Block logging — roll back grief, audit changes.' },
   { id: 'squaremap',  name: 'squaremap',  icon: '🗺', desc: 'Lightweight web map — view your world in a browser.' },
+  // Bedrock cross-play (Geyser + Floodgate) is NOT shown as loose chips — toggling
+  // the plugins alone installs them but doesn't open the UDP tunnel, so Bedrock
+  // still wouldn't work. They're driven by the single "Bedrock cross-play" switch
+  // below, which installs both AND enables the playit tunnel. See BEDROCK_PLUGIN_IDS.
+  { id: 'wKkoqHrH', name: 'GeyserMC',   icon: '📱', desc: 'Bedrock cross-play — mobile / Xbox / Switch / PS players join.', bedrock: true },
+  { id: 'bWrNNfkb', name: 'Floodgate',  icon: '🌊', desc: 'Geyser companion — Bedrock players join without a Java account.', bedrock: true },
 ];
+// The two project IDs the Bedrock toggle pulls in (kept in sync with the flags above).
+const BEDROCK_PLUGIN_IDS = STARTER_PLUGINS.filter(p => p.bedrock).map(p => p.id);
 
 async function openWizard() {
   // Gate at the door: must be authenticated. If not, send to login.
@@ -242,6 +255,7 @@ function renderStep2() {
     </div>
     ${heavyWarn}
     <p class="text-muted" style="font-size:13px;">Selected: <span class="text-emerald">${SERVER_TYPES.find(t => t.id === wizState.type)?.name} ${wizState.version}</span></p>
+    ${renderBedrockToggle()}
   `;
 }
 
@@ -283,11 +297,7 @@ function renderStep3() {
         </select>
       </div>
     </div>
-    <div class="field">
-      <label class="label">World seed <span class="text-muted" style="font-weight:400;font-size:12px;">(optional)</span></label>
-      <input type="text" class="input" placeholder="Leave blank for random — or paste any seed (e.g. -1565555510)" value="${escapeHtmlW(wizState.seed || '')}" oninput="wizState.seed=this.value" maxlength="80" />
-      <p class="text-muted" style="font-size:11.5px;margin-top:4px;">Generates the same terrain as a Minecraft single-player world with the same seed.</p>
-    </div>
+    ${renderBedrockToggle()}
     ${renderStarterPlugins()}
   `;
 }
@@ -303,7 +313,7 @@ function renderStarterPlugins() {
       <label class="label">Starter plugins (optional)</label>
       <p class="text-muted" style="font-size:12.5px;margin-bottom:10px;">Pre-installed on first boot. Toggle the ones you want — you can always install more later from the Marketplace.</p>
       <div class="plugin-chips">
-        ${STARTER_PLUGINS.map(p => {
+        ${STARTER_PLUGINS.filter(p => !p.bedrock).map(p => {
           const on = (wizState.starterPlugins || []).includes(p.id);
           return `
             <button type="button" class="pl-chip ${on ? 'on' : ''}" onclick="toggleStarterPlugin('${p.id}')" title="${escapeHtmlW(p.desc)}">
@@ -320,6 +330,37 @@ function renderStarterPlugins() {
     </div>
   `;
 }
+
+// Single switch that does the whole Bedrock job: installs Geyser + Floodgate AND
+// opens the playit UDP tunnel after deploy. Replaces the old two loose plugin
+// chips that installed the plugins but left Bedrock players unable to connect.
+function renderBedrockToggle() {
+  // Geyser is a Spigot-family plugin — only offer Bedrock on plugin-capable types.
+  if (!['paper', 'spigot', 'purpur'].includes((wizState.type || '').toLowerCase())) return '';
+  const on = !!wizState.bedrock;
+  return `
+    <div class="bedrock-toggle ${on ? 'on' : ''}" onclick="toggleBedrock()"
+         style="margin-top:14px;display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;cursor:pointer;
+                border:1px solid ${on ? 'var(--emerald)' : 'var(--glass-border, rgba(255,255,255,0.12))'};
+                background:${on ? 'rgba(16,185,129,0.10)' : 'rgba(255,255,255,0.03)'};transition:all .18s;">
+      <span style="font-size:22px;line-height:1;">📱</span>
+      <span style="flex:1;">
+        <span style="display:block;font-weight:700;font-size:13.5px;">Bedrock cross-play</span>
+        <span style="display:block;font-size:12px;color:var(--text-muted, #9aa);">Let mobile / Xbox / Switch / PS players join. Installs Geyser + Floodgate and opens the Bedrock tunnel automatically.</span>
+      </span>
+      <span aria-hidden="true" style="flex:none;width:40px;height:23px;border-radius:999px;position:relative;transition:background .18s;
+            background:${on ? 'var(--emerald)' : 'rgba(255,255,255,0.18)'};">
+        <span style="position:absolute;top:2px;left:${on ? '19px' : '2px'};width:19px;height:19px;border-radius:50%;background:#fff;transition:left .18s;box-shadow:0 1px 3px rgba(0,0,0,.4);"></span>
+      </span>
+    </div>
+  `;
+}
+
+function toggleBedrock() {
+  wizState.bedrock = !wizState.bedrock;
+  renderWizard();
+}
+window.toggleBedrock = toggleBedrock;
 
 function toggleStarterPlugin(pid) {
   const list = wizState.starterPlugins = wizState.starterPlugins || [];
@@ -342,6 +383,7 @@ function renderStep4() {
       <div class="review-row"><span class="l">Region</span><span class="v">${wizState.region.toUpperCase()}</span></div>
       <div class="review-row"><span class="l">Gamemode</span><span class="v">${wizState.gamemode} (${wizState.difficulty})</span></div>
       <div class="review-row"><span class="l">Whitelist</span><span class="v">${wizState.whitelist ? 'On' : 'Off'}</span></div>
+      <div class="review-row"><span class="l">Bedrock cross-play</span><span class="v">${wizState.bedrock ? '📱 On' : 'Off'}</span></div>
     </div>
     <p class="text-muted mt-6" style="font-size:13px;">Your server will be deployed to <span class="text-emerald">${wizState.region.toUpperCase()}</span> region. Boot time is typically 30–90 seconds.</p>
   `;
@@ -382,6 +424,11 @@ async function wizDeploy() {
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Deploying…'; }
   toast('Deploying your server... ⚡');
   try {
+    // When Bedrock cross-play is on, fold Geyser + Floodgate into the install
+    // list (deduped) so they're present on first boot. The tunnel itself is
+    // opened by the auto-enable call after the server is created (below).
+    const plugins = [...(wizState.starterPlugins || [])];
+    if (wizState.bedrock) for (const id of BEDROCK_PLUGIN_IDS) if (!plugins.includes(id)) plugins.push(id);
     const body = {
       name: wizState.name,
       type: wizState.type,
@@ -392,7 +439,7 @@ async function wizDeploy() {
       difficulty: wizState.difficulty,
       gamemode: wizState.gamemode,
       whitelist: !!wizState.whitelist,
-      seed_plugins: Array.isArray(wizState.starterPlugins) && wizState.starterPlugins.length ? wizState.starterPlugins : undefined,
+      seed_plugins: plugins.length ? plugins : undefined,
       seed: (wizState.seed && wizState.seed.trim()) || undefined,
     };
     // If a custom JAR was selected, upload it first to /api/jars then attach its storage path
@@ -409,6 +456,22 @@ async function wizDeploy() {
     }
     const r = await api('/api/servers', { method: 'POST', body });
     if (r?.id) localStorage.setItem('crafthost.currentServerId', r.id);
+    // Bedrock toggle: open the playit tunnel for the new server. Uses the shared
+    // operator secret (one click). If that's not configured (503), the Geyser +
+    // Floodgate plugins are still installed — the user finishes the one-time
+    // playit approve from the dashboard's Bedrock panel. Non-fatal either way.
+    if (wizState.bedrock && r?.id) {
+      try {
+        await api(`/api/servers/${r.id}/playit/auto-enable`, { method: 'POST' });
+        toast('📱 Bedrock cross-play enabled');
+      } catch (err) {
+        if (err?.status === 503) {
+          toast('Geyser installed — finish Bedrock setup from the server\'s ⋮ menu', 'info');
+        } else {
+          toast(`Bedrock setup deferred: ${err.message}`, 'warn');
+        }
+      }
+    }
     // Switch the wizard modal to the live progress screen and poll until ready
     renderDeployProgress(r);
   } catch (err) {

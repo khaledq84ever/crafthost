@@ -22,7 +22,10 @@ function check(cond, msg, severity = 'error') {
   }
 }
 
-const PAGES = ['/', '/login.html', '/register.html', '/forgot.html', '/reset.html', '/dashboard.html', '/files.html', '/console.html', '/marketplace.html', '/jars.html', '/billing.html', '/settings.html', '/admin.html', '/support.html', '/pricing.html'];
+// pricing.html removed from this list: tiers/pricing were dropped (CraftHost is
+// free), so pricing.html is now just a redirect stub — it intentionally doesn't
+// load app.js or carry i18n, which the per-page checks below would flag.
+const PAGES = ['/', '/login.html', '/register.html', '/forgot.html', '/reset.html', '/dashboard.html', '/files.html', '/console.html', '/marketplace.html', '/jars.html', '/billing.html', '/settings.html', '/admin.html', '/support.html'];
 
 console.log(`\nDeep test against ${BASE}\n`);
 
@@ -83,10 +86,10 @@ const PROTECTED = [
   ['GET',  '/api/servers/health-check'],
   ['POST', '/api/servers/clone'],
   ['GET',  '/api/auth/me'],
-  ['GET',  '/api/admin/stats'],
-  ['POST', '/api/admin/disk/cleanup'],
   ['GET',  '/api/jars'],
-  ['GET',  '/api/billing/summary'],
+  // Removed 2026-05-25: /api/admin/* and /api/billing/summary were dropped when the
+  // platform collapsed to a single free plan (no billing). The routers aren't mounted,
+  // so these returned 404 instead of 401 — stale checks, not real auth gaps.
 ];
 for (const [method, path] of PROTECTED) {
   try {

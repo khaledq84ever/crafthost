@@ -180,22 +180,64 @@ async function exercise(ctx) {
 }
 
 async function crossUserCheck(ctxA, ctxB) {
-  // A tries to read B's data — should 4xx
+  // A tries to read AND mutate B's data — every attempt should 4xx.
   const r = {};
-  for (const p of [
+  const readPaths = [
     `/api/servers/${ctxB.serverId}/status`,
     `/api/servers/${ctxB.serverId}/logs`,
     `/api/servers/${ctxB.serverId}/events`,
     `/api/servers/${ctxB.serverId}/players`,
-  ]) {
+  ];
+  for (const p of readPaths) {
     try {
       await ctxA.fetchJson(p);
-      r[p] = 'LEAKED ✗';
+      r[`GET ${p}`] = 'LEAKED ✗';
     } catch (e) {
-      r[p] = e.status >= 400 && e.status < 500 ? `${e.status} ✓` : `${e.status || 'err'} ?`;
+      r[`GET ${p}`] = e.status >= 400 && e.status < 500 ? `${e.status} ✓` : `${e.status || 'err'} ?`;
+    }
+  }
+  // Mutation attempts: A tries to stop/start/delete B's server
+  const mutations = [
+    { method: 'POST',   path: `/api/servers/${ctxB.serverId}/stop`  },
+    { method: 'POST',   path: `/api/servers/${ctxB.serverId}/start` },
+    { method: 'DELETE', path: `/api/servers/${ctxB.serverId}`       },
+  ];
+  for (const m of mutations) {
+    try {
+      await ctxA.fetchJson(m.path, { method: m.method });
+      r[`${m.method} ${m.path}`] = 'LEAKED ✗';
+    } catch (e) {
+      r[`${m.method} ${m.path}`] = e.status >= 400 && e.status < 500 ? `${e.status} ✓` : `${e.status || 'err'} ?`;
     }
   }
   return r;
+}
+
+function checkUniqueAddressing(contexts, onlineMask) {
+  // Each running server must have its own DB port, internal host port, and
+  // public tunnel addr — proof that file/network namespaces don't collide.
+  const seenDbPort = new Set(), seenTunnel = new Set();
+  let dupes = 0;
+  return Promise.all(contexts.map(async (ctx, i) => {
+    if (!onlineMask[i]?.ok) return null;
+    const ls = await ctx.fetchJson('/api/servers');
+    const mine = ls.servers.find(s => s.id === ctx.serverId);
+    if (!mine) return null;
+    const tunnelAddr = mine.tunnel_host && mine.tunnel_port ? `${mine.tunnel_host}:${mine.tunnel_port}` : null;
+    const row = {
+      letter: ctx.user.letter,
+      serverId: ctx.serverId,
+      dbPort: mine.port,
+      tunnel: tunnelAddr,
+    };
+    if (seenDbPort.has(mine.port)) { dupes++; row.dupe_port = true; }
+    seenDbPort.add(mine.port);
+    if (tunnelAddr) {
+      if (seenTunnel.has(tunnelAddr)) { dupes++; row.dupe_tunnel = true; }
+      seenTunnel.add(tunnelAddr);
+    }
+    return row;
+  })).then(rows => ({ rows: rows.filter(Boolean), dupes }));
 }
 
 async function cleanup(ctx) {
@@ -232,8 +274,17 @@ async function cleanup(ctx) {
     results.push({ ...USERS[i], boot: true, bootMs: polled[i].ms, ...r });
   }
 
-  // Cross-user isolation
-  console.log('\n──── Cross-user isolation: User A reads User B ────');
+  // Unique addressing — each server must have its own port + tunnel addr
+  console.log('\n──── Unique addressing per server ────');
+  const uniq = await checkUniqueAddressing(contexts, polled);
+  for (const row of uniq.rows) {
+    const tag = (row.dupe_port || row.dupe_tunnel) ? '🚨 COLLISION' : '✓';
+    console.log(`  ${row.letter}  db_port=${row.dbPort}  tunnel=${row.tunnel || '—'}  ${tag}`);
+  }
+  if (uniq.dupes === 0) console.log('  ✓ all ports + tunnels unique');
+
+  // Cross-user isolation: A reads + mutates B
+  console.log('\n──── Cross-user isolation: User A → User B ────');
   let leaks = 0;
   const onlineCtxs = contexts.filter((_, i) => polled[i].ok);
   if (onlineCtxs.length >= 2) {
@@ -259,9 +310,10 @@ async function cleanup(ctx) {
     console.log(`  ${r.letter.padEnd(5)} ${r.engine.padEnd(9)} ${r.version.padEnd(10)} ${cell(r.boot).padEnd(6)} ${cell(r.stats_ok).padEnd(6)} ${cell(r.logs_ok).padEnd(6)} ${cell(r.events_ok).padEnd(7)} ${cell(r.list_ok).padEnd(6)} ${cell(r.tcp_ok).padEnd(6)}`);
   }
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log(`  Isolation: ${leaks === 0 ? '✅ no cross-user data leak' : '🚨 ' + leaks + ' leaks'}`);
+  console.log(`  Isolation: ${leaks === 0 ? '✅ no cross-user read/mutate leak' : '🚨 ' + leaks + ' leaks'}`);
+  console.log(`  Addressing: ${uniq.dupes === 0 ? '✅ every server has its own port + tunnel' : '🚨 ' + uniq.dupes + ' collisions'}`);
 
-  const allOk = results.every(r => r.boot && r.stats_ok && r.logs_ok && r.events_ok && r.list_ok && r.tcp_ok) && leaks === 0;
+  const allOk = results.every(r => r.boot && r.stats_ok && r.logs_ok && r.events_ok && r.list_ok && r.tcp_ok) && leaks === 0 && uniq.dupes === 0;
   console.log(`  Total: ${((Date.now() - overallStart) / 1000).toFixed(0)}s`);
   console.log(allOk ? '  ✅ ALL USERS WORK CORRECTLY · STATS REAL · CONSOLE OK · NO LEAKS' : '  ❌ at least one check failed');
   process.exit(allOk ? 0 : 1);

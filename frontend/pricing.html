@@ -3,185 +3,28 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#07090F" media="(prefers-color-scheme: dark)" />
-<meta name="theme-color" content="#07090F" />
 <meta name="color-scheme" content="dark" />
-<meta name="mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="CraftHost" />
-<meta name="format-detection" content="telephone=no" />
-<link rel="icon" type="image/svg+xml" href="/icon.svg" />
-<link rel="apple-touch-icon" href="/icon.svg" />
-<link rel="manifest" href="/manifest.json" />
-<title>Pricing · CraftHost</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
+<title>CraftHost — Free</title>
+<!-- Pricing/tiers removed: CraftHost is free. Redirect anyone landing here
+     (old links, bookmarks, search results) straight to the dashboard. -->
+<meta http-equiv="refresh" content="0; url=/dashboard.html" />
 <link rel="stylesheet" href="/css/theme.css" />
-<link rel="stylesheet" href="/css/landing.css" />
 <style>
-/* Pricing-page-specific layout. Grid collapses cleanly: 6 → 3 → 2 → 1. */
-.pricing-grid.pricing-6 {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 14px;
-}
-@media (max-width: 1280px) { .pricing-grid.pricing-6 { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 820px)  { .pricing-grid.pricing-6 { grid-template-columns: repeat(2, 1fr); gap: 12px; } }
-@media (max-width: 480px)  { .pricing-grid.pricing-6 { grid-template-columns: 1fr; gap: 12px; } }
-
-/* The plan cards used to overflow on phones because of long price text + emoji name. */
-.pricing-grid.pricing-6 .plan {
-  min-width: 0;
-  padding: 18px 16px;
-}
-@media (max-width: 600px) {
-  .pricing-grid.pricing-6 .plan-price span { font-size: 32px; }
-  .pricing-grid.pricing-6 .plan-name { font-size: 16px; }
-  .pricing-grid.pricing-6 .plan-feats li { font-size: 13px; padding: 6px 0; }
-}
-
-/* Make the comparison table horizontally scrollable on mobile instead of bleeding off-screen. */
-.compare-wrap {
-  margin-top: 40px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  border-radius: var(--radius);
-  border: 1px solid var(--glass-border);
-  background: var(--glass);
-}
-.compare-table {
-  width: 100%;
-  min-width: 640px; /* keeps columns readable; scroll horizontally below this */
-  border-collapse: separate;
-  border-spacing: 0;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  overflow: visible;
-}
-.compare-table th, .compare-table td {
-  padding: 14px 18px;
-  text-align: center;
-  font-size: 14px;
-  border-bottom: 1px solid var(--glass-border);
-}
-.compare-table tr:last-child td { border-bottom: 0; }
-.compare-table th { background: var(--slate-800); font-weight: 700; position: sticky; top: 0; }
-.compare-table th:first-child, .compare-table td:first-child { text-align: left; font-weight: 500; color: var(--slate-300); position: sticky; left: 0; background: var(--slate-900); z-index: 1; }
-.compare-table th:first-child { z-index: 2; background: var(--slate-800); }
-.compare-table .yes { color: var(--emerald); font-weight: 700; }
-.compare-table .no { color: var(--slate-500); }
-@media (max-width: 600px) {
-  .compare-table th, .compare-table td { padding: 10px 12px; font-size: 13px; }
-  .compare-wrap::after {
-    content: "← swipe →";
-    display: block;
-    text-align: center;
-    font-size: 11px;
-    color: var(--slate-500);
-    padding: 6px 0;
-    border-top: 1px solid var(--glass-border);
-  }
-}
-
-/* Mobile nav: the top "Features / Pricing / FAQ" links + CTA buttons overflow on phones. */
-@media (max-width: 720px) {
-  .nav-inner { flex-wrap: wrap; gap: 8px; padding: 10px 16px; }
-  .nav-links { order: 3; flex-basis: 100%; justify-content: center; gap: 14px; font-size: 14px; }
-  .nav-cta { gap: 6px; }
-  .nav-cta .btn { padding: 8px 12px; font-size: 13px; }
-  .nav-cta .btn-ghost { padding: 8px 10px; }
-}
-
-/* Section container sometimes spills off-screen on phones due to the wide grid above */
-.section.container { overflow-x: hidden; }
+  body { display:flex; min-height:100vh; align-items:center; justify-content:center; margin:0;
+         font-family:'Inter', system-ui, sans-serif; background:#07090F; color:#e7ebf3; text-align:center; }
+  .box { padding:32px; }
+  .box h1 { font-size:22px; margin:0 0 8px; }
+  .box p { color:#8B92A7; margin:0 0 18px; }
+  .box a { display:inline-block; padding:12px 22px; border-radius:10px; background:#34D399; color:#04110b;
+           font-weight:700; text-decoration:none; }
 </style>
 </head>
 <body>
-<nav class="nav">
-  <div class="nav-inner">
-    <a href="/" class="brand"><span class="brand-mark">C</span><span>CraftHost</span></a>
-    <div class="nav-links">
-      <a href="/#features" data-i18n="nav_features">Features</a>
-      <a href="/pricing.html" data-i18n="nav_pricing">Pricing</a>
-      <a href="/#faq" data-i18n="nav_faq">FAQ</a>
-    </div>
-    <div class="nav-cta" id="navCta">
-      <a href="/login.html" class="btn btn-ghost" data-i18n="sign_in">Sign in</a>
-      <a href="/register.html" class="btn btn-primary" data-i18n="get_started">Get Started</a>
-    </div>
+  <div class="box">
+    <h1>It's all free 🎉</h1>
+    <p>CraftHost has no paid plans — just create a server.</p>
+    <a href="/dashboard.html">Go to dashboard →</a>
   </div>
-</nav>
-
-<section class="section container">
-  <div class="section-head">
-    <span class="badge badge-emerald" data-i18n="landing_pricing_badge">Pricing</span>
-    <h2 data-i18n="pricing_title">Simple, transparent pricing.</h2>
-    <p class="text-muted" data-i18n="pricing_sub">All plans include DDoS protection, automatic backups, NVMe storage, and 24/7 support.</p>
-  </div>
-
-  <div class="pricing-center">
-    <div class="plan featured" style="max-width:420px;width:100%;">
-      <div class="plan-ribbon">Forever Free</div>
-      <div class="plan-name">Starter</div>
-      <div class="plan-price"><span>$0</span><small>/ month</small></div>
-      <div class="plan-tag">Everything you need to ship your first server.</div>
-      <ul class="plan-feats">
-        <li>512 MB RAM</li>
-        <li>1 vCPU</li>
-        <li>5 GB NVMe storage</li>
-        <li>20 player slots</li>
-        <li>Unlimited plugins</li>
-        <li>Daily backups (7d retention)</li>
-        <li>Custom JAR upload</li>
-        <li>DDoS protection</li>
-      </ul>
-      <a href="/register.html?plan=free" class="btn btn-primary btn-block btn-lg" data-plan-cta="free" data-i18n="start_free">Start free →</a>
-    </div>
-  </div>
-</section>
-<style>.pricing-center{display:flex;justify-content:center;}</style>
-<script src="/js/app.js"></script>
-<script>
-// Reflect signed-in state in the nav. If /api/auth/me returns a user, swap
-// "Sign in / Get Started" → "Dashboard / Sign out" and rewire plan CTAs so
-// they go to /dashboard.html instead of /register.html (where they'd be told
-// to log in again).
-(async function reflectAuth() {
-  try {
-    const r = await fetch('/api/auth/me', { credentials: 'include' });
-    if (!r.ok) return; // not signed in — leave nav as-is
-    const data = await r.json().catch(() => ({}));
-    const user = data?.user || data; // tolerate either shape
-    if (!user || !user.username) return;
-
-    // Swap the nav CTA buttons
-    const cta = document.getElementById('navCta');
-    if (cta) {
-      const dashLabel = (window.t ? window.t('open_dashboard') : null) || 'Dashboard';
-      const outLabel = (window.t ? window.t('sign_out') : null) || 'Sign out';
-      cta.innerHTML = `
-        <span class="nav-user">${user.username}</span>
-        <a href="/dashboard.html" class="btn btn-primary">${dashLabel}</a>
-        <button type="button" id="navSignOut" class="btn btn-ghost">${outLabel}</button>
-      `;
-      const out = document.getElementById('navSignOut');
-      if (out) out.addEventListener('click', async () => {
-        try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); } catch {}
-        location.reload();
-      });
-    }
-
-    // Rewire plan-pick buttons so a logged-in user goes to dashboard (where
-    // plan upgrade now happens inline), not to register where they'd get bounced.
-    document.querySelectorAll('[data-plan-cta]').forEach(a => {
-      const plan = a.getAttribute('data-plan-cta');
-      a.setAttribute('href', `/dashboard.html?plan=${encodeURIComponent(plan)}`);
-    });
-  } catch { /* offline / network error — leave nav alone */ }
-})();
-</script>
+  <script>location.replace('/dashboard.html');</script>
 </body>
 </html>

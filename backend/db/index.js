@@ -66,6 +66,19 @@ if (!hasColumn('servers', 'tunnel_port')) {
   db.exec(`ALTER TABLE servers ADD COLUMN tunnel_port INTEGER`);
 }
 
+// Per-server playit.gg agent (UDP-capable tunnel for Bedrock cross-play).
+// Runs alongside bore — bore handles Java TCP, playit handles Bedrock UDP via
+// Geyser. User supplies their own playit.gg secret (free signup).
+if (!hasColumn('servers', 'playit_secret')) {
+  db.exec(`ALTER TABLE servers ADD COLUMN playit_secret TEXT`);
+}
+if (!hasColumn('servers', 'playit_host')) {
+  db.exec(`ALTER TABLE servers ADD COLUMN playit_host TEXT`);
+}
+if (!hasColumn('servers', 'playit_port')) {
+  db.exec(`ALTER TABLE servers ADD COLUMN playit_port INTEGER`);
+}
+
 // Auto-heal timestamp — the platform records when it auto-swapped a free-plan
 // server from a heavy JAR to Paper 1.20.1 after detecting OOM, so it doesn't
 // keep trying the same heal in a loop.
