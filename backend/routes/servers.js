@@ -7,6 +7,7 @@ const { authMiddleware } = require('../lib/auth');
 const dc = require('../lib/controller');
 const railway = require('../lib/railway-api');
 const tunnel = require('../lib/tunnel');
+const pubtun = require('../lib/public-tunnel');
 const playit = require('../lib/playit');
 
 const MAX_WORLD_ZIP_BYTES = 500 * 1024 * 1024; // 500MB cap for world.zip uploads
@@ -285,9 +286,9 @@ async function createServerForUser(user, opts, ip) {
     // real public host:port that friends can paste into Minecraft. Only useful
     // if the server actually started — otherwise nothing to forward to.
     let proxy = null;
-    if (autoStarted && tunnel.isAvailable()) {
+    if (autoStarted && pubtun.isAvailable()) {
       try {
-        const t = await tunnel.start(id, internalListenPort({ port }));
+        const t = await pubtun.start(id, internalListenPort({ port }));
         if (t) {
           proxy = { host: t.host, port: t.port };
           audit(user.id, 'server.tunnel_create', id, ip, proxy);
@@ -461,9 +462,9 @@ router.post('/clone', async (req, res) => {
       audit(req.user.id, 'server.start', out.id, req.ip, { auto: true, cloned_from: src.id });
       autoStarted = true;
       // Tunnel for the clone
-      if (tunnel.isAvailable()) {
+      if (pubtun.isAvailable()) {
         try {
-          const t = await tunnel.start(out.id, internalListenPort({ port: out.port }));
+          const t = await pubtun.start(out.id, internalListenPort({ port: out.port }));
           if (t) out.proxy = { host: t.host, port: t.port };
         } catch (err) { console.warn('[clone] tunnel start failed:', err.message); }
       }
@@ -702,12 +703,12 @@ router.post('/:id/start', async (req, res) => {
     audit(req.user.id, 'server.start', s.id, req.ip);
     // Start tunnel after JVM is launching. Don't await — tunnel can come up
     // within a few seconds and the response shouldn't block on it.
-    if (tunnel.isAvailable()) {
-      tunnel.start(s.id, internalListenPort(s))
+    if (pubtun.isAvailable()) {
+      pubtun.start(s.id, internalListenPort(s))
         .catch(err => console.warn('[start] tunnel:', err.message));
     }
     // playit.gg agent (UDP — Bedrock cross-play via Geyser). Only if the user
-    // configured a playit secret on this server. Java still uses bore above.
+    // configured a playit secret on this server. Java uses pubtun above.
     if (s.playit_secret && playit.isAvailable()) {
       playit.start(s.id, internalListenPort(s), s.playit_secret)
         .catch(err => console.warn('[start] playit:', err.message));
@@ -720,7 +721,7 @@ router.post('/:id/start', async (req, res) => {
 
 router.post('/:id/stop', async (req, res) => {
   const s = getOwnedServer(req, res); if (!s) return;
-  tunnel.stop(s.id);
+  pubtun.stop(s.id);
   playit.stop(s.id);
   const r = await dc.stopServer(s);
   db.prepare('UPDATE servers SET status = ? WHERE id = ?').run('offline', s.id);
@@ -731,13 +732,13 @@ router.post('/:id/stop', async (req, res) => {
 router.post('/:id/restart', async (req, res) => {
   const s = getOwnedServer(req, res); if (!s) return;
   try {
-    tunnel.stop(s.id);
+    pubtun.stop(s.id);
     playit.stop(s.id);
     const r = await dc.restartServer(s);
     db.prepare('UPDATE servers SET status = ? WHERE id = ?').run('starting', s.id);
     audit(req.user.id, 'server.restart', s.id, req.ip);
-    if (tunnel.isAvailable()) {
-      tunnel.start(s.id, internalListenPort(s))
+    if (pubtun.isAvailable()) {
+      pubtun.start(s.id, internalListenPort(s))
         .catch(err => console.warn('[restart] tunnel:', err.message));
     }
     if (s.playit_secret && playit.isAvailable()) {
@@ -752,8 +753,11 @@ router.post('/:id/restart', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   const s = getOwnedServer(req, res); if (!s) return;
-  tunnel.stop(s.id);
+  pubtun.stop(s.id);
   playit.stop(s.id);
+  // Remove this server's playit Java tunnel from the shared account so tunnels
+  // don't leak. Best-effort, non-blocking. (Shared Bedrock tunnel is left alone.)
+  { const sec = getSharedPlayitSecret(); if (sec) playit.deleteServerTunnels(sec, s.id).catch(() => {}); }
   await dc.removeServer(s);
   if (s.proxy_id && railway.isConfigured()) {
     try { await railway.deleteTcpProxy(s.proxy_id); }
