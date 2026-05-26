@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="430" viewBox="0 0 900 430" font-family="Inter, Segoe UI, system-ui, sans-serif">
+  <rect width="900" height="430" rx="16" fill="#0F172A"/>
+  <rect x="1" y="1" width="898" height="428" rx="15" fill="none" stroke="#1E293B"/>
+  <text x="32" y="48" fill="#F8FAFC" font-size="22" font-weight="800">Everything you need to run a server</text>
+
+  <!-- card template via groups -->
+  <!-- row 1 -->
+  <g transform="translate(32,78)">
+    <rect width="270" height="148" rx="14" fill="#0b1322" stroke="#1E293B"/>
+    <rect x="20" y="22" width="44" height="44" rx="11" fill="#10241c"/>
+    <path d="M42 34 l14 10 l-14 10 l-14 -10 z" fill="#00E676" transform="translate(0,-2)"/>
+    <text x="20" y="96" fill="#F8FAFC" font-size="16" font-weight="700">Instant deploy</text>
+    <text x="20" y="118" fill="#94A3B8" font-size="12.5">Vanilla, Paper, Forge, Fabric,</text>
+    <text x="20" y="135" fill="#94A3B8" font-size="12.5">Bedrock — live in seconds.</text>
+  </g>
+  <g transform="translate(315,78)">
+    <rect width="270" height="148" rx="14" fill="#0b1322" stroke="#1E293B"/>
+    <rect x="20" y="22" width="44" height="44" rx="11" fill="#2a210a"/>
+    <g transform="translate(31,33)" fill="none" stroke="#FFB300" stroke-width="3" stroke-linecap="round"><circle cx="11" cy="11" r="9"/><path d="M11 6 v6 l4 3"/></g>
+    <text x="20" y="96" fill="#F8FAFC" font-size="16" font-weight="700">One-click public play</text>
+    <text x="20" y="118" fill="#94A3B8" font-size="12.5">playit.gg tunnels — no router</text>
+    <text x="20" y="135" fill="#94A3B8" font-size="12.5">config, no port forwarding.</text>
+  </g>
+  <g transform="translate(598,78)">
+    <rect width="270" height="148" rx="14" fill="#0b1322" stroke="#1E293B"/>
+    <rect x="20" y="22" width="44" height="44" rx="11" fill="#10241c"/>
+    <g transform="translate(30,32)" fill="#00E676"><rect width="24" height="4" rx="2"/><rect y="8" width="24" height="4" rx="2"/><rect y="16" width="16" height="4" rx="2"/></g>
+    <text x="20" y="96" fill="#F8FAFC" font-size="16" font-weight="700">Live RCON console</text>
+    <text x="20" y="118" fill="#94A3B8" font-size="12.5">Stream logs &amp; run commands</text>
+    <text x="20" y="135" fill="#94A3B8" font-size="12.5">over WebSocket, in-browser.</text>
+  </g>
+
+  <!-- row 2 -->
+  <g transform="translate(32,242)">
+    <rect width="270" height="148" rx="14" fill="#0b1322" stroke="#1E293B"/>
+    <rect x="20" y="22" width="44" height="44" rx="11" fill="#10241c"/>
+    <g transform="translate(31,32)" fill="none" stroke="#00E676" stroke-width="3"><rect x="2" y="2" width="20" height="20" rx="3"/><path d="M7 12 l4 4 l8 -9" stroke-linecap="round" stroke-linejoin="round"/></g>
+    <text x="20" y="96" fill="#F8FAFC" font-size="16" font-weight="700">Plugins &amp; mods</text>
+    <text x="20" y="118" fill="#94A3B8" font-size="12.5">Modrinth marketplace + upload</text>
+    <text x="20" y="135" fill="#94A3B8" font-size="12.5">your own custom JARs.</text>
+  </g>
+  <g transform="translate(315,242)">
+    <rect width="270" height="148" rx="14" fill="#0b1322" stroke="#1E293B"/>
+    <rect x="20" y="22" width="44" height="44" rx="11" fill="#10241c"/>
+    <g transform="translate(30,31)" fill="#00E676"><path d="M12 2 a10 6 0 1 0 0.01 0 z" fill="none" stroke="#00E676" stroke-width="3"/><ellipse cx="12" cy="8" rx="10" ry="5" fill="none" stroke="#00E676" stroke-width="3"/><path d="M2 8 v8 a10 5 0 0 0 20 0 v-8" fill="none" stroke="#00E676" stroke-width="3"/></g>
+    <text x="20" y="96" fill="#F8FAFC" font-size="16" font-weight="700">Auto backups</text>
+    <text x="20" y="118" fill="#94A3B8" font-size="12.5">Compressed world snapshots,</text>
+    <text x="20" y="135" fill="#94A3B8" font-size="12.5">one-click restore.</text>
+  </g>
+  <g transform="translate(598,242)">
+    <rect width="270" height="148" rx="14" fill="#0b1322" stroke="#1E293B"/>
+    <rect x="20" y="22" width="44" height="44" rx="11" fill="#2a210a"/>
+    <g transform="translate(31,32)" fill="none" stroke="#FFB300" stroke-width="3" stroke-linecap="round"><path d="M3 18 v-6 M11 18 v-12 M19 18 v-9"/></g>
+    <text x="20" y="96" fill="#F8FAFC" font-size="16" font-weight="700">Live metrics</text>
+    <text x="20" y="118" fill="#94A3B8" font-size="12.5">CPU, RAM, TPS &amp; player count</text>
+    <text x="20" y="135" fill="#94A3B8" font-size="12.5">per container, in real time.</text>
+  </g>
+</svg>

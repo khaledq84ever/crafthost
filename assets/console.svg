@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420" font-family="ui-monospace, Menlo, Consolas, monospace">
+  <rect width="900" height="420" rx="16" fill="#0b1322"/>
+  <rect x="1" y="1" width="898" height="418" rx="15" fill="none" stroke="#1E293B"/>
+
+  <!-- header -->
+  <rect x="0" y="0" width="900" height="48" rx="16" fill="#0F172A"/>
+  <rect x="0" y="32" width="900" height="16" fill="#0F172A"/>
+  <g transform="translate(24,24)" font-family="Inter, system-ui, sans-serif">
+    <circle cx="0" cy="0" r="9" fill="#00C853"/><circle cx="0" cy="0" r="14" fill="none" stroke="#00C853" stroke-opacity="0.3" stroke-width="3"/>
+    <text x="24" y="5" fill="#F8FAFC" font-size="15" font-weight="700">SkyBlock SMP &#183; live console</text>
+    <text x="640" y="5" fill="#00E676" font-size="12">RCON connected</text>
+  </g>
+
+  <!-- log lines -->
+  <g font-size="13.5" transform="translate(24,80)">
+    <text y="0"  fill="#64748b">[12:04:01] [Server thread/INFO]: Starting minecraft server version 1.21.4</text>
+    <text y="24" fill="#64748b">[12:04:03] [Server thread/INFO]: Loading properties</text>
+    <text y="48" fill="#64748b">[12:04:09] [Server thread/INFO]: Preparing level "world"</text>
+    <text y="72" fill="#00E676">[12:04:11] [Server thread/INFO]: Done (8.2s)! For help, type "help"</text>
+    <text y="96" fill="#94A3B8">[12:06:22] [Server thread/INFO]: <tspan fill="#FFB300">Steve</tspan> joined the game</text>
+    <text y="120" fill="#94A3B8">[12:06:24] [Server thread/INFO]: <tspan fill="#FFB300">Alex</tspan> joined the game</text>
+    <text y="144" fill="#94A3B8">[12:07:50] [Server thread/INFO]: &lt;Steve&gt; anyone got diamonds?</text>
+    <text y="168" fill="#7dd3fc">&gt; say Welcome to the server! Backups run hourly.</text>
+    <text y="192" fill="#94A3B8">[12:07:58] [Server thread/INFO]: [Server] Welcome to the server! Backups run hourly.</text>
+    <text y="216" fill="#94A3B8">[12:09:14] [Server thread/INFO]: Saved the game</text>
+  </g>
+
+  <!-- input -->
+  <g transform="translate(24,372)">
+    <rect x="-8" y="-22" width="852" height="40" rx="10" fill="#0F172A" stroke="#1f5138"/>
+    <text x="6" y="4" fill="#00E676" font-size="14">&gt;</text>
+    <text x="24" y="4" fill="#E2E8F0" font-size="14">op Steve<tspan fill="#00C853">&#9612;</tspan></text>
+    <g transform="translate(740,-14)" font-family="Inter, system-ui, sans-serif"><rect width="92" height="28" rx="8" fill="#00C853"/><text x="46" y="19" fill="#04230f" font-size="13" font-weight="700" text-anchor="middle">Send</text></g>
+  </g>
+</svg>

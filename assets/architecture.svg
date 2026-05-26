@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="440" viewBox="0 0 900 440" font-family="Inter, Segoe UI, system-ui, sans-serif">
+  <defs>
+    <marker id="arr" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#00C853"/></marker>
+    <marker id="arrg" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#FFB300"/></marker>
+  </defs>
+  <rect width="900" height="440" rx="16" fill="#0F172A"/>
+  <rect x="1" y="1" width="898" height="438" rx="15" fill="none" stroke="#1E293B"/>
+  <text x="32" y="44" fill="#F8FAFC" font-size="20" font-weight="700">How it works</text>
+
+  <!-- Browser -->
+  <g transform="translate(40,90)">
+    <rect width="180" height="120" rx="14" fill="#0b1322" stroke="#1E293B"/>
+    <text x="90" y="34" fill="#E2E8F0" font-size="15" font-weight="700" text-anchor="middle">Browser</text>
+    <text x="90" y="58" fill="#64748b" font-size="12" text-anchor="middle">HTML / CSS / JS</text>
+    <text x="90" y="78" fill="#64748b" font-size="12" text-anchor="middle">dashboard, console,</text>
+    <text x="90" y="94" fill="#64748b" font-size="12" text-anchor="middle">marketplace</text>
+  </g>
+
+  <!-- Express API -->
+  <g transform="translate(300,90)">
+    <rect width="200" height="120" rx="14" fill="#0b1322" stroke="#1f5138"/>
+    <text x="100" y="32" fill="#00E676" font-size="15" font-weight="700" text-anchor="middle">Express API</text>
+    <text x="100" y="54" fill="#94A3B8" font-size="12" text-anchor="middle">JWT auth &#183; rate limit</text>
+    <text x="100" y="72" fill="#94A3B8" font-size="12" text-anchor="middle">REST + WebSocket</text>
+    <text x="100" y="90" fill="#94A3B8" font-size="12" text-anchor="middle">SQLite (better-sqlite3)</text>
+    <text x="100" y="108" fill="#64748b" font-size="11" text-anchor="middle">routes / middleware / lib</text>
+  </g>
+
+  <!-- Docker controller -->
+  <g transform="translate(580,90)">
+    <rect width="280" height="120" rx="14" fill="#0b1322" stroke="#1E293B"/>
+    <text x="140" y="32" fill="#E2E8F0" font-size="15" font-weight="700" text-anchor="middle">Docker controller (dockerode)</text>
+    <g transform="translate(20,48)">
+      <rect width="76" height="54" rx="9" fill="#10241c" stroke="#1f5138"/><text x="38" y="24" fill="#00E676" font-size="11" text-anchor="middle">MC #1</text><text x="38" y="42" fill="#64748b" font-size="10" text-anchor="middle">4 GB</text>
+      <rect x="84" width="76" height="54" rx="9" fill="#10241c" stroke="#1f5138"/><text x="122" y="24" fill="#00E676" font-size="11" text-anchor="middle">MC #2</text><text x="122" y="42" fill="#64748b" font-size="10" text-anchor="middle">2 GB</text>
+      <rect x="168" width="76" height="54" rx="9" fill="#161f33" stroke="#334155"/><text x="206" y="24" fill="#94A3B8" font-size="11" text-anchor="middle">MC #3</text><text x="206" y="42" fill="#475569" font-size="10" text-anchor="middle">idle</text>
+    </g>
+  </g>
+
+  <!-- arrows row 1 -->
+  <line x1="220" y1="150" x2="296" y2="150" stroke="#00C853" stroke-width="2.5" marker-end="url(#arr)"/>
+  <line x1="500" y1="150" x2="576" y2="150" stroke="#00C853" stroke-width="2.5" marker-end="url(#arr)"/>
+
+  <!-- playit tunnel -->
+  <g transform="translate(580,260)">
+    <rect width="280" height="96" rx="14" fill="#0b1322" stroke="#5a4205"/>
+    <text x="140" y="32" fill="#FFB300" font-size="15" font-weight="700" text-anchor="middle">playit.gg tunnels</text>
+    <text x="140" y="54" fill="#94A3B8" font-size="12" text-anchor="middle">one singleton agent &#183; REST API</text>
+    <text x="140" y="74" fill="#64748b" font-size="11.5" text-anchor="middle">TCP &#8594; *.joinmc.link &#183; UDP &#8594; *.gl.at.ply.gg</text>
+  </g>
+  <line x1="720" y1="210" x2="720" y2="256" stroke="#FFB300" stroke-width="2.5" marker-end="url(#arrg)"/>
+
+  <!-- players -->
+  <g transform="translate(300,260)">
+    <rect width="200" height="96" rx="14" fill="#0b1322" stroke="#1E293B"/>
+    <text x="100" y="32" fill="#E2E8F0" font-size="15" font-weight="700" text-anchor="middle">Players worldwide</text>
+    <text x="100" y="56" fill="#64748b" font-size="12" text-anchor="middle">Java &#183; Bedrock</text>
+    <text x="100" y="76" fill="#64748b" font-size="12" text-anchor="middle">no port-forwarding</text>
+  </g>
+  <line x1="580" y1="306" x2="504" y2="306" stroke="#FFB300" stroke-width="2.5" marker-end="url(#arrg)"/>
+
+  <!-- Railway footer -->
+  <g transform="translate(40,300)">
+    <rect width="200" height="56" rx="12" fill="#101a2b" stroke="#334155"/>
+    <text x="100" y="26" fill="#94A3B8" font-size="13" text-anchor="middle" font-weight="600">Deployed on Railway</text>
+    <text x="100" y="44" fill="#64748b" font-size="11" text-anchor="middle">Dockerfile + railway.toml</text>
+  </g>
+
+  <text x="32" y="416" fill="#475569" font-size="12.5">Each user's server runs in its own isolated container; public play is brokered through one shared playit agent.</text>
+</svg>

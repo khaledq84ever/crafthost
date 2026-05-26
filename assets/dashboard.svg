@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560" font-family="Inter, Segoe UI, system-ui, sans-serif">
+  <defs>
+    <linearGradient id="em2" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#00E676"/><stop offset="1" stop-color="#00C853"/></linearGradient>
+  </defs>
+  <rect width="900" height="560" rx="18" fill="#0F172A"/>
+  <rect x="1" y="1" width="898" height="558" rx="17" fill="none" stroke="#1E293B"/>
+
+  <!-- top bar -->
+  <g transform="translate(28,26)">
+    <circle cx="0" cy="0" r="6" fill="#ef4444"/><circle cx="20" cy="0" r="6" fill="#FFB300"/><circle cx="40" cy="0" r="6" fill="#00C853"/>
+    <text x="92" y="5" fill="#64748b" font-size="13">crafthost-production.up.railway.app/dashboard</text>
+  </g>
+
+  <!-- sidebar -->
+  <rect x="24" y="56" width="186" height="480" rx="14" fill="#0b1322" stroke="#1E293B"/>
+  <g transform="translate(44,84)">
+    <rect width="30" height="30" rx="8" fill="url(#em2)"/>
+    <g transform="translate(7,7)" fill="#0F172A"><rect width="7" height="7" rx="1"/><rect x="9" width="7" height="7" rx="1"/><rect y="9" width="7" height="7" rx="1"/><rect x="9" y="9" width="7" height="7" rx="1" opacity="0.5"/></g>
+    <text x="42" y="20" fill="#F8FAFC" font-size="17" font-weight="700">CraftHost</text>
+  </g>
+  <g font-size="14" transform="translate(44,140)">
+    <g><rect x="-12" y="-16" width="166" height="34" rx="9" fill="#10241c"/><text y="6" fill="#00E676" font-weight="600">&#9632;  Servers</text></g>
+    <text y="56" fill="#94A3B8">&#9776;  Marketplace</text>
+    <text y="96" fill="#94A3B8">&#9783;  Plugins</text>
+    <text y="136" fill="#94A3B8">&#128190;  Backups</text>
+    <text y="176" fill="#94A3B8">&#9881;  Settings</text>
+  </g>
+  <g transform="translate(44,470)"><rect x="-12" y="-18" width="166" height="44" rx="11" fill="#1E293B"/><circle cx="8" cy="4" r="13" fill="#334155"/><text x="30" y="0" fill="#E2E8F0" font-size="13" font-weight="600">khaled</text><text x="30" y="16" fill="#64748b" font-size="11">Pro plan</text></g>
+
+  <!-- main -->
+  <text x="236" y="92" fill="#F8FAFC" font-size="24" font-weight="800">Your servers</text>
+  <g transform="translate(742,72)"><rect width="130" height="38" rx="10" fill="url(#em2)"/><text x="65" y="24" fill="#04230f" font-size="14" font-weight="700" text-anchor="middle">+ New server</text></g>
+
+  <!-- server card 1 (running) -->
+  <g transform="translate(236,118)">
+    <rect width="636" height="118" rx="14" fill="#0b1322" stroke="#1E293B"/>
+    <circle cx="30" cy="34" r="9" fill="#00C853"/><circle cx="30" cy="34" r="14" fill="none" stroke="#00C853" stroke-opacity="0.3" stroke-width="3"/>
+    <text x="52" y="32" fill="#F8FAFC" font-size="17" font-weight="700">SkyBlock SMP</text>
+    <text x="52" y="52" fill="#64748b" font-size="13">Paper 1.21.4 &#183; 4 GB RAM &#183; <tspan fill="#FFB300">play.crafthost.gg:25565</tspan></text>
+    <!-- stat chips -->
+    <g transform="translate(52,72)" font-size="12">
+      <g><rect width="92" height="30" rx="8" fill="#10241c"/><text x="12" y="20" fill="#00E676">&#9679; 12/20 online</text></g>
+      <g transform="translate(102,0)"><rect width="92" height="30" rx="8" fill="#161f33"/><text x="12" y="20" fill="#94A3B8">CPU 38%</text></g>
+      <g transform="translate(204,0)"><rect width="104" height="30" rx="8" fill="#161f33"/><text x="12" y="20" fill="#94A3B8">RAM 2.4/4 GB</text></g>
+      <g transform="translate(318,0)"><rect width="92" height="30" rx="8" fill="#161f33"/><text x="12" y="20" fill="#94A3B8">TPS 20.0</text></g>
+    </g>
+    <g transform="translate(520,40)"><rect width="92" height="34" rx="9" fill="#1E293B"/><text x="46" y="22" fill="#E2E8F0" font-size="13" font-weight="600" text-anchor="middle">Console</text></g>
+  </g>
+
+  <!-- server card 2 (starting) -->
+  <g transform="translate(236,250)">
+    <rect width="636" height="118" rx="14" fill="#0b1322" stroke="#1E293B"/>
+    <circle cx="30" cy="34" r="9" fill="#FFB300"/>
+    <text x="52" y="32" fill="#F8FAFC" font-size="17" font-weight="700">Bedrock Creative</text>
+    <text x="52" y="52" fill="#64748b" font-size="13">Bedrock &#183; 2 GB RAM &#183; <tspan fill="#FFB300">president-status.gl.at.ply.gg:65397</tspan></text>
+    <g transform="translate(52,72)" font-size="12">
+      <g><rect width="120" height="30" rx="8" fill="#2a210a"/><text x="12" y="20" fill="#FFB300">&#9679; starting&#8230; 73%</text></g>
+      <g transform="translate(130,0)"><rect width="120" height="30" rx="8" fill="#161f33"/><text x="12" y="20" fill="#94A3B8">one-click playit</text></g>
+    </g>
+    <g transform="translate(520,40)"><rect width="92" height="34" rx="9" fill="#1E293B"/><text x="46" y="22" fill="#E2E8F0" font-size="13" font-weight="600" text-anchor="middle">Console</text></g>
+  </g>
+
+  <!-- server card 3 (stopped) -->
+  <g transform="translate(236,382)">
+    <rect width="636" height="118" rx="14" fill="#0b1322" stroke="#1E293B"/>
+    <circle cx="30" cy="34" r="9" fill="#475569"/>
+    <text x="52" y="32" fill="#cbd5e1" font-size="17" font-weight="700">Modded ATM9</text>
+    <text x="52" y="52" fill="#64748b" font-size="13">Forge 1.20.1 &#183; 8 GB RAM &#183; stopped</text>
+    <g transform="translate(52,72)" font-size="12">
+      <g><rect width="92" height="30" rx="8" fill="#161f33"/><text x="12" y="20" fill="#64748b">&#9632; stopped</text></g>
+      <g transform="translate(102,0)"><rect width="120" height="30" rx="8" fill="#161f33"/><text x="12" y="20" fill="#94A3B8">last: 2 days ago</text></g>
+    </g>
+    <g transform="translate(520,40)"><rect width="92" height="34" rx="9" fill="url(#em2)"/><text x="46" y="22" fill="#04230f" font-size="13" font-weight="700" text-anchor="middle">Start</text></g>
+  </g>
+</svg>
