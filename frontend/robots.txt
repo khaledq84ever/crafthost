@@ -1,0 +1,15 @@
+# CraftHost — allow all search engines to crawl the public site.
+User-agent: *
+Allow: /
+
+# Keep crawlers out of authenticated/app pages (no SEO value, avoids thin/duplicate pages).
+Disallow: /dashboard.html
+Disallow: /console.html
+Disallow: /files.html
+Disallow: /jars.html
+Disallow: /settings.html
+Disallow: /reset.html
+Disallow: /forgot.html
+Disallow: /api/
+
+Sitemap: https://crafthost-production.up.railway.app/sitemap.xml
