@@ -5,57 +5,100 @@ let pollTimer = null;
 let isDemo = false;
 
 const DEMO_SERVERS = [
-  { id: 'demo-1', name: 'Survival World', type: 'paper', version: '1.21.1',
-    status: 'online', port: 25565, max_players: 25,
-    ram_mb: 2048, cpu_cores: 2,
-    stats: { players: 12, ram_used: 1850, cpu: 34, uptime: 4*3600+12*60 },
-    icon: 'S' },
-  { id: 'demo-2', name: 'Modded ATM9', type: 'forge', version: '1.20.1',
-    status: 'online', port: 25566, max_players: 60,
-    ram_mb: 4096, cpu_cores: 3,
-    stats: { players: 5, ram_used: 3400, cpu: 61, uptime: 12*3600 },
-    icon: 'A' },
+  {
+    id: "demo-1",
+    name: "Survival World",
+    type: "paper",
+    version: "1.21.1",
+    status: "online",
+    port: 25565,
+    max_players: 25,
+    ram_mb: 2048,
+    cpu_cores: 2,
+    stats: { players: 12, ram_used: 1850, cpu: 34, uptime: 4 * 3600 + 12 * 60 },
+    icon: "S",
+  },
+  {
+    id: "demo-2",
+    name: "Modded ATM9",
+    type: "forge",
+    version: "1.20.1",
+    status: "online",
+    port: 25566,
+    max_players: 60,
+    ram_mb: 4096,
+    cpu_cores: 3,
+    stats: { players: 5, ram_used: 3400, cpu: 61, uptime: 12 * 3600 },
+    icon: "A",
+  },
 ];
 
 function colorForName(s) {
-  const palette = ['#00C853','#FFB300','#A855F7','#3B82F6','#EF4444','#01579B','#7CB342','#FF6F00'];
-  let h = 0; for (const c of (s || '?')) h = (h * 31 + c.charCodeAt(0)) | 0;
+  const palette = [
+    "#00C853",
+    "#FFB300",
+    "#A855F7",
+    "#3B82F6",
+    "#EF4444",
+    "#01579B",
+    "#7CB342",
+    "#FF6F00",
+  ];
+  let h = 0;
+  for (const c of s || "?") h = (h * 31 + c.charCodeAt(0)) | 0;
   return palette[Math.abs(h) % palette.length];
 }
 
 function escapeHtml(s) {
-  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  return String(s == null ? "" : s).replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ],
+  );
 }
 
 function typeLabel(s) {
-  const t = (s.type || '').charAt(0).toUpperCase() + (s.type || '').slice(1);
-  return `${t} ${s.version === 'LATEST' ? '' : (s.version || '')}`.trim();
+  const t = (s.type || "").charAt(0).toUpperCase() + (s.type || "").slice(1);
+  return `${t} ${s.version === "LATEST" ? "" : s.version || ""}`.trim();
 }
 
 // Real brand-ish inline SVG icons per server type. Geometric, lightweight, no
 // external assets. Each returns an SVG sized to fit a 44×44 tile.
 const TYPE_ICONS = {
-  paper:    '<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 4h12l6 6v18a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="#F57C00"/><path d="M20 4v6h6" fill="#FFA940"/><path d="M10 16h12M10 20h12M10 24h8" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>',
-  vanilla:  '<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="24" height="24" fill="#7CB342"/><rect x="4" y="4" width="12" height="12" fill="#558B2F"/><rect x="16" y="16" width="12" height="12" fill="#558B2F"/><rect x="4" y="20" width="6" height="6" fill="#8B5A2B"/><rect x="22" y="6" width="6" height="6" fill="#8B5A2B"/></svg>',
-  purpur:   '<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 4l10 6v12l-10 6-10-6V10z" fill="#7B1FA2"/><path d="M16 4l10 6v12l-10 6V4z" fill="#5E1791"/><circle cx="16" cy="16" r="4" fill="#E1BEE7"/></svg>',
-  fabric:   '<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="12" fill="#01579B"/><path d="M16 6c-5 0-9 4-9 10 4-2 7-1 9 1s5 3 9 1c0-6-4-12-9-12z" fill="#039BE5"/><circle cx="13" cy="14" r="1.5" fill="white"/><circle cx="19" cy="14" r="1.5" fill="white"/></svg>',
-  neoforge: '<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 6l20 0L26 26L6 26z" fill="#FF6F00"/><path d="M11 11h10v2H11zM11 15h10v2H11zM11 19h6v2h-6z" fill="white"/><circle cx="22" cy="20" r="2" fill="#FFB300"/></svg>',
-  forge:    '<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 22l4-12h12l4 12z" fill="#6A1B9A"/><circle cx="16" cy="22" r="4" fill="#9C27B0"/></svg>',
-  spigot:   '<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="12" fill="#E65100"/><path d="M16 8v16M8 16h16" stroke="white" stroke-width="2.5"/></svg>',
-  bedrock:  '<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="24" height="24" fill="#37474F"/><rect x="6" y="6" width="6" height="6" fill="#546E7A"/><rect x="14" y="6" width="6" height="6" fill="#455A64"/><rect x="22" y="6" width="4" height="6" fill="#546E7A"/><rect x="6" y="14" width="6" height="6" fill="#455A64"/><rect x="14" y="14" width="6" height="6" fill="#546E7A"/><rect x="22" y="14" width="4" height="6" fill="#455A64"/></svg>',
-  custom:   '<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 6h16a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" fill="#FFB300"/><path d="M16 12v8M12 16h8" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>',
+  paper:
+    '<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 4h12l6 6v18a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="#F57C00"/><path d="M20 4v6h6" fill="#FFA940"/><path d="M10 16h12M10 20h12M10 24h8" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>',
+  vanilla:
+    '<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="24" height="24" fill="#7CB342"/><rect x="4" y="4" width="12" height="12" fill="#558B2F"/><rect x="16" y="16" width="12" height="12" fill="#558B2F"/><rect x="4" y="20" width="6" height="6" fill="#8B5A2B"/><rect x="22" y="6" width="6" height="6" fill="#8B5A2B"/></svg>',
+  purpur:
+    '<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 4l10 6v12l-10 6-10-6V10z" fill="#7B1FA2"/><path d="M16 4l10 6v12l-10 6V4z" fill="#5E1791"/><circle cx="16" cy="16" r="4" fill="#E1BEE7"/></svg>',
+  fabric:
+    '<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="12" fill="#01579B"/><path d="M16 6c-5 0-9 4-9 10 4-2 7-1 9 1s5 3 9 1c0-6-4-12-9-12z" fill="#039BE5"/><circle cx="13" cy="14" r="1.5" fill="white"/><circle cx="19" cy="14" r="1.5" fill="white"/></svg>',
+  neoforge:
+    '<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 6l20 0L26 26L6 26z" fill="#FF6F00"/><path d="M11 11h10v2H11zM11 15h10v2H11zM11 19h6v2h-6z" fill="white"/><circle cx="22" cy="20" r="2" fill="#FFB300"/></svg>',
+  forge:
+    '<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 22l4-12h12l4 12z" fill="#6A1B9A"/><circle cx="16" cy="22" r="4" fill="#9C27B0"/></svg>',
+  spigot:
+    '<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="12" fill="#E65100"/><path d="M16 8v16M8 16h16" stroke="white" stroke-width="2.5"/></svg>',
+  bedrock:
+    '<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="24" height="24" fill="#37474F"/><rect x="6" y="6" width="6" height="6" fill="#546E7A"/><rect x="14" y="6" width="6" height="6" fill="#455A64"/><rect x="22" y="6" width="4" height="6" fill="#546E7A"/><rect x="6" y="14" width="6" height="6" fill="#455A64"/><rect x="14" y="14" width="6" height="6" fill="#546E7A"/><rect x="22" y="14" width="4" height="6" fill="#455A64"/></svg>',
+  custom:
+    '<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 6h16a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" fill="#FFB300"/><path d="M16 12v8M12 16h8" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>',
 };
 function typeIcon(type) {
-  return TYPE_ICONS[(type || '').toLowerCase()] || TYPE_ICONS.paper;
+  return TYPE_ICONS[(type || "").toLowerCase()] || TYPE_ICONS.paper;
 }
 window.TYPE_ICONS = TYPE_ICONS;
 window.typeIcon = typeIcon;
 
-let publicHost = 'crafthost-production.up.railway.app';
+let publicHost = "crafthost-production.up.railway.app";
 let publicMcPort = 25565;
 function ipFor(s) {
-  if (s.id?.startsWith('demo-')) return `${s.name.toLowerCase().replace(/\s+/g,'-')}.crafthost.gg:${s.port}`;
-  if (s.tunnel_host && s.tunnel_port) return `${s.tunnel_host}:${s.tunnel_port}`;
+  if (s.id?.startsWith("demo-"))
+    return `${s.name.toLowerCase().replace(/\s+/g, "-")}.crafthost.gg:${s.port}`;
+  if (s.tunnel_host && s.tunnel_port)
+    return `${s.tunnel_host}:${s.tunnel_port}`;
   if (s.proxy_host && s.proxy_port) return `${s.proxy_host}:${s.proxy_port}`;
   if (s.is_public) return `${publicHost}:${publicMcPort}`;
   return `${publicHost}:${s.port} (waiting for tunnel…)`;
@@ -65,8 +108,10 @@ function ipFor(s) {
 // Green when TPS holds 19+; amber 15-19; red <15. Last value shown numerically
 // to the right so users get both the trend AND the current absolute value.
 function renderTpsSparkline(history, current) {
-  if (!Array.isArray(history) || history.length < 2) return '';
-  const W = 220, H = 28, PAD = 2;
+  if (!Array.isArray(history) || history.length < 2) return "";
+  const W = 220,
+    H = 28,
+    PAD = 2;
   const max = 20;
   // Map values to (x, y) coords
   const pts = history.map((v, i) => {
@@ -74,11 +119,12 @@ function renderTpsSparkline(history, current) {
     const y = PAD + (1 - Math.max(0, Math.min(max, v)) / max) * (H - PAD * 2);
     return [x, y];
   });
-  const d = 'M ' + pts.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L ');
+  const d =
+    "M " + pts.map((p) => p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" L ");
   // Area fill
-  const area = d + ` L ${W-PAD} ${H-PAD} L ${PAD} ${H-PAD} Z`;
+  const area = d + ` L ${W - PAD} ${H - PAD} L ${PAD} ${H - PAD} Z`;
   const last = current ?? history[history.length - 1] ?? 0;
-  const color = last >= 19 ? '#10b981' : last >= 15 ? '#f59e0b' : '#ef4444';
+  const color = last >= 19 ? "#10b981" : last >= 15 ? "#f59e0b" : "#ef4444";
   return `
     <div class="sc-tps-row" title="TPS over last ~60s">
       <svg class="sc-tps-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
@@ -99,26 +145,32 @@ function renderServer(s) {
   const ramPct = Math.min(100, Math.round((ramUsed / ramMax) * 100)) || 0;
   const playersOnline = stats.players ?? 0;
   const playersMax = stats.players_max || s.max_players || 0;
-  const players = stats.online ? `${playersOnline}/${playersMax}` : '—';
-  const cpu = stats.cpu != null ? Math.round(stats.cpu) + '%' : '—';
-  const uptime = stats.uptime ? fmtTime(stats.uptime) : '—';
-  const icon = s.icon || (s.name || '?')[0].toUpperCase();
+  const players = stats.online ? `${playersOnline}/${playersMax}` : "—";
+  const cpu = stats.cpu != null ? Math.round(stats.cpu) + "%" : "—";
+  const uptime = stats.uptime ? fmtTime(stats.uptime) : "—";
+  const icon = s.icon || (s.name || "?")[0].toUpperCase();
   const c = colorForName(s.name);
 
   // Prefer the live stats.online flag (proven by SLP) over the DB status (can lag/lie)
   const liveOnline = stats.online === true;
-  const isStarting = !liveOnline && s.status === 'starting';
+  const isStarting = !liveOnline && s.status === "starting";
   const isOnline = liveOnline || isStarting;
-  const statusKey = liveOnline ? 'online' : isStarting ? 'starting' : 'offline';
+  const statusKey = liveOnline ? "online" : isStarting ? "starting" : "offline";
   // Pull translated status label so it follows the user's language setting.
-  const statusLabel = (window.t ? window.t(statusKey) : null) || (liveOnline ? 'Online' : isStarting ? 'Starting…' : 'Offline');
-  const motdLine = stats.motd ? `<div class="text-muted" style="font-size:11px;margin-top:2px;font-style:italic;">"${escapeHtml(String(stats.motd).slice(0, 60))}"</div>` : '';
+  const statusLabel =
+    (window.t ? window.t(statusKey) : null) ||
+    (liveOnline ? "Online" : isStarting ? "Starting…" : "Offline");
+  const motdLine = stats.motd
+    ? `<div class="text-muted" style="font-size:11px;margin-top:2px;font-style:italic;">"${escapeHtml(String(stats.motd).slice(0, 60))}"</div>`
+    : "";
   const sampleLine = (stats.player_sample || []).length
-    ? `<div class="text-muted" style="font-size:11px;margin-top:4px;">👥 ${(stats.player_sample || []).slice(0, 5).map(escapeHtml).join(', ')}${stats.player_sample.length > 5 ? '…' : ''}</div>`
-    : '';
+    ? `<div class="text-muted" style="font-size:11px;margin-top:4px;">👥 ${(stats.player_sample || []).slice(0, 5).map(escapeHtml).join(", ")}${stats.player_sample.length > 5 ? "…" : ""}</div>`
+    : "";
   const ip = ipFor(s);
 
-  const slotBadge = s.user_slot ? `<span class="badge" style="background:rgba(56,189,248,0.15);color:var(--blue);border:1px solid rgba(56,189,248,0.25);font-size:11px;">#${s.user_slot}</span>` : '';
+  const slotBadge = s.user_slot
+    ? `<span class="badge" style="background:rgba(56,189,248,0.15);color:var(--blue);border:1px solid rgba(56,189,248,0.25);font-size:11px;">#${s.user_slot}</span>`
+    : "";
   const publicBadge = s.is_public
     ? `<span class="badge badge-emerald" title="Reachable from Minecraft clients">🌍 Public</span>`
     : `<span class="badge" title="Internal only — promote to play">🔒 Internal</span>`;
@@ -126,18 +178,24 @@ function renderServer(s) {
   //  1. Auto-healed recently → green "✓ Auto-healed" badge
   //  2. OOM + heavy version → red warn w/ instant-fix button (platform also auto-heals within ~20s)
   //  3. OOM + non-heavy version → generic upgrade hint
-  const isOomCrash = stats.oom || (s.status === 'offline' && stats.exit_code === 0 && (stats.last_log || []).some(l => /OutOfMemoryError/i.test(l)));
+  const isOomCrash =
+    stats.oom ||
+    (s.status === "offline" &&
+      stats.exit_code === 0 &&
+      (stats.last_log || []).some((l) => /OutOfMemoryError/i.test(l)));
   // "Heavy" = anything that isn't already the proven-safe combo (Paper 1.20.1).
   // Fabric 1.20.1, NeoForge, Purpur, anything 1.21+ all qualify — they need
   // more memory than the plan provides. With 2 GB plan / 1.5 GB heap, this is
   // effectively never true for normal MC versions — kept as a hook for very
   // heavy modpacks that might still OOM.
   const versionIsHeavy = false;
-  const healedRecently = s.auto_healed_at && (Date.now()/1000 - s.auto_healed_at < 600); // 10 min window
+  const healedRecently =
+    s.auto_healed_at && Date.now() / 1000 - s.auto_healed_at < 600; // 10 min window
   // Auto-restart badge — visible for 10 min after the platform restarted a crashed server
-  const restartedRecently = s.last_auto_restart_at && (Date.now() - s.last_auto_restart_at < 600_000);
+  const restartedRecently =
+    s.last_auto_restart_at && Date.now() - s.last_auto_restart_at < 600_000;
   const restartCount = s.auto_restart_count || 0;
-  let crashHint = '';
+  let crashHint = "";
   if (healedRecently) {
     crashHint = `<div class="sc-warn sc-warn-healed">
       <strong>✓ Auto-healed</strong>
@@ -147,7 +205,7 @@ function renderServer(s) {
     crashHint = `<div class="sc-warn sc-warn-actionable">
       <div class="sc-warn-text">
         <strong>⚠ Out of memory</strong>
-        <div>Minecraft ${escapeHtml(s.version || 'latest')} exceeded available heap. The platform will auto-fix this within 20 seconds.</div>
+        <div>Minecraft ${escapeHtml(s.version || "latest")} exceeded available heap. The platform will auto-fix this within 20 seconds.</div>
       </div>
       <button class="btn btn-primary btn-sm sc-fix-btn" onclick="autoFixOom('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')">
         🔧 Fix it now
@@ -158,12 +216,19 @@ function renderServer(s) {
   } else if (restartedRecently && restartCount > 0) {
     crashHint = `<div class="sc-warn sc-warn-healed">
       <strong>🔁 Auto-restarted</strong>
-      <div>The server crashed unexpectedly and was restarted by the platform${restartCount > 1 ? ` (${restartCount}× recently)` : ''}. Check logs if this keeps happening.</div>
+      <div>The server crashed unexpectedly and was restarted by the platform${restartCount > 1 ? ` (${restartCount}× recently)` : ""}. Check logs if this keeps happening.</div>
     </div>`;
-  } else if (s.last_idle_stop_at && (Date.now() - s.last_idle_stop_at < 30 * 60_000) && s.status === 'offline') {
+  } else if (
+    s.last_idle_stop_at &&
+    Date.now() - s.last_idle_stop_at < 30 * 60_000 &&
+    s.status === "offline"
+  ) {
     // Auto-stopped from inactivity. World was saved before stop — clicking Start
     // resumes exactly where players left off. Pill visible for 30 min after stop.
-    const mins = Math.max(1, Math.round((Date.now() - s.last_idle_stop_at) / 60_000));
+    const mins = Math.max(
+      1,
+      Math.round((Date.now() - s.last_idle_stop_at) / 60_000),
+    );
     crashHint = `<div class="sc-warn sc-warn-healed">
       <strong>💤 Auto-stopped (no players for 30 min)</strong>
       <div>World was saved before shutdown — click <strong>Start</strong> to resume. Player progress, builds, and inventories are intact (last stop: ${mins} min ago).</div>
@@ -176,7 +241,7 @@ function renderServer(s) {
       <div class="sc-title">
         <div class="sc-icon" style="position:relative;">
           ${typeIcon(s.type)}
-          ${s.user_slot ? `<span class="sc-slot">#${s.user_slot}</span>` : ''}
+          ${s.user_slot ? `<span class="sc-slot">#${s.user_slot}</span>` : ""}
         </div>
         <div>
           <div class="sc-name">${escapeHtml(s.name)} ${slotBadge}</div>
@@ -193,23 +258,36 @@ function renderServer(s) {
       <span style="flex:1;">🖥️ <span style="font-weight:600;">Java:</span> ${escapeHtml(ip)}</span>
       <span class="sc-copy">📋 Copy</span>
     </div>
-    ${s.playit_host && s.playit_port ? `
-    <div class="sc-ip" title="Bedrock Edition (mobile / console) · click to copy" onclick="copyText('${escapeHtml(s.playit_host + ':' + s.playit_port)}')" style="cursor:pointer;border-color:rgba(255,107,53,0.35);background:rgba(255,107,53,0.05);">
+    ${
+      s.playit_host && s.playit_port
+        ? `
+    <div class="sc-ip" title="Bedrock Edition (mobile / console) · click to copy" onclick="copyText('${escapeHtml(s.playit_host + ":" + s.playit_port)}')" style="cursor:pointer;border-color:rgba(255,107,53,0.35);background:rgba(255,107,53,0.05);">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ff6b35" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
-      <span style="flex:1;">📱 <span style="font-weight:600;">Bedrock:</span> ${escapeHtml(s.playit_host + ':' + s.playit_port)}</span>
+      <span style="flex:1;">📱 <span style="font-weight:600;">Bedrock:</span> ${escapeHtml(s.playit_host + ":" + s.playit_port)}</span>
       <span class="sc-copy">📋 Copy</span>
     </div>`
-    : s.playit_enabled ? `
+        : s.playit_enabled
+          ? `
     <div class="sc-ip" title="Bedrock cross-play is on — waiting for tunnel address" onclick="openBedrockModal('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')" style="cursor:pointer;border-color:rgba(255,107,53,0.35);background:rgba(255,107,53,0.05);">
       <span style="flex:1;">📱 <span style="font-weight:600;">Bedrock:</span> on — connecting…</span>
       <span class="sc-copy">Details</span>
     </div>`
-    : ['paper','spigot','purpur'].includes((s.type || '').toLowerCase()) ? `
+          : [
+                "paper",
+                "spigot",
+                "purpur",
+                "vanilla",
+                "fabric",
+                "neoforge",
+              ].includes((s.type || "").toLowerCase())
+            ? `
     <div class="sc-ip sc-bedrock-enable" title="Enable Bedrock cross-play — mobile / Xbox / Switch / PS players" onclick="openBedrockModal('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')" style="cursor:pointer;border-style:dashed;border-color:rgba(255,107,53,0.5);background:rgba(255,107,53,0.04);">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ff6b35" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
       <span style="flex:1;">📱 <span style="font-weight:600;">Enable Bedrock cross-play</span> <span style="opacity:.65;font-size:11px;">mobile / console</span></span>
       <span class="sc-copy" style="background:rgba(255,107,53,0.18);color:#ff6b35;">Enable →</span>
-    </div>` : ''}
+    </div>`
+            : ""
+    }
     ${motdLine}
     ${sampleLine}
     ${crashHint}
@@ -223,16 +301,17 @@ function renderServer(s) {
     ${renderTpsSparkline(stats.tps_history, stats.tps)}
 
     <div style="font-size:12px;color:var(--slate-400);margin-bottom:4px;display:flex;justify-content:space-between;">
-      <span>RAM</span><span>${ramUsed >= 1024 ? (ramUsed/1024).toFixed(1)+' GB' : ramUsed+' MB'} / ${(ramMax/1024).toFixed(1)} GB</span>
+      <span>RAM</span><span>${ramUsed >= 1024 ? (ramUsed / 1024).toFixed(1) + " GB" : ramUsed + " MB"} / ${(ramMax / 1024).toFixed(1)} GB</span>
     </div>
     <div class="sc-bar"><div style="width:${ramPct}%"></div></div>
 
     <div class="sc-actions">
       <div class="sc-primary-row">
-        ${isOnline
-          ? `<button class="btn btn-danger sc-primary" onclick="serverAction('${escapeHtml(s.id)}', 'stop')">■ Stop Server</button>
+        ${
+          isOnline
+            ? `<button class="btn btn-danger sc-primary" onclick="serverAction('${escapeHtml(s.id)}', 'stop')">■ Stop Server</button>
              <button class="btn btn-warning sc-icon-btn" onclick="serverAction('${escapeHtml(s.id)}', 'restart')" title="Restart server" aria-label="Restart server">⟳</button>`
-          : `<button class="btn btn-primary sc-primary" onclick="serverAction('${escapeHtml(s.id)}', 'start')">▶ Start Server</button>`
+            : `<button class="btn btn-primary sc-primary" onclick="serverAction('${escapeHtml(s.id)}', 'start')">▶ Start Server</button>`
         }
         <button class="btn btn-secondary sc-icon-btn sc-console-btn" onclick="goToConsole('${escapeHtml(s.id)}')" title="Open console" aria-label="Open console">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
@@ -248,19 +327,34 @@ function renderServer(s) {
         <button role="menuitem" onclick="closeCardMenu();openSettings('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')">
           <span class="sc-menu-icon">⚙️</span><span>Settings</span>
         </button>
-        <button role="menuitem" onclick="closeCardMenu();openSwapJar('${escapeHtml(s.id)}', '${escapeHtml(s.type)}', '${escapeHtml(s.version || '')}', '${escapeHtml(s.plan_id || 'free')}')">
+        <button role="menuitem" onclick="closeCardMenu();openSwapJar('${escapeHtml(s.id)}', '${escapeHtml(s.type)}', '${escapeHtml(s.version || "")}', '${escapeHtml(s.plan_id || "free")}')">
           <span class="sc-menu-icon">📦</span><span>Change JAR</span>
         </button>
         <button role="menuitem" onclick="closeCardMenu();copyText('${escapeHtml(ip)}')">
           <span class="sc-menu-icon">📋</span><span>Copy address</span>
         </button>
-        ${['paper','spigot','purpur'].includes((s.type || '').toLowerCase()) ? `
+        ${
+          [
+            "paper",
+            "spigot",
+            "purpur",
+            "vanilla",
+            "fabric",
+            "neoforge",
+          ].includes((s.type || "").toLowerCase())
+            ? `
         <button role="menuitem" onclick="closeCardMenu();openBedrockModal('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')">
-          <span class="sc-menu-icon">📱</span><span>${s.playit_enabled ? 'Bedrock cross-play (ON)' : 'Enable Bedrock cross-play'}</span>
-        </button>` : ''}
-        ${!s.is_public ? `<button role="menuitem" onclick="closeCardMenu();promoteServer('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')">
+          <span class="sc-menu-icon">📱</span><span>${s.playit_enabled ? "Bedrock cross-play (ON)" : "Enable Bedrock cross-play"}</span>
+        </button>`
+            : ""
+        }
+        ${
+          !s.is_public
+            ? `<button role="menuitem" onclick="closeCardMenu();promoteServer('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')">
           <span class="sc-menu-icon">🌍</span><span>Make Public</span>
-        </button>` : ''}
+        </button>`
+            : ""
+        }
         <button role="menuitem" onclick="closeCardMenu();openCloneDialog('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')">
           <span class="sc-menu-icon">📑</span><span>Clone server</span>
         </button>
@@ -279,11 +373,11 @@ function renderServer(s) {
 // Custom delete confirmation modal (replaces browser confirm() so it's
 // styled, has typed confirmation, and gives accurate consequence text).
 function openDeleteConfirm(sid, name) {
-  let modal = document.getElementById('delServerModal');
+  let modal = document.getElementById("delServerModal");
   if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'delServerModal';
-    modal.className = 'modal-bg';
+    modal = document.createElement("div");
+    modal.id = "delServerModal";
+    modal.className = "modal-bg";
     document.body.appendChild(modal);
   }
   modal.innerHTML = `
@@ -313,22 +407,24 @@ function openDeleteConfirm(sid, name) {
       </div>
     </div>
   `;
-  modal.classList.add('show');
-  const input = document.getElementById('delConfirmInput');
-  const btn = document.getElementById('delServerGo');
-  input.addEventListener('input', () => {
+  modal.classList.add("show");
+  const input = document.getElementById("delConfirmInput");
+  const btn = document.getElementById("delServerGo");
+  input.addEventListener("input", () => {
     btn.disabled = input.value.trim() !== name;
   });
   btn.onclick = async () => {
-    btn.disabled = true; btn.textContent = '⏳ Deleting…';
+    btn.disabled = true;
+    btn.textContent = "⏳ Deleting…";
     try {
-      await api(`/api/servers/${sid}`, { method: 'DELETE' });
-      toast('Server deleted');
-      modal.classList.remove('show');
+      await api(`/api/servers/${sid}`, { method: "DELETE" });
+      toast("Server deleted");
+      modal.classList.remove("show");
       loadServers();
     } catch (err) {
-      toast(err.message, 'error');
-      btn.disabled = false; btn.textContent = 'Delete forever';
+      toast(err.message, "error");
+      btn.disabled = false;
+      btn.textContent = "Delete forever";
     }
   };
 }
@@ -336,11 +432,11 @@ function openDeleteConfirm(sid, name) {
 // Inline logs viewer modal. Shows the last 200 lines from /api/servers/:id/logs
 // so users can debug boot failures without going to /console.html.
 async function openLogs(sid, name) {
-  let modal = document.getElementById('logsModal');
+  let modal = document.getElementById("logsModal");
   if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'logsModal';
-    modal.className = 'modal-bg';
+    modal = document.createElement("div");
+    modal.id = "logsModal";
+    modal.className = "modal-bg";
     document.body.appendChild(modal);
   }
   modal.innerHTML = `
@@ -361,25 +457,41 @@ async function openLogs(sid, name) {
       </div>
     </div>
   `;
-  modal.classList.add('show');
+  modal.classList.add("show");
   let autoTimer = null;
   async function refresh() {
     try {
       const r = await api(`/api/servers/${sid}/logs?lines=200`);
-      const pre = document.getElementById('logsContent');
+      const pre = document.getElementById("logsContent");
       if (!pre) return;
-      pre.textContent = r.logs.length ? r.logs.join('\n') : (r.note || '(no logs — server hasn\'t started yet)');
+      pre.textContent = r.logs.length
+        ? r.logs.join("\n")
+        : r.note || "(no logs — server hasn't started yet)";
       pre.scrollTop = pre.scrollHeight;
     } catch (err) {
-      const pre = document.getElementById('logsContent');
-      if (pre) pre.textContent = 'Failed to load: ' + err.message;
+      const pre = document.getElementById("logsContent");
+      if (pre) pre.textContent = "Failed to load: " + err.message;
     }
   }
-  function clearAuto() { if (autoTimer) { clearInterval(autoTimer); autoTimer = null; } }
-  function startAuto() { clearAuto(); autoTimer = setInterval(refresh, 3000); }
-  document.getElementById('logsRefresh').onclick = refresh;
-  document.getElementById('logsAuto').onchange = (e) => e.target.checked ? startAuto() : clearAuto();
-  modal.addEventListener('click', (e) => { if (e.target === modal) { clearAuto(); modal.classList.remove('show'); } });
+  function clearAuto() {
+    if (autoTimer) {
+      clearInterval(autoTimer);
+      autoTimer = null;
+    }
+  }
+  function startAuto() {
+    clearAuto();
+    autoTimer = setInterval(refresh, 3000);
+  }
+  document.getElementById("logsRefresh").onclick = refresh;
+  document.getElementById("logsAuto").onchange = (e) =>
+    e.target.checked ? startAuto() : clearAuto();
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      clearAuto();
+      modal.classList.remove("show");
+    }
+  });
   refresh();
   startAuto();
 }
@@ -389,18 +501,22 @@ window.openLogs = openLogs;
 
 // Card overflow menu — single-open. Click-outside / escape / scroll closes.
 function closeCardMenu() {
-  document.querySelectorAll('.sc-menu.show').forEach(el => el.classList.remove('show'));
-  document.querySelectorAll('.sc-menu-btn.active').forEach(el => el.classList.remove('active'));
+  document
+    .querySelectorAll(".sc-menu.show")
+    .forEach((el) => el.classList.remove("show"));
+  document
+    .querySelectorAll(".sc-menu-btn.active")
+    .forEach((el) => el.classList.remove("active"));
 }
 function toggleCardMenu(evt, sid) {
   evt.stopPropagation();
   const menu = document.getElementById(`sc-menu-${sid}`);
   if (!menu) return;
-  const wasOpen = menu.classList.contains('show');
+  const wasOpen = menu.classList.contains("show");
   closeCardMenu();
   if (!wasOpen) {
-    menu.classList.add('show');
-    evt.currentTarget.classList.add('active');
+    menu.classList.add("show");
+    evt.currentTarget.classList.add("active");
   }
 }
 window.closeCardMenu = closeCardMenu;
@@ -410,40 +526,51 @@ window.toggleCardMenu = toggleCardMenu;
 // The platform also has a background auto-heal loop; this gives impatient users
 // instant action without waiting for the next loop tick.
 async function autoFixOom(sid, name) {
-  if (!confirm(`Swap "${name}" to Paper 1.20.1 and restart now?\n\nThis fixes the out-of-memory crash. Your world data is preserved.`)) return;
+  if (
+    !confirm(
+      `Swap "${name}" to Paper 1.20.1 and restart now?\n\nThis fixes the out-of-memory crash. Your world data is preserved.`,
+    )
+  )
+    return;
   try {
     toast(`🔧 Healing ${name}…`);
-    await api(`/api/servers/${sid}/swap-jar`, { method: 'POST', body: { type: 'paper', version: '1.21.1' } });
+    await api(`/api/servers/${sid}/swap-jar`, {
+      method: "POST",
+      body: { type: "paper", version: "1.21.1" },
+    });
     toast(`✓ ${name} restarted with Paper 1.20.1`);
     loadServers();
   } catch (err) {
-    toast(err.message || 'Auto-fix failed', 'error');
+    toast(err.message || "Auto-fix failed", "error");
   }
 }
 window.autoFixOom = autoFixOom;
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.sc-menu') && !e.target.closest('.sc-menu-btn')) closeCardMenu();
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".sc-menu") && !e.target.closest(".sc-menu-btn"))
+    closeCardMenu();
 });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCardMenu(); });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeCardMenu();
+});
 
 // ── Swap-JAR modal ─────────────────────────────────────────────────
 async function openSwapJar(sid, curType, curVer, planId) {
-  planId = planId || 'free';
-  const isFree = planId === 'free';
+  planId = planId || "free";
+  const isFree = planId === "free";
   // Mirror isHeavyVersion from wizard.js (currently always false with 2GB plan).
   const heavy = (v) => {
-    if (!v || v === 'LATEST') return true;
+    if (!v || v === "LATEST") return true;
     const m = String(v).match(/^1\.(\d+)/);
     return m ? parseInt(m[1], 10) >= 21 : false;
   };
-  let modal = document.getElementById('swapJarModal');
+  let modal = document.getElementById("swapJarModal");
   if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'swapJarModal';
-    modal.className = 'modal-bg';
+    modal = document.createElement("div");
+    modal.id = "swapJarModal";
+    modal.className = "modal-bg";
     document.body.appendChild(modal);
   }
-  modal.classList.add('show');
+  modal.classList.add("show");
   modal.innerHTML = `
     <div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">
       <div class="modal-head">
@@ -454,7 +581,7 @@ async function openSwapJar(sid, curType, curVer, planId) {
         <div class="field">
           <label class="label">Server Type</label>
           <select class="select" id="sjType">
-            ${['paper','vanilla','purpur','fabric'].map(t => `<option value="${t}" ${t===curType?'selected':''}>${t[0].toUpperCase()+t.slice(1)}</option>`).join('')}
+            ${["paper", "vanilla", "purpur", "fabric"].map((t) => `<option value="${t}" ${t === curType ? "selected" : ""}>${t[0].toUpperCase() + t.slice(1)}</option>`).join("")}
           </select>
         </div>
         <div class="field">
@@ -471,82 +598,111 @@ async function openSwapJar(sid, curType, curVer, planId) {
     </div>
   `;
   function updateWarn() {
-    const v = document.getElementById('sjVersion').value;
-    const warn = document.getElementById('sjWarn');
+    const v = document.getElementById("sjVersion").value;
+    const warn = document.getElementById("sjWarn");
     if (isFree && heavy(v)) {
       warn.innerHTML = `<div class="wiz-warn" role="alert">
         <strong>⚠ This version may OOM on the Free plan.</strong>
         <p>Minecraft ${v} may exceed your plan's heap on boot. Pick a lighter version if it crashes.</p>
       </div>`;
-    } else { warn.innerHTML = ''; }
+    } else {
+      warn.innerHTML = "";
+    }
   }
   async function loadVer() {
-    const type = document.getElementById('sjType').value;
-    const sel = document.getElementById('sjVersion');
-    sel.innerHTML = '<option>Loading…</option>';
+    const type = document.getElementById("sjType").value;
+    const sel = document.getElementById("sjVersion");
+    sel.innerHTML = "<option>Loading…</option>";
     try {
-      const r = await fetch(`/api/versions/${encodeURIComponent(type)}?limit=50`, { credentials: 'include' });
+      const r = await fetch(
+        `/api/versions/${encodeURIComponent(type)}?limit=50`,
+        { credentials: "include" },
+      );
       const d = await r.json();
       const vs = d.versions || [];
       // Pick the safest default for free plan: prefer current version if not heavy,
       // else first non-heavy in the list, else first item.
-      const safeFor = (planId === 'free')
-        ? (vs.find(v => v.id === curVer && !heavy(v.id))?.id
-           || vs.find(v => !heavy(v.id))?.id
-           || vs[0]?.id)
-        : (vs.find(v => v.id === curVer)?.id || vs[0]?.id);
+      const safeFor =
+        planId === "free"
+          ? vs.find((v) => v.id === curVer && !heavy(v.id))?.id ||
+            vs.find((v) => !heavy(v.id))?.id ||
+            vs[0]?.id
+          : vs.find((v) => v.id === curVer)?.id || vs[0]?.id;
       // Group by major.minor (1.21.x, 1.20.x, ...) so a long list stays readable.
       const groups = {};
       for (const v of vs) {
         const m = String(v.id).match(/^(\d+\.\d+)/);
-        const key = m ? m[1] + '.x' : 'other';
+        const key = m ? m[1] + ".x" : "other";
         (groups[key] = groups[key] || []).push(v);
       }
       const groupKeys = Object.keys(groups).sort((a, b) => {
-        const ax = a.split('.').map(n => parseInt(n, 10) || 0);
-        const bx = b.split('.').map(n => parseInt(n, 10) || 0);
-        return (bx[0] - ax[0]) || (bx[1] - ax[1]);
+        const ax = a.split(".").map((n) => parseInt(n, 10) || 0);
+        const bx = b.split(".").map((n) => parseInt(n, 10) || 0);
+        return bx[0] - ax[0] || bx[1] - ax[1];
       });
-      sel.innerHTML = groupKeys.map(gk => `<optgroup label="Minecraft ${escapeHtml(gk)}">${groups[gk].map(v => {
-        const isCur = v.id === curVer;
-        const isSel = v.id === safeFor;
-        const tags = [];
-        if (isCur) tags.push('Current');
-        if (isFree && heavy(v.id)) tags.push('⚠ may OOM');
-        if (isFree && !heavy(v.id) && v.id === safeFor) tags.push('✓ recommended');
-        const tag = tags.length ? ` — ${tags.join(' · ')}` : '';
-        return `<option value="${escapeHtml(v.id)}" ${isSel ? 'selected':''}>${escapeHtml(v.id)}${tag}</option>`;
-      }).join('')}</optgroup>`).join('') || '<option>(no versions)</option>';
+      sel.innerHTML =
+        groupKeys
+          .map(
+            (gk) =>
+              `<optgroup label="Minecraft ${escapeHtml(gk)}">${groups[gk]
+                .map((v) => {
+                  const isCur = v.id === curVer;
+                  const isSel = v.id === safeFor;
+                  const tags = [];
+                  if (isCur) tags.push("Current");
+                  if (isFree && heavy(v.id)) tags.push("⚠ may OOM");
+                  if (isFree && !heavy(v.id) && v.id === safeFor)
+                    tags.push("✓ recommended");
+                  const tag = tags.length ? ` — ${tags.join(" · ")}` : "";
+                  return `<option value="${escapeHtml(v.id)}" ${isSel ? "selected" : ""}>${escapeHtml(v.id)}${tag}</option>`;
+                })
+                .join("")}</optgroup>`,
+          )
+          .join("") || "<option>(no versions)</option>";
       sel.onchange = updateWarn;
       updateWarn();
-    } catch { sel.innerHTML = '<option>Failed to fetch</option>'; }
+    } catch {
+      sel.innerHTML = "<option>Failed to fetch</option>";
+    }
   }
-  document.getElementById('sjType').onchange = loadVer;
-  document.getElementById('sjApply').onclick = async () => {
-    const type = document.getElementById('sjType').value;
-    const version = document.getElementById('sjVersion').value;
-    const btn = document.getElementById('sjApply');
-    btn.disabled = true; btn.textContent = '⏳ Swapping…';
+  document.getElementById("sjType").onchange = loadVer;
+  document.getElementById("sjApply").onclick = async () => {
+    const type = document.getElementById("sjType").value;
+    const version = document.getElementById("sjVersion").value;
+    const btn = document.getElementById("sjApply");
+    btn.disabled = true;
+    btn.textContent = "⏳ Swapping…";
     try {
-      await api(`/api/servers/${sid}/swap-jar`, { method: 'POST', body: { type, version } });
+      await api(`/api/servers/${sid}/swap-jar`, {
+        method: "POST",
+        body: { type, version },
+      });
       toast(`✓ Swapped to ${type} ${version}`);
-      document.getElementById('swapJarModal').classList.remove('show');
+      document.getElementById("swapJarModal").classList.remove("show");
       loadServers();
     } catch (err) {
-      toast(err.message, 'error');
-      btn.disabled = false; btn.textContent = 'Apply';
+      toast(err.message, "error");
+      btn.disabled = false;
+      btn.textContent = "Apply";
     }
   };
   loadVer();
 }
 
 async function promoteServer(sid, name) {
-  if (!confirm(`Promote "${name}" to the public port? Any other public server will be demoted.`)) return;
+  if (
+    !confirm(
+      `Promote "${name}" to the public port? Any other public server will be demoted.`,
+    )
+  )
+    return;
   try {
-    const r = await api(`/api/servers/${sid}/promote`, { method: 'POST' });
+    const r = await api(`/api/servers/${sid}/promote`, { method: "POST" });
     toast(`✓ "${name}" is now public on ${r.public_host}:${r.mc_port}`);
     loadServers();
-  } catch (err) { toast(err.message, 'error'); }
+  } catch (err) {
+    toast(err.message, "error");
+  }
 }
 
 window.openSwapJar = openSwapJar;
@@ -554,14 +710,14 @@ window.promoteServer = promoteServer;
 
 // ── Server Settings modal ─────────────────────────────────────────────
 async function openSettings(sid, name) {
-  let modal = document.getElementById('settingsModal');
+  let modal = document.getElementById("settingsModal");
   if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'settingsModal';
-    modal.className = 'modal-bg';
+    modal = document.createElement("div");
+    modal.id = "settingsModal";
+    modal.className = "modal-bg";
     document.body.appendChild(modal);
   }
-  modal.classList.add('show');
+  modal.classList.add("show");
   modal.innerHTML = `
     <div class="modal" onclick="event.stopPropagation()" style="max-width:560px;">
       <div class="modal-head">
@@ -598,11 +754,20 @@ async function openSettings(sid, name) {
             </div>
             <div class="field"><label class="label">Max Players</label><input class="input" type="number" id="set_max_players" min="1" max="999" /></div>
             <div class="field"><label class="label">View Distance</label><input class="input" type="number" id="set_view_distance" min="3" max="32" /></div>
+            <div class="field"><label class="label">Simulation Distance</label><input class="input" type="number" id="set_simulation_distance" min="3" max="32" /></div>
+            <div class="field"><label class="label">Spawn Protection <span class="text-muted" style="font-weight:400;font-size:11.5px;">(blocks, 0=off)</span></label><input class="input" type="number" id="set_spawn_protection" min="0" max="64" /></div>
           </div>
-          <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:6px;">
+          <div style="display:flex;gap:14px 18px;flex-wrap:wrap;margin-top:6px;">
             <label class="flex items-center gap-2"><input type="checkbox" id="set_pvp" /> Enable PvP</label>
             <label class="flex items-center gap-2"><input type="checkbox" id="set_hardcore" /> Hardcore</label>
             <label class="flex items-center gap-2"><input type="checkbox" id="set_whitelist" /> Whitelist</label>
+            <label class="flex items-center gap-2"><input type="checkbox" id="set_allow_flight" /> Allow flight</label>
+            <label class="flex items-center gap-2"><input type="checkbox" id="set_allow_nether" /> Allow Nether</label>
+            <label class="flex items-center gap-2"><input type="checkbox" id="set_command_blocks" /> Command blocks</label>
+            <label class="flex items-center gap-2"><input type="checkbox" id="set_force_gamemode" /> Force gamemode</label>
+            <label class="flex items-center gap-2"><input type="checkbox" id="set_spawn_monsters" /> Spawn monsters</label>
+            <label class="flex items-center gap-2"><input type="checkbox" id="set_spawn_animals" /> Spawn animals</label>
+            <label class="flex items-center gap-2"><input type="checkbox" id="set_spawn_npcs" /> Spawn villagers</label>
           </div>
           <div class="field" style="margin-top:18px;padding-top:14px;border-top:1px solid var(--glass-border);">
             <label class="label">⏰ Scheduled daily restart <span class="text-muted" style="font-weight:400;font-size:11.5px;">(UTC — clears memory leaks)</span></label>
@@ -622,21 +787,66 @@ async function openSettings(sid, name) {
     </div>
   `;
   function applyProps(p) {
-    document.getElementById('setLoading').style.display = 'none';
-    document.getElementById('setForm').style.display = 'block';
-    document.getElementById('set_save').disabled = false;
-    document.getElementById('set_motd').value = p['motd'] != null ? p['motd'] : '';
-    document.getElementById('set_gamemode').value = p['gamemode'] || 'survival';
-    document.getElementById('set_difficulty').value = p['difficulty'] || 'normal';
-    document.getElementById('set_max_players').value = p['max-players'] || '10';
-    document.getElementById('set_view_distance').value = p['view-distance'] || '10';
-    document.getElementById('set_pvp').checked = String(p['pvp'] ?? 'true').toLowerCase() === 'true';
-    document.getElementById('set_hardcore').checked = String(p['hardcore']).toLowerCase() === 'true';
-    document.getElementById('set_whitelist').checked = String(p['white-list']).toLowerCase() === 'true';
+    document.getElementById("setLoading").style.display = "none";
+    document.getElementById("setForm").style.display = "block";
+    document.getElementById("set_save").disabled = false;
+    document.getElementById("set_motd").value =
+      p["motd"] != null ? p["motd"] : "";
+    document.getElementById("set_gamemode").value = p["gamemode"] || "survival";
+    document.getElementById("set_difficulty").value =
+      p["difficulty"] || "normal";
+    document.getElementById("set_max_players").value = p["max-players"] || "10";
+    document.getElementById("set_view_distance").value =
+      p["view-distance"] || "10";
+    document.getElementById("set_simulation_distance").value =
+      p["simulation-distance"] || "10";
+    document.getElementById("set_spawn_protection").value =
+      p["spawn-protection"] != null ? p["spawn-protection"] : "16";
+    // Booleans — fall back to Minecraft's own defaults when the key is absent
+    // (brand-new server whose properties file hasn't been generated yet).
+    const boolOn = (key, def) => String(p[key] ?? def).toLowerCase() === "true";
+    document.getElementById("set_pvp").checked = boolOn("pvp", "true");
+    document.getElementById("set_hardcore").checked = boolOn(
+      "hardcore",
+      "false",
+    );
+    document.getElementById("set_whitelist").checked = boolOn(
+      "white-list",
+      "false",
+    );
+    document.getElementById("set_allow_flight").checked = boolOn(
+      "allow-flight",
+      "false",
+    );
+    document.getElementById("set_allow_nether").checked = boolOn(
+      "allow-nether",
+      "true",
+    );
+    document.getElementById("set_command_blocks").checked = boolOn(
+      "enable-command-block",
+      "false",
+    );
+    document.getElementById("set_force_gamemode").checked = boolOn(
+      "force-gamemode",
+      "false",
+    );
+    document.getElementById("set_spawn_monsters").checked = boolOn(
+      "spawn-monsters",
+      "true",
+    );
+    document.getElementById("set_spawn_animals").checked = boolOn(
+      "spawn-animals",
+      "true",
+    );
+    document.getElementById("set_spawn_npcs").checked = boolOn(
+      "spawn-npcs",
+      "true",
+    );
     // Scheduled restart isn't in server.properties — pull from the cached
     // server row that the dashboard list keeps in `servers`.
-    const row = (servers || []).find(x => x.id === sid);
-    document.getElementById('set_schedrestart').value = row?.scheduled_restart_at || '';
+    const row = (servers || []).find((x) => x.id === sid);
+    document.getElementById("set_schedrestart").value =
+      row?.scheduled_restart_at || "";
   }
   try {
     const r = await api(`/api/servers/${sid}/properties`);
@@ -646,75 +856,92 @@ async function openSettings(sid, name) {
     // sane defaults so the user can save initial settings; the backend will
     // create the file on PATCH.
     applyProps({});
-    const note = document.createElement('div');
-    note.className = 'text-muted';
-    note.style.cssText = 'font-size:12px;margin-top:10px;color:var(--slate-400);';
+    const note = document.createElement("div");
+    note.className = "text-muted";
+    note.style.cssText =
+      "font-size:12px;margin-top:10px;color:var(--slate-400);";
     note.textContent = `Server hasn't been started yet — saving will create the initial config.`;
-    document.getElementById('setForm').appendChild(note);
+    document.getElementById("setForm").appendChild(note);
   }
   // ── Server icon ───────────────────────────────────────────────────────────
-  const iconImg = document.getElementById('set_icon_img');
-  const iconEmpty = document.getElementById('set_icon_empty');
-  const iconRemoveBtn = document.getElementById('set_icon_remove');
+  const iconImg = document.getElementById("set_icon_img");
+  const iconEmpty = document.getElementById("set_icon_empty");
+  const iconRemoveBtn = document.getElementById("set_icon_remove");
   function setIconState(hasIcon) {
     if (hasIcon) {
       iconImg.src = `/api/servers/${sid}/icon?_=${Date.now()}`;
-      iconImg.style.display = 'block';
-      iconEmpty.style.display = 'none';
-      iconRemoveBtn.style.display = '';
+      iconImg.style.display = "block";
+      iconEmpty.style.display = "none";
+      iconRemoveBtn.style.display = "";
     } else {
-      iconImg.style.display = 'none';
-      iconImg.removeAttribute('src');
-      iconEmpty.style.display = 'flex';
-      iconRemoveBtn.style.display = 'none';
+      iconImg.style.display = "none";
+      iconImg.removeAttribute("src");
+      iconEmpty.style.display = "flex";
+      iconRemoveBtn.style.display = "none";
     }
   }
   // Probe whether an icon exists
   try {
-    const probe = await fetch(`/api/servers/${sid}/icon`, { credentials: 'include' });
+    const probe = await fetch(`/api/servers/${sid}/icon`, {
+      credentials: "include",
+    });
     setIconState(probe.ok);
-  } catch { setIconState(false); }
+  } catch {
+    setIconState(false);
+  }
 
-  document.getElementById('set_icon_file').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const status = document.getElementById('set_icon_status');
-    if (file.size > 256 * 1024) { status.textContent = '✗ PNG too large (max 256 KB)'; status.style.color = 'var(--red, #ef4444)'; return; }
-    if (!/^image\/png$/i.test(file.type) && !/\.png$/i.test(file.name)) {
-      status.textContent = '✗ Must be a PNG'; status.style.color = 'var(--red, #ef4444)'; return;
-    }
-    status.style.color = 'var(--slate-300)';
-    status.textContent = 'Uploading…';
-    const fd = new FormData();
-    fd.append('icon', file, file.name);
-    try {
-      const r = await fetch(`/api/servers/${sid}/icon`, { method: 'POST', credentials: 'include', body: fd });
-      const body = await r.json().catch(() => ({}));
-      if (r.ok && body.ok) {
-        status.style.color = 'var(--emerald)';
-        status.textContent = `✓ Saved (${(body.size/1024).toFixed(1)} KB) — restart to apply`;
-        setIconState(true);
-      } else {
-        status.style.color = 'var(--red, #ef4444)';
-        status.textContent = '✗ ' + (body.error || `HTTP ${r.status}`);
+  document
+    .getElementById("set_icon_file")
+    .addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const status = document.getElementById("set_icon_status");
+      if (file.size > 256 * 1024) {
+        status.textContent = "✗ PNG too large (max 256 KB)";
+        status.style.color = "var(--red, #ef4444)";
+        return;
       }
-    } catch (err) {
-      status.style.color = 'var(--red, #ef4444)';
-      status.textContent = '✗ ' + err.message;
-    }
-  });
-  iconRemoveBtn.addEventListener('click', async () => {
-    const status = document.getElementById('set_icon_status');
+      if (!/^image\/png$/i.test(file.type) && !/\.png$/i.test(file.name)) {
+        status.textContent = "✗ Must be a PNG";
+        status.style.color = "var(--red, #ef4444)";
+        return;
+      }
+      status.style.color = "var(--slate-300)";
+      status.textContent = "Uploading…";
+      const fd = new FormData();
+      fd.append("icon", file, file.name);
+      try {
+        const r = await fetch(`/api/servers/${sid}/icon`, {
+          method: "POST",
+          credentials: "include",
+          body: fd,
+        });
+        const body = await r.json().catch(() => ({}));
+        if (r.ok && body.ok) {
+          status.style.color = "var(--emerald)";
+          status.textContent = `✓ Saved (${(body.size / 1024).toFixed(1)} KB) — restart to apply`;
+          setIconState(true);
+        } else {
+          status.style.color = "var(--red, #ef4444)";
+          status.textContent = "✗ " + (body.error || `HTTP ${r.status}`);
+        }
+      } catch (err) {
+        status.style.color = "var(--red, #ef4444)";
+        status.textContent = "✗ " + err.message;
+      }
+    });
+  iconRemoveBtn.addEventListener("click", async () => {
+    const status = document.getElementById("set_icon_status");
     try {
-      const r = await api(`/api/servers/${sid}/icon`, { method: 'DELETE' });
+      const r = await api(`/api/servers/${sid}/icon`, { method: "DELETE" });
       if (r.ok) {
         setIconState(false);
-        status.style.color = 'var(--emerald)';
-        status.textContent = '✓ Icon removed — restart to apply';
+        status.style.color = "var(--emerald)";
+        status.textContent = "✓ Icon removed — restart to apply";
       }
     } catch (err) {
-      status.style.color = 'var(--red, #ef4444)';
-      status.textContent = '✗ ' + err.message;
+      status.style.color = "var(--red, #ef4444)";
+      status.textContent = "✗ " + err.message;
     }
   });
 
@@ -722,39 +949,39 @@ async function openSettings(sid, name) {
   // The 16 Minecraft colors + 6 formatting codes. Clicking a swatch inserts
   // the code at the cursor position in the MOTD field.
   const MC_COLORS = [
-    { code: '0', name: 'black',        hex: '#000000' },
-    { code: '1', name: 'dark blue',    hex: '#0000AA' },
-    { code: '2', name: 'dark green',   hex: '#00AA00' },
-    { code: '3', name: 'dark aqua',    hex: '#00AAAA' },
-    { code: '4', name: 'dark red',     hex: '#AA0000' },
-    { code: '5', name: 'dark purple',  hex: '#AA00AA' },
-    { code: '6', name: 'gold',         hex: '#FFAA00' },
-    { code: '7', name: 'gray',         hex: '#AAAAAA' },
-    { code: '8', name: 'dark gray',    hex: '#555555' },
-    { code: '9', name: 'blue',         hex: '#5555FF' },
-    { code: 'a', name: 'green',        hex: '#55FF55' },
-    { code: 'b', name: 'aqua',         hex: '#55FFFF' },
-    { code: 'c', name: 'red',          hex: '#FF5555' },
-    { code: 'd', name: 'light purple', hex: '#FF55FF' },
-    { code: 'e', name: 'yellow',       hex: '#FFFF55' },
-    { code: 'f', name: 'white',        hex: '#FFFFFF' },
+    { code: "0", name: "black", hex: "#000000" },
+    { code: "1", name: "dark blue", hex: "#0000AA" },
+    { code: "2", name: "dark green", hex: "#00AA00" },
+    { code: "3", name: "dark aqua", hex: "#00AAAA" },
+    { code: "4", name: "dark red", hex: "#AA0000" },
+    { code: "5", name: "dark purple", hex: "#AA00AA" },
+    { code: "6", name: "gold", hex: "#FFAA00" },
+    { code: "7", name: "gray", hex: "#AAAAAA" },
+    { code: "8", name: "dark gray", hex: "#555555" },
+    { code: "9", name: "blue", hex: "#5555FF" },
+    { code: "a", name: "green", hex: "#55FF55" },
+    { code: "b", name: "aqua", hex: "#55FFFF" },
+    { code: "c", name: "red", hex: "#FF5555" },
+    { code: "d", name: "light purple", hex: "#FF55FF" },
+    { code: "e", name: "yellow", hex: "#FFFF55" },
+    { code: "f", name: "white", hex: "#FFFFFF" },
   ];
   const MC_FORMATS = [
-    { code: 'l', name: 'bold',          label: 'B' },
-    { code: 'o', name: 'italic',        label: 'I' },
-    { code: 'n', name: 'underline',     label: 'U' },
-    { code: 'm', name: 'strikethrough', label: 'S' },
-    { code: 'k', name: 'obfuscated',    label: '▓' },
-    { code: 'r', name: 'reset',         label: '⤺' },
+    { code: "l", name: "bold", label: "B" },
+    { code: "o", name: "italic", label: "I" },
+    { code: "n", name: "underline", label: "U" },
+    { code: "m", name: "strikethrough", label: "S" },
+    { code: "k", name: "obfuscated", label: "▓" },
+    { code: "r", name: "reset", label: "⤺" },
   ];
-  const motdInput = document.getElementById('set_motd');
-  const colorRow = document.getElementById('motdColors');
+  const motdInput = document.getElementById("set_motd");
+  const colorRow = document.getElementById("motdColors");
   colorRow.innerHTML = `
     <div class="motd-swatches">
-      ${MC_COLORS.map(c => `<button type="button" class="motd-sw" data-code="${c.code}" style="background:${c.hex};" title="${c.name} (&amp;${c.code})"></button>`).join('')}
+      ${MC_COLORS.map((c) => `<button type="button" class="motd-sw" data-code="${c.code}" style="background:${c.hex};" title="${c.name} (&amp;${c.code})"></button>`).join("")}
     </div>
     <div class="motd-formats">
-      ${MC_FORMATS.map(f => `<button type="button" class="motd-fmt" data-code="${f.code}" title="${f.name} (&amp;${f.code})">${f.label}</button>`).join('')}
+      ${MC_FORMATS.map((f) => `<button type="button" class="motd-fmt" data-code="${f.code}" title="${f.name} (&amp;${f.code})">${f.label}</button>`).join("")}
     </div>
     <div class="motd-preview" id="motdPreview"></div>
   `;
@@ -763,85 +990,133 @@ async function openSettings(sid, name) {
     const j = motdInput.selectionEnd ?? motdInput.value.length;
     const before = motdInput.value.slice(0, i);
     const after = motdInput.value.slice(j);
-    motdInput.value = before + '&' + code + after;
+    motdInput.value = before + "&" + code + after;
     const pos = i + 2;
     motdInput.focus();
     motdInput.setSelectionRange(pos, pos);
     renderMotdPreview();
   }
   function renderMotdPreview() {
-    const text = motdInput.value || '';
+    const text = motdInput.value || "";
     // Convert & codes into colored spans. Section/§ codes also work.
-    const codes = Object.fromEntries(MC_COLORS.map(c => [c.code, { type: 'color', hex: c.hex }]));
-    for (const f of MC_FORMATS) codes[f.code] = { type: 'format', code: f.code };
-    let html = '';
-    let cur = { color: '#aaaaaa', bold: false, italic: false, underline: false, strike: false };
+    const codes = Object.fromEntries(
+      MC_COLORS.map((c) => [c.code, { type: "color", hex: c.hex }]),
+    );
+    for (const f of MC_FORMATS)
+      codes[f.code] = { type: "format", code: f.code };
+    let html = "";
+    let cur = {
+      color: "#aaaaaa",
+      bold: false,
+      italic: false,
+      underline: false,
+      strike: false,
+    };
     const re = /[&§]([0-9a-fk-or])/gi;
     let lastIdx = 0;
     let match;
     function span(text) {
-      if (!text) return '';
+      if (!text) return "";
       const styles = [`color:${cur.color}`];
-      if (cur.bold) styles.push('font-weight:bold');
-      if (cur.italic) styles.push('font-style:italic');
+      if (cur.bold) styles.push("font-weight:bold");
+      if (cur.italic) styles.push("font-style:italic");
       const deco = [];
-      if (cur.underline) deco.push('underline');
-      if (cur.strike) deco.push('line-through');
-      if (deco.length) styles.push('text-decoration:' + deco.join(' '));
-      return `<span style="${styles.join(';')}">${text.replace(/</g,'&lt;')}</span>`;
+      if (cur.underline) deco.push("underline");
+      if (cur.strike) deco.push("line-through");
+      if (deco.length) styles.push("text-decoration:" + deco.join(" "));
+      return `<span style="${styles.join(";")}">${text.replace(/</g, "&lt;")}</span>`;
     }
     while ((match = re.exec(text))) {
       html += span(text.slice(lastIdx, match.index));
       const c = match[1].toLowerCase();
       const def = codes[c];
-      if (def?.type === 'color') { cur.color = def.hex; cur.bold = cur.italic = cur.underline = cur.strike = false; }
-      else if (def?.code === 'l') cur.bold = true;
-      else if (def?.code === 'o') cur.italic = true;
-      else if (def?.code === 'n') cur.underline = true;
-      else if (def?.code === 'm') cur.strike = true;
-      else if (def?.code === 'r') cur = { color: '#aaaaaa', bold: false, italic: false, underline: false, strike: false };
+      if (def?.type === "color") {
+        cur.color = def.hex;
+        cur.bold = cur.italic = cur.underline = cur.strike = false;
+      } else if (def?.code === "l") cur.bold = true;
+      else if (def?.code === "o") cur.italic = true;
+      else if (def?.code === "n") cur.underline = true;
+      else if (def?.code === "m") cur.strike = true;
+      else if (def?.code === "r")
+        cur = {
+          color: "#aaaaaa",
+          bold: false,
+          italic: false,
+          underline: false,
+          strike: false,
+        };
       lastIdx = re.lastIndex;
     }
     html += span(text.slice(lastIdx));
-    document.getElementById('motdPreview').innerHTML = html || '<span style="color:var(--slate-500);">Preview appears here</span>';
+    document.getElementById("motdPreview").innerHTML =
+      html ||
+      '<span style="color:var(--slate-500);">Preview appears here</span>';
   }
-  colorRow.querySelectorAll('.motd-sw, .motd-fmt').forEach(btn => {
-    btn.addEventListener('click', () => insertCode(btn.dataset.code));
+  colorRow.querySelectorAll(".motd-sw, .motd-fmt").forEach((btn) => {
+    btn.addEventListener("click", () => insertCode(btn.dataset.code));
   });
-  motdInput.addEventListener('input', renderMotdPreview);
+  motdInput.addEventListener("input", renderMotdPreview);
   renderMotdPreview();
 
-  document.getElementById('set_save').onclick = async () => {
+  document.getElementById("set_save").onclick = async () => {
     const body = {
-      motd: document.getElementById('set_motd').value,
-      max_players: parseInt(document.getElementById('set_max_players').value, 10),
-      gamemode: document.getElementById('set_gamemode').value,
-      difficulty: document.getElementById('set_difficulty').value,
-      view_distance: parseInt(document.getElementById('set_view_distance').value, 10),
-      pvp: document.getElementById('set_pvp').checked,
-      hardcore: document.getElementById('set_hardcore').checked,
-      whitelist: document.getElementById('set_whitelist').checked,
+      motd: document.getElementById("set_motd").value,
+      max_players: parseInt(
+        document.getElementById("set_max_players").value,
+        10,
+      ),
+      gamemode: document.getElementById("set_gamemode").value,
+      difficulty: document.getElementById("set_difficulty").value,
+      view_distance: parseInt(
+        document.getElementById("set_view_distance").value,
+        10,
+      ),
+      simulation_distance: parseInt(
+        document.getElementById("set_simulation_distance").value,
+        10,
+      ),
+      spawn_protection: parseInt(
+        document.getElementById("set_spawn_protection").value,
+        10,
+      ),
+      pvp: document.getElementById("set_pvp").checked,
+      hardcore: document.getElementById("set_hardcore").checked,
+      whitelist: document.getElementById("set_whitelist").checked,
+      allow_flight: document.getElementById("set_allow_flight").checked,
+      allow_nether: document.getElementById("set_allow_nether").checked,
+      command_blocks: document.getElementById("set_command_blocks").checked,
+      force_gamemode: document.getElementById("set_force_gamemode").checked,
+      spawn_monsters: document.getElementById("set_spawn_monsters").checked,
+      spawn_animals: document.getElementById("set_spawn_animals").checked,
+      spawn_npcs: document.getElementById("set_spawn_npcs").checked,
       // Empty string means "disable scheduled restart"; non-empty must match HH:MM
-      scheduled_restart_at: document.getElementById('set_schedrestart').value || '',
-      restart: document.getElementById('set_restart').checked,
+      scheduled_restart_at:
+        document.getElementById("set_schedrestart").value || "",
+      restart: document.getElementById("set_restart").checked,
     };
-    const btn = document.getElementById('set_save');
-    btn.disabled = true; btn.textContent = '⏳ Saving…';
+    const btn = document.getElementById("set_save");
+    btn.disabled = true;
+    btn.textContent = "⏳ Saving…";
     try {
-      const r = await api(`/api/servers/${sid}`, { method: 'PATCH', body });
-      toast(r.restarted ? '✓ Saved + restarting' : '✓ Saved (restart needed to apply some settings)');
-      document.getElementById('settingsModal').classList.remove('show');
+      const r = await api(`/api/servers/${sid}`, { method: "PATCH", body });
+      toast(
+        r.restarted
+          ? "✓ Saved + restarting"
+          : "✓ Saved (restart needed to apply some settings)",
+      );
+      document.getElementById("settingsModal").classList.remove("show");
       loadServers();
     } catch (err) {
-      toast(err.message, 'error');
-      btn.disabled = false; btn.textContent = 'Save';
+      toast(err.message, "error");
+      btn.disabled = false;
+      btn.textContent = "Save";
     }
   };
 }
 window.openSettings = openSettings;
 
 function renderServers() {
-  const grid = document.getElementById('serversGrid');
+  const grid = document.getElementById("serversGrid");
   if (!servers.length) {
     grid.innerHTML = `
       <div class="empty" style="grid-column:1/-1;padding:60px 20px;text-align:center;">
@@ -851,64 +1126,99 @@ function renderServers() {
         <button class="btn btn-primary" onclick="openWizard()">+ Create your first server</button>
       </div>`;
   } else {
-    grid.innerHTML = servers.map(renderServer).join('');
+    grid.innerHTML = servers.map(renderServer).join("");
   }
   updateSummary();
 }
 
 function updateSummary() {
-  const online = servers.filter(s => s.status === 'online' || s.status === 'starting');
+  const online = servers.filter(
+    (s) => s.status === "online" || s.status === "starting",
+  );
   const totalPlayers = servers.reduce((a, s) => a + (s.stats?.players || 0), 0);
-  const tps = online.length ? (online.reduce((a, s) => a + (s.stats?.tps || 19.8), 0) / online.length).toFixed(1) : '—';
-  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-  set('statServers', servers.length);
-  set('statServersDelta', online.length + ' online');
-  set('statPlayers', totalPlayers);
-  set('statTps', tps);
-  if (!online.length) set('statTpsDelta', 'no servers running');
+  const tps = online.length
+    ? (
+        online.reduce((a, s) => a + (s.stats?.tps || 19.8), 0) / online.length
+      ).toFixed(1)
+    : "—";
+  const set = (id, v) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = v;
+  };
+  set("statServers", servers.length);
+  set("statServersDelta", online.length + " online");
+  set("statPlayers", totalPlayers);
+  set("statTps", tps);
+  if (!online.length) set("statTpsDelta", "no servers running");
 
   // Side-foot plan badge — show top plan among the user's servers
-  const topPlanId = servers.map(s => s.plan_id).sort((a,b) => ({free:0,dirt:1,stone:2,iron:3,diamond:4,netherite:5}[b] || 0) - ({free:0,dirt:1,stone:2,iron:3,diamond:4,netherite:5}[a] || 0))[0] || 'free';
-  const planLabel = { free:'Free', dirt:'Dirt', stone:'Stone', iron:'Iron', diamond:'Diamond', netherite:'Netherite' }[topPlanId] || 'Free';
-  set('planName', planLabel);
-  set('planUsage', `${servers.length} server${servers.length === 1 ? '' : 's'}`);
+  const topPlanId =
+    servers
+      .map((s) => s.plan_id)
+      .sort(
+        (a, b) =>
+          (({ free: 0, dirt: 1, stone: 2, iron: 3, diamond: 4, netherite: 5 })[
+            b
+          ] || 0) -
+          ({ free: 0, dirt: 1, stone: 2, iron: 3, diamond: 4, netherite: 5 }[
+            a
+          ] || 0),
+      )[0] || "free";
+  const planLabel =
+    {
+      free: "Free",
+      dirt: "Dirt",
+      stone: "Stone",
+      iron: "Iron",
+      diamond: "Diamond",
+      netherite: "Netherite",
+    }[topPlanId] || "Free";
+  set("planName", planLabel);
+  set(
+    "planUsage",
+    `${servers.length} server${servers.length === 1 ? "" : "s"}`,
+  );
 }
 
 async function loadMe() {
   try {
-    const me = await api('/api/auth/me');
+    const me = await api("/api/auth/me");
     if (me?.user) {
-      const n = me.user.username || '';
-      const nameEl = document.getElementById('userName');
+      const n = me.user.username || "";
+      const nameEl = document.getElementById("userName");
       if (nameEl) nameEl.textContent = n;
-      const av = document.getElementById('avatar');
-      if (av) av.textContent = (n[0] || 'U').toUpperCase();
+      const av = document.getElementById("avatar");
+      if (av) av.textContent = (n[0] || "U").toUpperCase();
     }
   } catch {}
 }
 
 async function loadServers() {
   // Wait for auth state to settle so we don't race the /api/servers call.
-  try { if (window.authReady) await window.authReady; } catch {}
   try {
-    const r = await api('/api/servers');
+    if (window.authReady) await window.authReady;
+  } catch {}
+  try {
+    const r = await api("/api/servers");
     servers = r.servers || [];
     if (r.public_host) publicHost = r.public_host;
     isDemo = false;
     // Also fetch /api/health to get the real public mc port
     try {
-      const h = await api('/api/health');
+      const h = await api("/api/health");
       if (h.public_mc_port) publicMcPort = h.public_mc_port;
     } catch {}
     // Fetch live stats for each running server
-    await Promise.all(servers.map(async s => {
-      if (s.status === 'online' || s.status === 'starting') {
-        try {
-          const st = await api(`/api/servers/${s.id}/status`);
-          s.stats = st.stats || {};
-        } catch {}
-      }
-    }));
+    await Promise.all(
+      servers.map(async (s) => {
+        if (s.status === "online" || s.status === "starting") {
+          try {
+            const st = await api(`/api/servers/${s.id}/status`);
+            s.stats = st.stats || {};
+          } catch {}
+        }
+      }),
+    );
   } catch (err) {
     // 401 = truly not signed in → show demo cards.
     // Any other error (5xx, network blip) when the user IS signed in: keep
@@ -917,37 +1227,44 @@ async function loadServers() {
     if (err?.status === 401 || !window.isSignedIn) {
       isDemo = true;
       servers = DEMO_SERVERS;
-      const nameEl = document.getElementById('userName');
-      if (nameEl) nameEl.textContent = 'Visitor';
-      toast('Showing demo servers — sign in to manage real ones.', 'warn');
+      const nameEl = document.getElementById("userName");
+      if (nameEl) nameEl.textContent = "Visitor";
+      toast("Showing demo servers — sign in to manage real ones.", "warn");
     } else {
       isDemo = false;
       servers = [];
       // Best-effort retry once after a short delay (covers cold-start latency).
-      toast('Could not load your servers — retrying…', 'warn');
-      setTimeout(() => { loadServers().catch(() => {}); }, 2500);
+      toast("Could not load your servers — retrying…", "warn");
+      setTimeout(() => {
+        loadServers().catch(() => {});
+      }, 2500);
     }
   }
   renderServers();
 }
 
 async function serverAction(id, action) {
-  if (isDemo) { toast('Sign in to control real servers', 'warn'); return; }
-  const verb = action[0].toUpperCase() + action.slice(1) + 'ing';
+  if (isDemo) {
+    toast("Sign in to control real servers", "warn");
+    return;
+  }
+  const verb = action[0].toUpperCase() + action.slice(1) + "ing";
   toast(`${verb} server…`);
   try {
-    await api(`/api/servers/${id}/${action}`, { method: 'POST' });
+    await api(`/api/servers/${id}/${action}`, { method: "POST" });
     // Optimistic update so the status pill flips instantly without waiting
     // for the next poll cycle.
-    const s = servers.find(x => x.id === id);
-    if (s) s.status = action === 'stop' ? 'offline' : 'starting';
+    const s = servers.find((x) => x.id === id);
+    if (s) s.status = action === "stop" ? "offline" : "starting";
     renderServers();
     // Then tight-poll the actual status every 2s up to 60s so the dot
     // catches the real transition (yellow → green for start/restart, any →
     // grey for stop) the moment the JVM reports it.
-    const target = action === 'stop' ? 'offline' : 'online';
+    const target = action === "stop" ? "offline" : "online";
     tightPollServerStatus(id, target);
-  } catch (err) { toast(err.message, 'error'); }
+  } catch (err) {
+    toast(err.message, "error");
+  }
 }
 
 // Aggressively poll one server's status until it reaches the target state
@@ -962,10 +1279,10 @@ function tightPollServerStatus(serverId, targetStatus) {
     if (Date.now() - start > MAX_MS) return;
     try {
       const r = await api(`/api/servers/${serverId}/status`);
-      const s = servers.find(x => x.id === serverId);
+      const s = servers.find((x) => x.id === serverId);
       if (s) {
         if (r.status) s.status = r.status;
-        if (r.stats)  s.stats  = r.stats;
+        if (r.stats) s.stats = r.stats;
         renderServers();
         if (s.status === targetStatus) return;
       }
@@ -976,18 +1293,24 @@ function tightPollServerStatus(serverId, targetStatus) {
 }
 
 async function deleteServer(id, name) {
-  if (isDemo) { toast('Sign in to delete real servers', 'warn'); return; }
-  if (!confirm(`Delete "${name}"? This removes the server and all its data.`)) return;
+  if (isDemo) {
+    toast("Sign in to delete real servers", "warn");
+    return;
+  }
+  if (!confirm(`Delete "${name}"? This removes the server and all its data.`))
+    return;
   try {
-    await api(`/api/servers/${id}`, { method: 'DELETE' });
-    toast('Server deleted');
+    await api(`/api/servers/${id}`, { method: "DELETE" });
+    toast("Server deleted");
     loadServers();
-  } catch (err) { toast(err.message, 'error'); }
+  } catch (err) {
+    toast(err.message, "error");
+  }
 }
 
 function goToConsole(id) {
-  localStorage.setItem('crafthost.currentServerId', id);
-  location.href = '/console.html';
+  localStorage.setItem("crafthost.currentServerId", id);
+  location.href = "/console.html";
 }
 
 window.serverAction = serverAction;
@@ -998,10 +1321,42 @@ window.goToConsole = goToConsole;
 // Each preset maps to a full POST /api/servers body. After the create returns,
 // we reuse the wizard's live progress modal so the user sees the same phase UI.
 const QUICK_PRESETS = {
-  survival: { type: 'paper',  version: '1.21.1', motd: 'Survival server — bring your axe', difficulty: 'normal',  gamemode: 'survival',  whitelist: false, namePrefix: 'Survival' },
-  creative: { type: 'paper',  version: '1.21.1', motd: 'Creative — build anything',       difficulty: 'peaceful', gamemode: 'creative',  whitelist: false, namePrefix: 'Creative' },
-  skyblock: { type: 'paper',  version: '1.21.1', motd: 'Skyblock — survive on an island', difficulty: 'hard',     gamemode: 'survival',  whitelist: false, namePrefix: 'Skyblock' },
-  modded:   { type: 'fabric', version: '1.21.1', motd: 'Modded adventure — Fabric',        difficulty: 'normal',   gamemode: 'survival',  whitelist: false, namePrefix: 'Modded'   },
+  survival: {
+    type: "paper",
+    version: "1.21.1",
+    motd: "Survival server — bring your axe",
+    difficulty: "normal",
+    gamemode: "survival",
+    whitelist: false,
+    namePrefix: "Survival",
+  },
+  creative: {
+    type: "paper",
+    version: "1.21.1",
+    motd: "Creative — build anything",
+    difficulty: "peaceful",
+    gamemode: "creative",
+    whitelist: false,
+    namePrefix: "Creative",
+  },
+  skyblock: {
+    type: "paper",
+    version: "1.21.1",
+    motd: "Skyblock — survive on an island",
+    difficulty: "hard",
+    gamemode: "survival",
+    whitelist: false,
+    namePrefix: "Skyblock",
+  },
+  modded: {
+    type: "fabric",
+    version: "1.21.1",
+    motd: "Modded adventure — Fabric",
+    difficulty: "normal",
+    gamemode: "survival",
+    whitelist: false,
+    namePrefix: "Modded",
+  },
 };
 
 async function quickDeploy(presetId) {
@@ -1014,8 +1369,8 @@ async function quickDeploy(presetId) {
     name,
     type: preset.type,
     version: preset.version,
-    plan: 'free',
-    region: 'eu',
+    plan: "free",
+    region: "eu",
     motd: preset.motd,
     difficulty: preset.difficulty,
     gamemode: preset.gamemode,
@@ -1023,14 +1378,14 @@ async function quickDeploy(presetId) {
   };
   // Ensure the wizardModal element exists (wizard.js creates it on openWizard;
   // for quick deploy we open it directly with the live-progress screen).
-  let modal = document.getElementById('wizardModal');
+  let modal = document.getElementById("wizardModal");
   if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'wizardModal';
-    modal.className = 'modal-bg';
+    modal = document.createElement("div");
+    modal.id = "wizardModal";
+    modal.className = "modal-bg";
     document.body.appendChild(modal);
   }
-  modal.classList.add('show');
+  modal.classList.add("show");
   // Surface a tiny loading state while POST is in flight
   modal.innerHTML = `
     <div class="modal wiz-modal" onclick="event.stopPropagation()" style="max-width:520px;">
@@ -1038,16 +1393,16 @@ async function quickDeploy(presetId) {
       <div class="modal-body"><p class="text-muted">Reserving resources…</p></div>
     </div>`;
   try {
-    const r = await api('/api/servers', { method: 'POST', body });
-    if (r?.id) localStorage.setItem('crafthost.currentServerId', r.id);
+    const r = await api("/api/servers", { method: "POST", body });
+    if (r?.id) localStorage.setItem("crafthost.currentServerId", r.id);
     // Hand off to the wizard's progress renderer. Ensure wizState.name is set
     // so the modal heading shows the right server name.
-    if (typeof window.wizState !== 'undefined') window.wizState.name = name;
+    if (typeof window.wizState !== "undefined") window.wizState.name = name;
     else window.wizState = { name };
     window.renderDeployProgress(r);
   } catch (err) {
-    toast(err.message || 'Quick deploy failed', 'error');
-    modal.classList.remove('show');
+    toast(err.message || "Quick deploy failed", "error");
+    modal.classList.remove("show");
   }
 }
 window.quickDeploy = quickDeploy;
@@ -1058,11 +1413,11 @@ window.quickDeploy = quickDeploy;
 // the same styling vocabulary as the dashboard server cards (.sc-warn*).
 let healthTimer = null;
 async function openHealthCheck() {
-  let modal = document.getElementById('healthModal');
+  let modal = document.getElementById("healthModal");
   if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'healthModal';
-    modal.className = 'modal show';
+    modal = document.createElement("div");
+    modal.id = "healthModal";
+    modal.className = "modal show";
     modal.innerHTML = `
       <div class="modal-card" style="max-width: 880px; width: 100%; max-height: 90vh; display: flex; flex-direction: column;">
         <div class="modal-head">
@@ -1082,82 +1437,120 @@ async function openHealthCheck() {
       </div>`;
     document.body.appendChild(modal);
     // Click backdrop to close
-    modal.addEventListener('click', (e) => { if (e.target === modal) closeHealthCheck(); });
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeHealthCheck();
+    });
   } else {
-    modal.classList.add('show');
+    modal.classList.add("show");
   }
   await refreshHealthCheck();
   if (healthTimer) clearInterval(healthTimer);
   healthTimer = setInterval(refreshHealthCheck, 10000);
 }
 function closeHealthCheck() {
-  const m = document.getElementById('healthModal');
-  if (m) m.classList.remove('show');
-  if (healthTimer) { clearInterval(healthTimer); healthTimer = null; }
+  const m = document.getElementById("healthModal");
+  if (m) m.classList.remove("show");
+  if (healthTimer) {
+    clearInterval(healthTimer);
+    healthTimer = null;
+  }
 }
 async function refreshHealthCheck() {
-  const body = document.getElementById('hcBody');
-  const status = document.getElementById('hcStatus');
-  const sumEl = document.getElementById('hcSummary');
+  const body = document.getElementById("hcBody");
+  const status = document.getElementById("hcStatus");
+  const sumEl = document.getElementById("hcSummary");
   if (!body) return;
   try {
-    const data = await api('/api/servers/health-check');
+    const data = await api("/api/servers/health-check");
     sumEl.innerHTML = `
-      ${data.summary.good   ? `<span class="hc-pill hc-good">✓ ${data.summary.good} healthy</span>`  : ''}
-      ${data.summary.warn   ? `<span class="hc-pill hc-warn">! ${data.summary.warn} warning${data.summary.warn>1?'s':''}</span>` : ''}
-      ${data.summary.error  ? `<span class="hc-pill hc-error">✗ ${data.summary.error} error${data.summary.error>1?'s':''}</span>` : ''}
-      ${!data.summary.total ? `<span class="hc-pill">No servers yet</span>` : ''}
+      ${data.summary.good ? `<span class="hc-pill hc-good">✓ ${data.summary.good} healthy</span>` : ""}
+      ${data.summary.warn ? `<span class="hc-pill hc-warn">! ${data.summary.warn} warning${data.summary.warn > 1 ? "s" : ""}</span>` : ""}
+      ${data.summary.error ? `<span class="hc-pill hc-error">✗ ${data.summary.error} error${data.summary.error > 1 ? "s" : ""}</span>` : ""}
+      ${!data.summary.total ? `<span class="hc-pill">No servers yet</span>` : ""}
     `;
     if (!data.servers.length) {
       body.innerHTML = `<div class="hc-empty">You haven't created a server yet. Hit <strong>+ Create Server</strong> to spin one up.</div>`;
     } else {
-      body.innerHTML = data.servers.map(renderHealthCard).join('');
+      body.innerHTML = data.servers.map(renderHealthCard).join("");
     }
     status.textContent = `Polling every 10s · last refresh: ${new Date(data.checked_at).toLocaleTimeString()}`;
   } catch (err) {
-    body.innerHTML = `<div class="hc-empty hc-error-text">Failed to load health check: ${escapeHtmlD(err.message || 'unknown error')}</div>`;
+    body.innerHTML = `<div class="hc-empty hc-error-text">Failed to load health check: ${escapeHtmlD(err.message || "unknown error")}</div>`;
     status.textContent = `Error · retrying in 10s`;
   }
 }
 function renderHealthCard(s) {
-  const pillClass = s.health === 'error' ? 'hc-error' : s.health === 'warn' ? 'hc-warn' : 'hc-good';
-  const pillIcon  = s.health === 'error' ? '✗' : s.health === 'warn' ? '!' : '✓';
-  const pillLabel = s.health === 'error' ? 'Needs attention' : s.health === 'warn' ? 'Has warnings' : 'Healthy';
-  const ramPct = s.stats?.ram_max ? Math.round((s.stats.ram_used / s.stats.ram_max) * 100) : 0;
+  const pillClass =
+    s.health === "error"
+      ? "hc-error"
+      : s.health === "warn"
+        ? "hc-warn"
+        : "hc-good";
+  const pillIcon = s.health === "error" ? "✗" : s.health === "warn" ? "!" : "✓";
+  const pillLabel =
+    s.health === "error"
+      ? "Needs attention"
+      : s.health === "warn"
+        ? "Has warnings"
+        : "Healthy";
+  const ramPct = s.stats?.ram_max
+    ? Math.round((s.stats.ram_used / s.stats.ram_max) * 100)
+    : 0;
   return `
     <div class="hc-card hc-card-${s.health}">
       <div class="hc-card-head">
         <div>
-          <div class="hc-name">${escapeHtmlD(s.name)} <span class="hc-meta">${s.type || ''} ${s.version || ''}</span></div>
-          ${s.address ? `<div class="hc-addr">${escapeHtmlD(s.address)}</div>` : ''}
+          <div class="hc-name">${escapeHtmlD(s.name)} <span class="hc-meta">${s.type || ""} ${s.version || ""}</span></div>
+          ${s.address ? `<div class="hc-addr">${escapeHtmlD(s.address)}</div>` : ""}
         </div>
         <span class="hc-pill ${pillClass}">${pillIcon} ${pillLabel}</span>
       </div>
-      ${s.online && s.stats ? `
+      ${
+        s.online && s.stats
+          ? `
         <div class="hc-stats">
           <div><span class="hc-stat-label">CPU</span><span>${s.stats.cpu}%</span></div>
           <div><span class="hc-stat-label">RAM</span><span>${s.stats.ram_used}/${s.stats.ram_max} MB (${ramPct}%)</span></div>
-          <div><span class="hc-stat-label">Players</span><span>${s.stats.players}/${s.stats.players_max || '?'}</span></div>
+          <div><span class="hc-stat-label">Players</span><span>${s.stats.players}/${s.stats.players_max || "?"}</span></div>
           <div><span class="hc-stat-label">Uptime</span><span>${fmtUptimeD(s.stats.uptime)}</span></div>
-        </div>` : `
-        <div class="hc-stats hc-stats-offline">Server is offline · no live stats</div>`}
-      ${s.issues.length ? `
+        </div>`
+          : `
+        <div class="hc-stats hc-stats-offline">Server is offline · no live stats</div>`
+      }
+      ${
+        s.issues.length
+          ? `
         <ul class="hc-issues">
-          ${s.issues.map(i => `<li class="hc-issue hc-issue-${i.severity}"><span class="hc-issue-dot"></span>${escapeHtmlD(i.message)}</li>`).join('')}
-        </ul>` : ''}
-      ${s.recent_logs?.length ? `
+          ${s.issues.map((i) => `<li class="hc-issue hc-issue-${i.severity}"><span class="hc-issue-dot"></span>${escapeHtmlD(i.message)}</li>`).join("")}
+        </ul>`
+          : ""
+      }
+      ${
+        s.recent_logs?.length
+          ? `
         <details class="hc-logs">
           <summary>Recent log (${s.recent_logs.length} lines)</summary>
-          <pre>${s.recent_logs.map(l => escapeHtmlD(l)).join('\n')}</pre>
-        </details>` : ''}
+          <pre>${s.recent_logs.map((l) => escapeHtmlD(l)).join("\n")}</pre>
+        </details>`
+          : ""
+      }
     </div>`;
 }
-function escapeHtmlD(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeHtmlD(s) {
+  return String(s ?? "").replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ],
+  );
+}
 function fmtUptimeD(sec) {
-  if (!sec || sec < 60) return (sec || 0) + 's';
-  if (sec < 3600) return Math.floor(sec / 60) + 'm';
-  if (sec < 86400) return Math.floor(sec / 3600) + 'h ' + Math.floor((sec % 3600) / 60) + 'm';
-  return Math.floor(sec / 86400) + 'd';
+  if (!sec || sec < 60) return (sec || 0) + "s";
+  if (sec < 3600) return Math.floor(sec / 60) + "m";
+  if (sec < 86400)
+    return Math.floor(sec / 3600) + "h " + Math.floor((sec % 3600) / 60) + "m";
+  return Math.floor(sec / 86400) + "d";
 }
 window.openHealthCheck = openHealthCheck;
 window.closeHealthCheck = closeHealthCheck;
@@ -1165,11 +1558,11 @@ window.refreshHealthCheck = refreshHealthCheck;
 
 // ── Clone server dialog ──────────────────────────────────────────────────────
 async function openCloneDialog(sourceId, sourceName) {
-  let modal = document.getElementById('cloneModal');
+  let modal = document.getElementById("cloneModal");
   if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'cloneModal';
-    modal.className = 'modal show';
+    modal = document.createElement("div");
+    modal.id = "cloneModal";
+    modal.className = "modal show";
     modal.innerHTML = `
       <div class="modal-card" style="max-width: 460px;width:100%;">
         <div class="modal-head">
@@ -1195,59 +1588,69 @@ async function openCloneDialog(sourceId, sourceName) {
         </div>
       </div>`;
     document.body.appendChild(modal);
-    modal.addEventListener('click', (e) => { if (e.target === modal) closeCloneDialog(); });
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeCloneDialog();
+    });
   } else {
-    modal.classList.add('show');
+    modal.classList.add("show");
   }
-  document.getElementById('cloneName').value = `Copy of ${sourceName}`.slice(0, 40);
-  document.getElementById('cloneWorld').checked = true;
-  document.getElementById('clonePlugins').checked = true;
-  document.getElementById('cloneStatus').style.display = 'none';
-  document.getElementById('cloneSubmit').disabled = false;
-  document.getElementById('cloneSubmit').innerHTML = '📑 Clone now';
-  document.getElementById('cloneSubmit').onclick = async () => {
-    const btn = document.getElementById('cloneSubmit');
-    const status = document.getElementById('cloneStatus');
+  document.getElementById("cloneName").value = `Copy of ${sourceName}`.slice(
+    0,
+    40,
+  );
+  document.getElementById("cloneWorld").checked = true;
+  document.getElementById("clonePlugins").checked = true;
+  document.getElementById("cloneStatus").style.display = "none";
+  document.getElementById("cloneSubmit").disabled = false;
+  document.getElementById("cloneSubmit").innerHTML = "📑 Clone now";
+  document.getElementById("cloneSubmit").onclick = async () => {
+    const btn = document.getElementById("cloneSubmit");
+    const status = document.getElementById("cloneStatus");
     btn.disabled = true;
     btn.innerHTML = '<span class="ed-spin"></span> Cloning…';
-    status.style.display = 'block';
-    status.style.color = 'var(--slate-300)';
-    status.textContent = 'Creating server row & copying files…';
+    status.style.display = "block";
+    status.style.color = "var(--slate-300)";
+    status.textContent = "Creating server row & copying files…";
     try {
       const body = {
         source_id: sourceId,
-        name: document.getElementById('cloneName').value.trim() || `Copy of ${sourceName}`,
-        skipWorld:   !document.getElementById('cloneWorld').checked,
-        skipPlugins: !document.getElementById('clonePlugins').checked,
+        name:
+          document.getElementById("cloneName").value.trim() ||
+          `Copy of ${sourceName}`,
+        skipWorld: !document.getElementById("cloneWorld").checked,
+        skipPlugins: !document.getElementById("clonePlugins").checked,
       };
-      const r = await api('/api/servers/clone', { method: 'POST', body });
+      const r = await api("/api/servers/clone", { method: "POST", body });
       const kb = Math.round((r.copy_stats?.bytes || 0) / 1024);
-      status.style.color = 'var(--emerald)';
-      status.textContent = `✓ Cloned · ${r.copy_stats?.files || 0} file(s), ${kb} KB · ${r.auto_started ? 'starting' : 'created (manual start)'}`;
-      toast('✓ Server cloned');
-      setTimeout(() => { closeCloneDialog(); loadServers(); }, 1200);
+      status.style.color = "var(--emerald)";
+      status.textContent = `✓ Cloned · ${r.copy_stats?.files || 0} file(s), ${kb} KB · ${r.auto_started ? "starting" : "created (manual start)"}`;
+      toast("✓ Server cloned");
+      setTimeout(() => {
+        closeCloneDialog();
+        loadServers();
+      }, 1200);
     } catch (err) {
-      status.style.color = 'var(--red, #ef4444)';
-      status.textContent = '✗ ' + (err.message || 'Clone failed');
+      status.style.color = "var(--red, #ef4444)";
+      status.textContent = "✗ " + (err.message || "Clone failed");
       btn.disabled = false;
-      btn.innerHTML = '📑 Retry';
+      btn.innerHTML = "📑 Retry";
     }
   };
 }
 function closeCloneDialog() {
-  const m = document.getElementById('cloneModal');
-  if (m) m.classList.remove('show');
+  const m = document.getElementById("cloneModal");
+  if (m) m.classList.remove("show");
 }
 window.openCloneDialog = openCloneDialog;
 window.closeCloneDialog = closeCloneDialog;
 
 // ── Import world.zip dialog ──────────────────────────────────────────────────
 async function openWorldImport(sid, sname) {
-  let modal = document.getElementById('worldModal');
+  let modal = document.getElementById("worldModal");
   if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'worldModal';
-    modal.className = 'modal show';
+    modal = document.createElement("div");
+    modal.id = "worldModal";
+    modal.className = "modal show";
     modal.innerHTML = `
       <div class="modal-card" style="max-width:480px;width:100%;">
         <div class="modal-head">
@@ -1293,92 +1696,111 @@ async function openWorldImport(sid, sname) {
         </div>
       </div>`;
     document.body.appendChild(modal);
-    modal.addEventListener('click', (e) => { if (e.target === modal) closeWorldImport(); });
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeWorldImport();
+    });
 
     // Drag-and-drop wiring (one-time)
-    const drop = document.getElementById('wiDrop');
-    const input = document.getElementById('wiFile');
-    drop.addEventListener('click', () => input.click());
-    ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('drag'); }));
-    ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('drag'); }));
-    drop.addEventListener('drop', (e) => {
+    const drop = document.getElementById("wiDrop");
+    const input = document.getElementById("wiFile");
+    drop.addEventListener("click", () => input.click());
+    ["dragenter", "dragover"].forEach((ev) =>
+      drop.addEventListener(ev, (e) => {
+        e.preventDefault();
+        drop.classList.add("drag");
+      }),
+    );
+    ["dragleave", "drop"].forEach((ev) =>
+      drop.addEventListener(ev, (e) => {
+        e.preventDefault();
+        drop.classList.remove("drag");
+      }),
+    );
+    drop.addEventListener("drop", (e) => {
       const f = e.dataTransfer?.files?.[0];
       if (f) wiSetFile(f);
     });
-    input.addEventListener('change', () => { if (input.files[0]) wiSetFile(input.files[0]); });
+    input.addEventListener("change", () => {
+      if (input.files[0]) wiSetFile(input.files[0]);
+    });
   } else {
-    modal.classList.add('show');
+    modal.classList.add("show");
   }
-  document.getElementById('wiTargetLine').textContent = `Target: ${sname}`;
-  document.getElementById('wiSubmit').dataset.sid = sid;
-  document.getElementById('wiSubmit').dataset.sname = sname;
+  document.getElementById("wiTargetLine").textContent = `Target: ${sname}`;
+  document.getElementById("wiSubmit").dataset.sid = sid;
+  document.getElementById("wiSubmit").dataset.sname = sname;
   // Reset state
-  document.getElementById('wiSubmit').disabled = true;
-  document.getElementById('wiSubmit').innerHTML = '🌍 Upload & restart';
-  document.querySelector('.wi-drop-empty').style.display = '';
-  document.querySelector('.wi-drop-file').style.display = 'none';
-  document.getElementById('wiProgress').style.display = 'none';
-  document.getElementById('wiStatus').style.display = 'none';
-  document.getElementById('wiFile').value = '';
+  document.getElementById("wiSubmit").disabled = true;
+  document.getElementById("wiSubmit").innerHTML = "🌍 Upload & restart";
+  document.querySelector(".wi-drop-empty").style.display = "";
+  document.querySelector(".wi-drop-file").style.display = "none";
+  document.getElementById("wiProgress").style.display = "none";
+  document.getElementById("wiStatus").style.display = "none";
+  document.getElementById("wiFile").value = "";
   window._wiFile = null;
 
-  document.getElementById('wiSubmit').onclick = async () => {
+  document.getElementById("wiSubmit").onclick = async () => {
     const file = window._wiFile;
     if (!file) return;
-    const sid = document.getElementById('wiSubmit').dataset.sid;
-    const btn = document.getElementById('wiSubmit');
+    const sid = document.getElementById("wiSubmit").dataset.sid;
+    const btn = document.getElementById("wiSubmit");
     btn.disabled = true;
     btn.innerHTML = '<span class="ed-spin"></span> Uploading…';
-    document.getElementById('wiProgress').style.display = 'block';
-    document.getElementById('wiStatus').style.display = 'none';
+    document.getElementById("wiProgress").style.display = "block";
+    document.getElementById("wiStatus").style.display = "none";
 
     const fd = new FormData();
-    fd.append('world', file, file.name);
+    fd.append("world", file, file.name);
 
     // Use XHR so we can show real upload progress
     await new Promise((resolve) => {
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', `/api/servers/${encodeURIComponent(sid)}/import-world`);
+      xhr.open("POST", `/api/servers/${encodeURIComponent(sid)}/import-world`);
       xhr.withCredentials = true;
       xhr.upload.onprogress = (e) => {
         if (!e.lengthComputable) return;
         const pct = Math.round((e.loaded / e.total) * 100);
-        document.getElementById('wiProgBar').style.width = pct + '%';
-        document.getElementById('wiProgPct').textContent = pct + '%';
-        if (pct >= 100) document.getElementById('wiProgLabel').textContent = 'Extracting on server…';
+        document.getElementById("wiProgBar").style.width = pct + "%";
+        document.getElementById("wiProgPct").textContent = pct + "%";
+        if (pct >= 100)
+          document.getElementById("wiProgLabel").textContent =
+            "Extracting on server…";
       };
       xhr.onload = () => {
-        const status = document.getElementById('wiStatus');
-        status.style.display = 'block';
+        const status = document.getElementById("wiStatus");
+        status.style.display = "block";
         try {
-          const r = JSON.parse(xhr.responseText || '{}');
+          const r = JSON.parse(xhr.responseText || "{}");
           if (xhr.status >= 200 && xhr.status < 300 && r.ok) {
-            const dims = Object.keys(r.restored || {}).join(', ');
-            status.style.color = 'var(--emerald)';
-            status.textContent = `✓ World imported (${dims || 'world'}) — server restarting`;
-            toast('✓ World imported, restarting');
-            setTimeout(() => { closeWorldImport(); loadServers(); }, 1500);
+            const dims = Object.keys(r.restored || {}).join(", ");
+            status.style.color = "var(--emerald)";
+            status.textContent = `✓ World imported (${dims || "world"}) — server restarting`;
+            toast("✓ World imported, restarting");
+            setTimeout(() => {
+              closeWorldImport();
+              loadServers();
+            }, 1500);
           } else {
-            status.style.color = 'var(--red, #ef4444)';
-            status.textContent = '✗ ' + (r.error || `HTTP ${xhr.status}`);
+            status.style.color = "var(--red, #ef4444)";
+            status.textContent = "✗ " + (r.error || `HTTP ${xhr.status}`);
             btn.disabled = false;
-            btn.innerHTML = '🌍 Retry';
+            btn.innerHTML = "🌍 Retry";
           }
         } catch {
-          status.style.color = 'var(--red, #ef4444)';
+          status.style.color = "var(--red, #ef4444)";
           status.textContent = `✗ HTTP ${xhr.status}`;
           btn.disabled = false;
-          btn.innerHTML = '🌍 Retry';
+          btn.innerHTML = "🌍 Retry";
         }
         resolve();
       };
       xhr.onerror = () => {
-        const status = document.getElementById('wiStatus');
-        status.style.display = 'block';
-        status.style.color = 'var(--red, #ef4444)';
-        status.textContent = '✗ Network error';
+        const status = document.getElementById("wiStatus");
+        status.style.display = "block";
+        status.style.color = "var(--red, #ef4444)";
+        status.textContent = "✗ Network error";
         btn.disabled = false;
-        btn.innerHTML = '🌍 Retry';
+        btn.innerHTML = "🌍 Retry";
         resolve();
       };
       xhr.send(fd);
@@ -1386,25 +1808,25 @@ async function openWorldImport(sid, sname) {
   };
 }
 function closeWorldImport() {
-  const m = document.getElementById('worldModal');
-  if (m) m.classList.remove('show');
+  const m = document.getElementById("worldModal");
+  if (m) m.classList.remove("show");
   window._wiFile = null;
 }
 function wiSetFile(file) {
   if (!/\.zip$/i.test(file.name)) {
-    toast('Please choose a .zip file', 'error');
+    toast("Please choose a .zip file", "error");
     return;
   }
   if (file.size > 500 * 1024 * 1024) {
-    toast('Zip exceeds 500 MB cap', 'error');
+    toast("Zip exceeds 500 MB cap", "error");
     return;
   }
   window._wiFile = file;
-  document.querySelector('.wi-drop-empty').style.display = 'none';
-  document.querySelector('.wi-drop-file').style.display = '';
-  document.getElementById('wiFileName').textContent = file.name;
-  document.getElementById('wiFileSize').textContent = fmtBytes(file.size);
-  document.getElementById('wiSubmit').disabled = false;
+  document.querySelector(".wi-drop-empty").style.display = "none";
+  document.querySelector(".wi-drop-file").style.display = "";
+  document.getElementById("wiFileName").textContent = file.name;
+  document.getElementById("wiFileSize").textContent = fmtBytes(file.size);
+  document.getElementById("wiSubmit").disabled = false;
 }
 window.openWorldImport = openWorldImport;
 window.closeWorldImport = closeWorldImport;
@@ -1414,11 +1836,12 @@ let bedrockPollTimer = null;
 
 async function openBedrockModal(sid, sname) {
   // Inject the modal markup if it's not already in the DOM
-  if (!document.getElementById('bedrockModal')) {
-    const div = document.createElement('div');
-    div.id = 'bedrockModal';
-    div.className = 'modal-host';
-    div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.65);display:none;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(4px);padding:16px;';
+  if (!document.getElementById("bedrockModal")) {
+    const div = document.createElement("div");
+    div.id = "bedrockModal";
+    div.className = "modal-host";
+    div.style.cssText =
+      "position:fixed;inset:0;background:rgba(0,0,0,0.65);display:none;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(4px);padding:16px;";
     div.innerHTML = `
       <div class="modal" style="max-width:520px;width:100%;background:var(--slate-800);border:1px solid var(--glass-border);border-radius:14px;overflow:hidden;">
         <div class="modal-head" style="padding:16px 20px;border-bottom:1px solid var(--glass-border);display:flex;justify-content:space-between;align-items:center;">
@@ -1431,30 +1854,41 @@ async function openBedrockModal(sid, sname) {
       </div>`;
     document.body.appendChild(div);
   }
-  const modal = document.getElementById('bedrockModal');
-  modal.style.display = 'flex';
+  const modal = document.getElementById("bedrockModal");
+  modal.style.display = "flex";
   modal.dataset.sid = sid;
   modal.dataset.sname = sname;
-  modal.onclick = e => { if (e.target === modal) closeBedrockModal(); };
+  modal.onclick = (e) => {
+    if (e.target === modal) closeBedrockModal();
+  };
   renderBedrockStatus(sid, sname);
 }
 
 function closeBedrockModal() {
-  const modal = document.getElementById('bedrockModal');
-  if (modal) modal.style.display = 'none';
-  if (bedrockPollTimer) { clearInterval(bedrockPollTimer); bedrockPollTimer = null; }
+  const modal = document.getElementById("bedrockModal");
+  if (modal) modal.style.display = "none";
+  if (bedrockPollTimer) {
+    clearInterval(bedrockPollTimer);
+    bedrockPollTimer = null;
+  }
 }
 
 async function renderBedrockStatus(sid, sname) {
-  const body = document.getElementById('bedrockBody');
+  const body = document.getElementById("bedrockBody");
   if (!body) return;
   body.innerHTML = `<div style="color:var(--slate-400);text-align:center;padding:16px 0;">Loading…</div>`;
   try {
     // Get server (for playit_enabled + host/port)
-    const list = await api('/api/servers');
-    const srv = (list.servers || []).find(s => s.id === sid);
-    if (!srv) { body.innerHTML = '<div style="color:var(--rose);">Server not found.</div>'; return; }
-    const status = await api(`/api/servers/${sid}/playit/claim/status`).catch(() => ({ status: 'none' }));
+    const list = await api("/api/servers");
+    const srv = (list.servers || []).find((s) => s.id === sid);
+    if (!srv) {
+      body.innerHTML =
+        '<div style="color:var(--rose);">Server not found.</div>';
+      return;
+    }
+    const status = await api(`/api/servers/${sid}/playit/claim/status`).catch(
+      () => ({ status: "none" }),
+    );
 
     if (srv.playit_enabled && srv.playit_host && srv.playit_port) {
       // Connected + agent running with assigned address
@@ -1463,25 +1897,26 @@ async function renderBedrockStatus(sid, sname) {
       const pluginsRow = pluginsReady
         ? `<div style="font-size:12px;color:var(--emerald);margin-bottom:14px;">✓ Geyser + Floodgate installed</div>`
         : bp.installing
-        ? `<div style="font-size:12px;color:var(--slate-300);margin-bottom:14px;">⏳ Installing Geyser + Floodgate from cache…</div>`
-        : `<div style="font-size:12px;color:var(--slate-400);margin-bottom:14px;">Geyser ${bp.geyser ? '✓' : '○'} · Floodgate ${bp.floodgate ? '✓' : '○'}</div>`;
+          ? `<div style="font-size:12px;color:var(--slate-300);margin-bottom:14px;">⏳ Installing Geyser + Floodgate from cache…</div>`
+          : `<div style="font-size:12px;color:var(--slate-400);margin-bottom:14px;">Geyser ${bp.geyser ? "✓" : "○"} · Floodgate ${bp.floodgate ? "✓" : "○"}</div>`;
       const restartHint = status.restart_required
         ? `<div style="background:rgba(245,158,11,0.10);border:1px solid rgba(245,158,11,0.3);border-radius:9px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#fbbf24;">
-             ⟳ ${escapeHtml(status.restart_reason || 'Restart the server to apply changes.')}
-           </div>` : '';
+             ⟳ ${escapeHtml(status.restart_reason || "Restart the server to apply changes.")}
+           </div>`
+        : "";
       body.innerHTML = `
         <div style="background:rgba(16,185,129,0.10);border:1px solid rgba(16,185,129,0.3);border-radius:9px;padding:12px;margin-bottom:14px;">
           <div style="font-weight:700;color:var(--emerald);margin-bottom:4px;">✓ Bedrock cross-play active</div>
           <div style="font-size:12px;color:var(--slate-400);">Mobile / Xbox / Switch / PS players can connect using:</div>
         </div>
-        <div class="sc-ip" onclick="copyText('${escapeHtml(srv.playit_host + ':' + srv.playit_port)}')" style="cursor:pointer;margin-bottom:14px;border-color:rgba(255,107,53,0.4);">
+        <div class="sc-ip" onclick="copyText('${escapeHtml(srv.playit_host + ":" + srv.playit_port)}')" style="cursor:pointer;margin-bottom:14px;border-color:rgba(255,107,53,0.4);">
           <span style="flex:1;font-family:monospace;font-size:14px;">📱 ${escapeHtml(srv.playit_host)}:${escapeHtml(String(srv.playit_port))}</span>
           <span class="sc-copy">📋 Copy</span>
         </div>
         ${pluginsRow}
         ${restartHint}
         <div style="display:flex;gap:8px;justify-content:flex-end;">
-          ${status.restart_required ? `<button class="btn btn-warning btn-sm" onclick="serverAction('${escapeHtml(sid)}', 'restart'); closeBedrockModal();">⟳ Restart now</button>` : ''}
+          ${status.restart_required ? `<button class="btn btn-warning btn-sm" onclick="serverAction('${escapeHtml(sid)}', 'restart'); closeBedrockModal();">⟳ Restart now</button>` : ""}
           <button class="btn btn-secondary btn-sm" onclick="closeBedrockModal()">Close</button>
           <button class="btn btn-danger btn-sm" onclick="disableBedrock('${escapeHtml(sid)}')">Disable</button>
         </div>`;
@@ -1501,11 +1936,14 @@ async function renderBedrockStatus(sid, sname) {
         </div>`;
       // Auto-refresh every 3s
       if (bedrockPollTimer) clearInterval(bedrockPollTimer);
-      bedrockPollTimer = setInterval(() => renderBedrockStatus(sid, sname), 3000);
+      bedrockPollTimer = setInterval(
+        () => renderBedrockStatus(sid, sname),
+        3000,
+      );
       return;
     }
 
-    if (status.status === 'pending' && status.claim_url) {
+    if (status.status === "pending" && status.claim_url) {
       // Claim in progress — show the URL + poll
       body.innerHTML = `
         <div style="margin-bottom:14px;">
@@ -1527,19 +1965,25 @@ async function renderBedrockStatus(sid, sname) {
         </div>`;
       if (bedrockPollTimer) clearInterval(bedrockPollTimer);
       bedrockPollTimer = setInterval(async () => {
-        const s2 = await api(`/api/servers/${sid}/playit/claim/status`).catch(() => null);
+        const s2 = await api(`/api/servers/${sid}/playit/claim/status`).catch(
+          () => null,
+        );
         if (!s2) return;
-        if (s2.status === 'connected') {
-          clearInterval(bedrockPollTimer); bedrockPollTimer = null;
-          toast('✓ Bedrock cross-play connected');
+        if (s2.status === "connected") {
+          clearInterval(bedrockPollTimer);
+          bedrockPollTimer = null;
+          toast("✓ Bedrock cross-play connected");
           renderBedrockStatus(sid, sname);
-        } else if (s2.status === 'expired' || s2.status === 'failed') {
-          clearInterval(bedrockPollTimer); bedrockPollTimer = null;
-          const node = document.getElementById('bedrockPoll');
-          if (node) node.innerHTML = `<span style="color:var(--rose);">✗ Claim ${s2.status}. Click "Connect" to try again.</span>`;
+        } else if (s2.status === "expired" || s2.status === "failed") {
+          clearInterval(bedrockPollTimer);
+          bedrockPollTimer = null;
+          const node = document.getElementById("bedrockPoll");
+          if (node)
+            node.innerHTML = `<span style="color:var(--rose);">✗ Claim ${s2.status}. Click "Connect" to try again.</span>`;
         } else {
-          const node = document.getElementById('bedrockPoll');
-          if (node) node.innerHTML = `<span class="ed-spin" style="display:inline-block;width:12px;height:12px;border:2px solid var(--slate-600);border-top-color:var(--emerald);border-radius:50%;animation:ed-spin 0.7s linear infinite;vertical-align:middle;margin-right:6px;"></span>Waiting for approval… (${s2.elapsed_sec || 0}s)`;
+          const node = document.getElementById("bedrockPoll");
+          if (node)
+            node.innerHTML = `<span class="ed-spin" style="display:inline-block;width:12px;height:12px;border:2px solid var(--slate-600);border-top-color:var(--emerald);border-radius:50%;animation:ed-spin 0.7s linear infinite;vertical-align:middle;margin-right:6px;"></span>Waiting for approval… (${s2.elapsed_sec || 0}s)`;
         }
       }, 2500);
       return;
@@ -1570,8 +2014,11 @@ async function renderBedrockStatus(sid, sname) {
 // no extra tabs). Only if the operator hasn't configured PLAYIT_SHARED_SECRET
 // (backend replies 503) do we fall back to the per-server playit.gg claim flow.
 async function enableBedrock(sid, sname) {
-  const btn = document.getElementById('bedrockEnableBtn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Enabling…'; }
+  const btn = document.getElementById("bedrockEnableBtn");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "⏳ Enabling…";
+  }
   return doEnableBedrock(sid, sname, false);
 }
 
@@ -1580,11 +2027,18 @@ async function enableBedrock(sid, sname) {
 // it. We surface that and offer a take-over, which re-calls with takeover:true
 // and the backend disables the other holder so state never goes inconsistent.
 async function doEnableBedrock(sid, sname, takeover) {
-  const btn = document.getElementById('bedrockEnableBtn');
+  const btn = document.getElementById("bedrockEnableBtn");
   try {
-    const r = await api(`/api/servers/${sid}/playit/auto-enable`, { method: 'POST', body: { takeover } });
-    toast('✓ Bedrock cross-play enabled');
-    if (r.restart_required) toast(r.restart_reason || 'Restart the server to load the new plugins.', 'info');
+    const r = await api(`/api/servers/${sid}/playit/auto-enable`, {
+      method: "POST",
+      body: { takeover },
+    });
+    toast("✓ Bedrock cross-play enabled");
+    if (r.restart_required)
+      toast(
+        r.restart_reason || "Restart the server to load the new plugins.",
+        "info",
+      );
     renderBedrockStatus(sid, sname); // re-renders into the "connecting → address" view
   } catch (err) {
     if (err?.status === 503) {
@@ -1593,40 +2047,61 @@ async function doEnableBedrock(sid, sname, takeover) {
     }
     if (err?.status === 409) {
       const other = err.data?.conflict;
-      const move = confirm(`${err.message}\n\nMove Bedrock to "${sname}" now? This turns it off on "${other?.name || 'the other server'}".`);
+      const move = confirm(
+        `${err.message}\n\nMove Bedrock to "${sname}" now? This turns it off on "${other?.name || "the other server"}".`,
+      );
       if (move) return doEnableBedrock(sid, sname, true);
-      if (btn) { btn.disabled = false; btn.textContent = '⚡ Enable Bedrock cross-play'; }
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "⚡ Enable Bedrock cross-play";
+      }
       return;
     }
-    if (btn) { btn.disabled = false; btn.textContent = '⚡ Enable Bedrock cross-play'; }
-    toast(err.message, 'error');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "⚡ Enable Bedrock cross-play";
+    }
+    toast(err.message, "error");
   }
 }
 
 async function startBedrockClaim(sid, sname) {
   try {
-    await api(`/api/servers/${sid}/playit/claim/start`, { method: 'POST' });
+    await api(`/api/servers/${sid}/playit/claim/start`, { method: "POST" });
     renderBedrockStatus(sid, sname);
   } catch (err) {
-    toast(err.message, 'error');
+    toast(err.message, "error");
   }
 }
 
 async function cancelBedrockClaim(sid, sname) {
-  try { await api(`/api/servers/${sid}/playit/claim/cancel`, { method: 'POST' }); } catch {}
-  if (bedrockPollTimer) { clearInterval(bedrockPollTimer); bedrockPollTimer = null; }
+  try {
+    await api(`/api/servers/${sid}/playit/claim/cancel`, { method: "POST" });
+  } catch {}
+  if (bedrockPollTimer) {
+    clearInterval(bedrockPollTimer);
+    bedrockPollTimer = null;
+  }
   renderBedrockStatus(sid, sname);
 }
 
 async function disableBedrock(sid) {
-  if (!confirm('Disable Bedrock cross-play? The playit tunnel will close. Your Java address (bore.pub) stays unchanged.')) return;
+  if (
+    !confirm(
+      "Disable Bedrock cross-play? The playit tunnel will close. Your Java address (bore.pub) stays unchanged.",
+    )
+  )
+    return;
   try {
-    await api(`/api/servers/${sid}/playit`, { method: 'POST', body: { secret: null } });
-    toast('Bedrock cross-play disabled');
+    await api(`/api/servers/${sid}/playit`, {
+      method: "POST",
+      body: { secret: null },
+    });
+    toast("Bedrock cross-play disabled");
     closeBedrockModal();
-    if (typeof loadServers === 'function') loadServers();
+    if (typeof loadServers === "function") loadServers();
   } catch (err) {
-    toast(err.message, 'error');
+    toast(err.message, "error");
   }
 }
 
@@ -1639,19 +2114,24 @@ window.cancelBedrockClaim = cancelBedrockClaim;
 window.disableBedrock = disableBedrock;
 
 // Logout
-document.addEventListener('DOMContentLoaded', () => {
-  const btn = document.getElementById('logoutBtn');
-  if (btn) btn.onclick = async () => {
-    try { await api('/api/auth/logout', { method: 'POST' }); } catch {}
-    location.href = '/';
-  };
+document.addEventListener("DOMContentLoaded", () => {
+  const btn = document.getElementById("logoutBtn");
+  if (btn)
+    btn.onclick = async () => {
+      try {
+        await api("/api/auth/logout", { method: "POST" });
+      } catch {}
+      location.href = "/";
+    };
 });
 
 // Boot
 (async () => {
   await Promise.all([loadMe(), loadServers()]);
   // Full reload every 6s — picks up new/deleted servers, IP/port changes.
-  pollTimer = setInterval(() => { if (!document.hidden) loadServers(); }, 6000);
+  pollTimer = setInterval(() => {
+    if (!document.hidden) loadServers();
+  }, 6000);
   // Light stats-only refresh every 3s for online servers — keeps CPU/RAM/
   // players/uptime/TPS feeling live without re-rendering the whole list.
   setInterval(refreshLiveStats, 3000);
@@ -1661,15 +2141,19 @@ document.addEventListener('DOMContentLoaded', () => {
 // card so we don't tear down + re-render the DOM every 3s.
 async function refreshLiveStats() {
   if (document.hidden || isDemo) return;
-  const live = servers.filter(s => s.status === 'online' || s.status === 'starting');
+  const live = servers.filter(
+    (s) => s.status === "online" || s.status === "starting",
+  );
   if (!live.length) return;
-  await Promise.all(live.map(async s => {
-    try {
-      const r = await api(`/api/servers/${s.id}/status`);
-      if (r.stats) s.stats = r.stats;
-      if (r.status && r.status !== s.status) s.status = r.status;
-    } catch {}
-  }));
+  await Promise.all(
+    live.map(async (s) => {
+      try {
+        const r = await api(`/api/servers/${s.id}/status`);
+        if (r.stats) s.stats = r.stats;
+        if (r.status && r.status !== s.status) s.status = r.status;
+      } catch {}
+    }),
+  );
   // Re-render only the affected cards' inner stats sections rather than the
   // whole grid. Simplest correct thing for now: full re-render but only when
   // something actually changed and the page is foreground.

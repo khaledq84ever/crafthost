@@ -94,19 +94,30 @@ router.get("/public", async (req, res) => {
 
 router.use(authMiddleware);
 
-// Port pool 25565..25665. Lowest free is allocated and persisted in `servers.port`.
+// Port pool. Lowest free is allocated and persisted in `servers.port`. The
+// usable size is bounded by the internal host-port derivation in
+// jvm-controller.pickHostPort / internalListenPort (`26000 + offset % 1000`):
+// offsets must stay in 0..999 so concurrent servers never share a host port.
+// That caps the pool at 1000 slots (25565..26564). Do NOT raise PORT_END past
+// 26564 without reworking that derivation — doing so would collide host ports
+// AND shift existing servers' ports (breaking their live tunnels).
 const PORT_START = parseInt(process.env.SERVER_PORT_START || "25565", 10);
-const PORT_END = parseInt(process.env.SERVER_PORT_END || "25665", 10);
+const PORT_END = parseInt(process.env.SERVER_PORT_END || "26564", 10);
 
 function allocPort() {
   const used = new Set(
     db
       .prepare("SELECT port FROM servers")
       .all()
-      .map((r) => r.port),
+      // Coerce to int and drop NULL/out-of-range rows so a stray/string port
+      // value can't silently block or alias a real slot.
+      .map((r) => parseInt(r.port, 10))
+      .filter((p) => Number.isInteger(p)),
   );
   for (let p = PORT_START; p <= PORT_END; p++) if (!used.has(p)) return p;
-  throw new Error("No free ports available");
+  throw new Error(
+    `No free ports available (pool ${PORT_START}-${PORT_END}, ${used.size} in use)`,
+  );
 }
 
 function nextSlotFor(userId) {
@@ -1112,8 +1123,10 @@ router.post("/:id/promote", async (req, res) => {
 });
 
 // PATCH /api/servers/:id — update live settings (motd, difficulty, gamemode,
-// max_players, whitelist, pvp, hardcore, view_distance). Persists to DB +
-// rewrites server.properties on disk. Optionally restarts if currently running.
+// max_players, whitelist, pvp, hardcore, view/simulation distance, spawn
+// protection, allow flight/nether, command blocks, force gamemode, mob/animal/
+// villager spawning). Persists DB columns + rewrites server.properties on disk.
+// Optionally restarts if currently running.
 router.patch("/:id", async (req, res) => {
   const s = getOwnedServer(req, res);
   if (!s) return;
@@ -1127,6 +1140,14 @@ router.patch("/:id", async (req, res) => {
     "hardcore",
     "view_distance",
     "simulation_distance",
+    "spawn_protection",
+    "allow_flight",
+    "allow_nether",
+    "command_blocks",
+    "force_gamemode",
+    "spawn_monsters",
+    "spawn_animals",
+    "spawn_npcs",
     "scheduled_restart_at",
   ];
   const updates = {};
@@ -1181,8 +1202,9 @@ router.patch("/:id", async (req, res) => {
   }
 
   // DB columns vs flags-only. We have: motd, difficulty, gamemode, max_players,
-  // whitelist, scheduled_restart_at. Others (pvp, hardcore, view_distance) live
-  // only in server.properties.
+  // whitelist, scheduled_restart_at. All the rest (pvp, hardcore, view/simulation
+  // distance, spawn protection, allow flight/nether, command blocks, force
+  // gamemode, spawn monsters/animals/npcs) live only in server.properties.
   const dbCols = [
     "motd",
     "difficulty",
@@ -1248,6 +1270,27 @@ router.patch("/:id", async (req, res) => {
       Math.min(32, parseInt(updates.simulation_distance, 10) || 6),
     );
     props["simulation-distance"] = String(v);
+  }
+  if (updates.spawn_protection !== undefined) {
+    const v = Math.max(
+      0,
+      Math.min(64, parseInt(updates.spawn_protection, 10) || 0),
+    );
+    props["spawn-protection"] = String(v);
+  }
+  // Properties-only boolean toggles → server.properties key map. These are not
+  // DB columns, so they live purely in server.properties (rewritten here).
+  const boolProps = {
+    allow_flight: "allow-flight",
+    allow_nether: "allow-nether",
+    command_blocks: "enable-command-block",
+    force_gamemode: "force-gamemode",
+    spawn_monsters: "spawn-monsters",
+    spawn_animals: "spawn-animals",
+    spawn_npcs: "spawn-npcs",
+  };
+  for (const [k, prop] of Object.entries(boolProps)) {
+    if (updates[k] !== undefined) props[prop] = updates[k] ? "true" : "false";
   }
   try {
     fs.mkdirSync(path.dirname(propPath), { recursive: true });
@@ -1589,6 +1632,9 @@ router.post("/:id/playit/auto-enable", (req, res) => {
             "UPDATE servers SET playit_secret = NULL, playit_host = NULL, playit_port = NULL WHERE id = ?",
           ).run(o.id);
           playit.stop(o.id);
+          try {
+            dc.stopBedrockSidecar(o.id);
+          } catch {}
         } catch (e) {
           console.warn("[playit auto-enable] takeover stop:", e.message);
         }
@@ -1613,22 +1659,38 @@ router.post("/:id/playit/auto-enable", (req, res) => {
           console.warn("[playit auto-enable] hot-start:", err.message),
         );
     }
-    // Auto-install Geyser + Floodgate from cache
-    seedDefaultPlugins(
-      req.user.id,
-      s.id,
-      ["wKkoqHrH", "bWrNNfkb"],
-      s.version,
-    ).catch((err) =>
-      console.warn("[playit auto-enable] plugin install:", err.message),
+    // Bedrock bridge install depends on the server type:
+    //   • Spigot-family (paper/spigot/purpur) → Geyser + Floodgate PLUGINS.
+    //   • Vanilla/Fabric/NeoForge → no plugins; a Geyser-Standalone SIDECAR is
+    //     launched by the JVM controller on (re)start. Just flag + tunnel here.
+    const spigotFamily = ["paper", "spigot", "purpur"].includes(
+      String(s.type || "").toLowerCase(),
     );
+    if (spigotFamily) {
+      seedDefaultPlugins(
+        req.user.id,
+        s.id,
+        ["wKkoqHrH", "bWrNNfkb"],
+        s.version,
+      ).catch((err) =>
+        console.warn("[playit auto-enable] plugin install:", err.message),
+      );
+    } else if (["online", "running", "starting"].includes(s.status)) {
+      // Non-plugin type already running → start the sidecar now (idempotent).
+      const fresh = db.prepare("SELECT * FROM servers WHERE id = ?").get(s.id);
+      dc.startBedrockSidecar(s.id, fresh, bedrockLocalPort(fresh)).catch(
+        (err) => console.warn("[playit auto-enable] sidecar:", err.message),
+      );
+    }
     const restartRequired = ["online", "running"].includes(s.status);
     res.json({
       ok: true,
       mode: "shared",
       restart_required: restartRequired,
       restart_reason: restartRequired
-        ? "Geyser + Floodgate installed — restart so the server loads them."
+        ? spigotFamily
+          ? "Geyser + Floodgate installed — restart so the server loads them."
+          : "Bedrock proxy enabled — restart to finish wiring it up."
         : null,
     });
   } catch (err) {
@@ -1702,44 +1764,65 @@ router.get("/:id/playit/claim/status", (req, res) => {
           "[playit] captured owner secret as shared — Bedrock is now one-click for all servers",
         );
       }
-      // Auto-install Geyser + Floodgate from the per-MC plugin cache. Idempotent —
-      // re-running is harmless (cache hardlink errors on EEXIST are swallowed).
-      // Done once per claim by tracking on the playit state via the request.
+      // Bedrock bridge depends on server type. Spigot-family loads Geyser as a
+      // plugin; Vanilla/Fabric/NeoForge use the Geyser-Standalone sidecar that
+      // the JVM controller starts on (re)boot — no plugins to install for them.
+      const spigotFamily = ["paper", "spigot", "purpur"].includes(
+        String(s.type || "").toLowerCase(),
+      );
       const path = require("path");
       const fs = require("fs");
       const DATA_DIR =
         process.env.DATA_DIR || path.resolve(__dirname, "../../data/servers");
-      const pluginsDir = path.join(DATA_DIR, s.id, "plugins");
-      const geyserInstalled =
-        fs.existsSync(pluginsDir) &&
-        fs.readdirSync(pluginsDir).some((f) => /geyser/i.test(f));
-      const floodgateInstalled =
-        fs.existsSync(pluginsDir) &&
-        fs.readdirSync(pluginsDir).some((f) => /floodgate/i.test(f));
-      out.bedrock_plugins = {
-        geyser: geyserInstalled,
-        floodgate: floodgateInstalled,
-      };
-      if (!geyserInstalled || !floodgateInstalled) {
-        seedDefaultPlugins(req.user.id, s.id, BEDROCK_PLUGINS, s.version)
-          .then(() =>
-            console.log(
-              `[playit claim] auto-installed Geyser+Floodgate for ${s.id}`,
-            ),
-          )
-          .catch((err) =>
-            console.warn(
-              `[playit claim] plugin auto-install failed:`,
-              err.message,
-            ),
+      if (spigotFamily) {
+        // Auto-install Geyser + Floodgate from the per-MC plugin cache. Idempotent —
+        // re-running is harmless (cache hardlink errors on EEXIST are swallowed).
+        const pluginsDir = path.join(DATA_DIR, s.id, "plugins");
+        const geyserInstalled =
+          fs.existsSync(pluginsDir) &&
+          fs.readdirSync(pluginsDir).some((f) => /geyser/i.test(f));
+        const floodgateInstalled =
+          fs.existsSync(pluginsDir) &&
+          fs.readdirSync(pluginsDir).some((f) => /floodgate/i.test(f));
+        out.bedrock_plugins = {
+          geyser: geyserInstalled,
+          floodgate: floodgateInstalled,
+        };
+        if (!geyserInstalled || !floodgateInstalled) {
+          seedDefaultPlugins(req.user.id, s.id, BEDROCK_PLUGINS, s.version)
+            .then(() =>
+              console.log(
+                `[playit claim] auto-installed Geyser+Floodgate for ${s.id}`,
+              ),
+            )
+            .catch((err) =>
+              console.warn(
+                `[playit claim] plugin auto-install failed:`,
+                err.message,
+              ),
+            );
+          out.bedrock_plugins.installing = true;
+        }
+        if (["online", "running"].includes(s.status)) {
+          out.restart_required = true;
+          out.restart_reason =
+            "Geyser + Floodgate plugins installed — restart the server so it loads them.";
+        }
+      } else {
+        // Non-plugin type: report the sidecar as the bridge and start it now if
+        // the server's already up (idempotent); otherwise it starts on boot.
+        out.bedrock_plugins = { geyser: true, floodgate: false, sidecar: true };
+        if (["online", "running", "starting"].includes(s.status)) {
+          const fresh2 = db
+            .prepare("SELECT * FROM servers WHERE id = ?")
+            .get(s.id);
+          dc.startBedrockSidecar(s.id, fresh2, bedrockLocalPort(fresh2)).catch(
+            (err) => console.warn(`[playit claim] sidecar:`, err.message),
           );
-        out.bedrock_plugins.installing = true;
-      }
-      // Restart hint — if server's online, plugins need a reload to take effect
-      if (["online", "running"].includes(s.status)) {
-        out.restart_required = true;
-        out.restart_reason =
-          "Geyser + Floodgate plugins installed — restart the server so it loads them.";
+          out.restart_required = true;
+          out.restart_reason =
+            "Bedrock proxy enabled — restart to finish wiring it up.";
+        }
       }
     }
     res.json(out);
@@ -1777,6 +1860,10 @@ router.post("/:id/playit", async (req, res) => {
     ).run(cleaned || null, s.id);
     if (!cleaned) {
       playit.stop(s.id);
+      // Stop the Bedrock sidecar too (non-plugin types); harmless if none.
+      try {
+        dc.stopBedrockSidecar(s.id);
+      } catch {}
     } else if (
       s.status === "online" ||
       s.status === "running" ||
@@ -1788,6 +1875,11 @@ router.post("/:id/playit", async (req, res) => {
           .start(s.id, bedrockLocalPort(s), cleaned)
           .catch((err) => console.warn("[playit set] hot-start:", err.message));
       }
+      // For non-plugin types, also start the Geyser sidecar now (idempotent).
+      const fresh3 = db.prepare("SELECT * FROM servers WHERE id = ?").get(s.id);
+      dc.startBedrockSidecar(s.id, fresh3, bedrockLocalPort(fresh3)).catch(
+        (err) => console.warn("[playit set] sidecar:", err.message),
+      );
     }
     audit(req.user.id, "server.playit_set", s.id, req.ip, {
       enabled: !!cleaned,

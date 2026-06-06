@@ -315,6 +315,155 @@ function cachedJarPath(type, version, info) {
   return path.join(JAR_CACHE_DIR, `${safeType}-${safeVer}.jar`);
 }
 
+// ── Bedrock cross-play for non-plugin server types (Vanilla/Fabric/NeoForge) ──
+// Paper/Spigot/Purpur load Geyser as an in-process plugin (see ensureGeyserConfig).
+// Vanilla/Fabric/NeoForge can't load Spigot plugins, so for those we run
+// Geyser-Standalone as a SIDECAR process: a separate JVM that listens on the
+// server's Bedrock UDP port and proxies to the Java server at 127.0.0.1:<javaPort>
+// in offline mode (every CraftHost server is online-mode=false, so Floodgate
+// isn't needed). The existing playit UDP tunnel forwards to that same UDP port.
+const STANDALONE_BEDROCK_TYPES = new Set(["vanilla", "fabric", "neoforge"]);
+const GEYSER_STANDALONE_URL =
+  process.env.GEYSER_STANDALONE_URL ||
+  "https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest/downloads/standalone";
+const GEYSER_STANDALONE_JAR = path.join(JAR_CACHE_DIR, "geyser-standalone.jar");
+
+// UDP port the playit Bedrock tunnel forwards to — MUST mirror playit.js:
+// per-server mode → geyserUdpPort(server); shared mode → GEYSER_PORT (19132).
+function bedrockListenPort(server) {
+  return BEDROCK_PER_SERVER
+    ? geyserUdpPort(server)
+    : parseInt(process.env.GEYSER_PORT || "19132", 10);
+}
+
+// Download Geyser-Standalone once into the shared cache (~28 MB). Re-used by
+// every sidecar via cwd, so we never copy the jar per server.
+async function ensureGeyserStandaloneJar() {
+  try {
+    if (
+      fs.existsSync(GEYSER_STANDALONE_JAR) &&
+      fs.statSync(GEYSER_STANDALONE_JAR).size > 1_000_000
+    )
+      return GEYSER_STANDALONE_JAR;
+  } catch {}
+  fs.mkdirSync(JAR_CACHE_DIR, { recursive: true });
+  const tmp = `${GEYSER_STANDALONE_JAR}.tmp`;
+  await downloadFile(GEYSER_STANDALONE_URL, tmp, "Geyser-Standalone");
+  fs.renameSync(tmp, GEYSER_STANDALONE_JAR);
+  return GEYSER_STANDALONE_JAR;
+}
+
+// Write a MINIMAL Geyser config — Geyser fills every other key with its own
+// defaults and self-manages config-version, so this stays valid across Geyser
+// releases (verified against 2.10.0). Authoritative values: bind port, Java
+// target port, offline auth, and an MTU low enough to survive the playit free
+// tunnel (~1200, same as the plugin path).
+function writeStandaloneGeyserConfig(geyserDir, javaPort, bedrockPort) {
+  fs.mkdirSync(geyserDir, { recursive: true });
+  const mtu = parseInt(process.env.GEYSER_MTU || "1200", 10);
+  const cfg =
+    "# Managed by CraftHost — Geyser-Standalone sidecar for non-plugin server types.\n" +
+    "bedrock:\n" +
+    "  address: 0.0.0.0\n" +
+    `  port: ${bedrockPort}\n` +
+    "java:\n" +
+    "  address: 127.0.0.1\n" +
+    `  port: ${javaPort}\n` +
+    "  auth-type: offline\n" +
+    "advanced:\n" +
+    "  bedrock:\n" +
+    `    mtu: ${mtu}\n`;
+  fs.writeFileSync(path.join(geyserDir, "config.yml"), cfg);
+}
+
+// Start the Geyser-Standalone sidecar for a server (idempotent). Stores the
+// child process on the server's running-state so stopServer can reap it.
+async function startBedrockSidecar(id, server, javaPort) {
+  const state = running.get(id);
+  if (!state) return;
+  if (state.geyserProc && !state.geyserProc.killed) return; // already running
+  const t = String(server.type || "").toLowerCase();
+  if (!STANDALONE_BEDROCK_TYPES.has(t)) return; // spigot-family uses the plugin
+  if (!server.playit_secret) return; // Bedrock not enabled for this server
+  let jar;
+  try {
+    jar = await ensureGeyserStandaloneJar();
+  } catch (err) {
+    console.warn(`[geyser-sidecar/${id}] jar download failed:`, err.message);
+    state.logs.push(`[geyser] download failed: ${err.message}`);
+    return;
+  }
+  // Re-check: the MC stop/restart may have replaced state while we downloaded.
+  const live = running.get(id);
+  if (!live || live !== state) return;
+  const geyserDir = path.join(serverDir(id), "geyser");
+  const bedrockPort = bedrockListenPort(server);
+  writeStandaloneGeyserConfig(geyserDir, javaPort, bedrockPort);
+  const gproc = spawn(
+    "java",
+    [
+      "-Xms64M",
+      "-Xmx256M",
+      `-XX:ActiveProcessorCount=${JVM_CPUS}`,
+      "-Xss512k",
+      "-XX:+ExitOnOutOfMemoryError",
+      "-Dlog4j2.formatMsgNoLookups=true",
+      "-jar",
+      jar,
+    ],
+    {
+      cwd: geyserDir,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, JAVA_TOOL_OPTIONS: "" },
+    },
+  );
+  state.geyserProc = gproc;
+  const onG = (buf) => {
+    String(buf)
+      .split("\n")
+      .forEach((ln) => {
+        const s = ln.replace(/\x1b\[[0-9;]*m/g, "").trimEnd();
+        if (!s) return;
+        const line = `[geyser] ${s}`;
+        state.logs.push(line);
+        if (state.logs.length > LOG_RING_SIZE) state.logs.shift();
+        for (const fn of state.listeners) {
+          try {
+            fn(line);
+          } catch {}
+        }
+      });
+  };
+  gproc.stdout.on("data", onG);
+  gproc.stderr.on("data", onG);
+  gproc.on("exit", (code, sig) => {
+    state.logs.push(`[geyser] sidecar exited (code=${code} sig=${sig || "-"})`);
+    if (state.geyserProc === gproc) state.geyserProc = null;
+  });
+  console.log(
+    `[geyser-sidecar/${id}] started → UDP ${bedrockPort} ⇄ Java 127.0.0.1:${javaPort} (offline)`,
+  );
+  state.logs.push(
+    `[geyser] Bedrock proxy starting on UDP ${bedrockPort} → Java ${javaPort}`,
+  );
+}
+
+function stopBedrockSidecar(id) {
+  const state = running.get(id);
+  if (!state || !state.geyserProc) return;
+  const gp = state.geyserProc;
+  try {
+    gp.kill("SIGTERM");
+  } catch {}
+  // Hard-kill if it lingers past the grace period.
+  setTimeout(() => {
+    try {
+      if (gp && !gp.killed) gp.kill("SIGKILL");
+    } catch {}
+  }, 6000);
+  state.geyserProc = null;
+}
+
 async function ensureJar(server) {
   const dir = serverDir(server.id);
   const jarPath = path.join(dir, "server.jar");
@@ -790,6 +939,15 @@ async function startServer(containerId, server) {
   // Clear any prior crash record — a successful restart resets the trigger.
   crashes.delete(id);
 
+  // Bedrock cross-play for non-plugin types: launch the Geyser-Standalone
+  // sidecar pointed at this boot's actual Java port. Spigot-family servers load
+  // Geyser in-process (ensureGeyserConfig above), so they skip this.
+  if (server.playit_secret && STANDALONE_BEDROCK_TYPES.has(t)) {
+    startBedrockSidecar(id, server, hostPort).catch((e) =>
+      console.warn(`[geyser-sidecar/${id}]`, e.message),
+    );
+  }
+
   const onLine = (line) => {
     const stamped = line.replace(/\x1b\[[0-9;]*m/g, "").trimEnd();
     if (!stamped) return;
@@ -1055,6 +1213,8 @@ async function stopServer(containerId, server) {
   // the auto-restart trigger.
   state.intentional = true;
   crashes.delete(id);
+  // Reap the Bedrock sidecar (if any) alongside the MC process.
+  stopBedrockSidecar(id);
   try {
     // graceful: send "stop" via stdin first
     state.proc.stdin.write("stop\n");
@@ -1770,6 +1930,8 @@ module.exports = {
   isAvailable,
   makeRconPassword,
   geyserUdpPort,
+  startBedrockSidecar,
+  stopBedrockSidecar,
   createServer,
   startServer,
   stopServer,
