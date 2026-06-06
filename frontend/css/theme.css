@@ -1076,3 +1076,26 @@ button:focus-visible, .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px 
   body { background: white; color: black; }
   .card, .server-card, .stat-tile { border: 1px solid #ccc; background: white; color: black; }
 }
+
+/* ── Material Symbols (Rounded) icon helper ───────────────────────────── */
+.material-symbols-rounded,
+.msr {
+  font-family: 'Material Symbols Rounded';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 1.15em;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  vertical-align: middle;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+}
+h1 .msr { font-size: 1.05em; margin-right: .12em; opacity: .95; }
+.btn .msr { font-size: 1.15em; }
+.msr.fill { font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24; }

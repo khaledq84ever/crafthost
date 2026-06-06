@@ -18,6 +18,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/css/theme.css" />
 <link rel="stylesheet" href="/css/dashboard.css" />
 <style>
@@ -316,9 +317,9 @@
       <select class="select" style="width:220px;max-width:48vw;" id="serverPicker"></select>
       <div class="topbar-actions">
         <span id="connDot" class="dot offline" title="Disconnected"></span>
-        <button class="btn btn-primary btn-sm" id="startBtn" title="Start"><span class="lbl-full">▶ Start</span><span class="lbl-short">▶</span></button>
-        <button class="btn btn-warning btn-sm" id="restartBtn" title="Restart"><span class="lbl-full">⟳ Restart</span><span class="lbl-short">⟳</span></button>
-        <button class="btn btn-danger btn-sm" id="stopBtn" title="Stop"><span class="lbl-full">■ Stop</span><span class="lbl-short">■</span></button>
+        <button class="btn btn-primary btn-sm" id="startBtn" title="Start"><span class="lbl-full"><span class="msr">play_arrow</span> Start</span><span class="lbl-short"><span class="msr">play_arrow</span></span></button>
+        <button class="btn btn-warning btn-sm" id="restartBtn" title="Restart"><span class="lbl-full"><span class="msr">restart_alt</span> Restart</span><span class="lbl-short"><span class="msr">restart_alt</span></span></button>
+        <button class="btn btn-danger btn-sm" id="stopBtn" title="Stop"><span class="lbl-full"><span class="msr">stop</span> Stop</span><span class="lbl-short"><span class="msr">stop</span></span></button>
         <div class="avatar">K</div>
       </div>
     </div>
@@ -492,14 +493,14 @@ function openPlayerMenu(name, e) {
   const y = e.clientY || (e.target.getBoundingClientRect().top + 30);
   menu.style.cssText = `position:fixed;z-index:500;background:var(--glass-strong);border:1px solid var(--glass-border-strong);border-radius:10px;padding:6px;min-width:170px;box-shadow:var(--shadow-md);backdrop-filter:blur(20px);font-size:13px;`;
   const actions = [
-    { label: '⚙ OP', cmd: `op ${name}` },
-    { label: '↡ DEOP', cmd: `deop ${name}` },
-    { label: '✕ Kick', cmd: `kick ${name} Kicked by admin`, confirm: `Kick ${name}?` },
-    { label: '🚫 Ban', cmd: `ban ${name} Banned by admin`, confirm: `Ban ${name}? Use /pardon to undo.` },
-    { label: '📍 TP here', cmd: null, build: () => `tp ${name} @s` },
-    { label: '🎮 Creative', cmd: `gamemode creative ${name}` },
-    { label: '🌱 Survival', cmd: `gamemode survival ${name}` },
-    { label: '👻 Spectator', cmd: `gamemode spectator ${name}` },
+    { label: '<span class="msr">add_moderator</span> OP', cmd: `op ${name}` },
+    { label: '<span class="msr">remove_moderator</span> DEOP', cmd: `deop ${name}` },
+    { label: '<span class="msr">logout</span> Kick', cmd: `kick ${name} Kicked by admin`, confirm: `Kick ${name}?` },
+    { label: '<span class="msr">gavel</span> Ban', cmd: `ban ${name} Banned by admin`, confirm: `Ban ${name}? Use /pardon to undo.` },
+    { label: '<span class="msr">my_location</span> TP here', cmd: null, build: () => `tp ${name} @s` },
+    { label: '<span class="msr">sports_esports</span> Creative', cmd: `gamemode creative ${name}` },
+    { label: '<span class="msr">forest</span> Survival', cmd: `gamemode survival ${name}` },
+    { label: '<span class="msr">visibility</span> Spectator', cmd: `gamemode spectator ${name}` },
   ];
   menu.innerHTML = `
     <div style="padding:8px 12px;border-bottom:1px solid var(--glass-border);font-weight:700;color:var(--emerald);">${escapeHtml(name)}</div>

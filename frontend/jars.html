@@ -18,6 +18,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/css/theme.css" />
 <link rel="stylesheet" href="/css/dashboard.css" />
 <style>
@@ -98,7 +99,7 @@
   <div>
     <div class="topbar">
       <div class="topbar-title">
-        <h1>📦 <span data-i18n="jars_title">JAR Library</span></h1>
+        <h1><span class="msr">deployed_code</span> <span data-i18n="jars_title">JAR Library</span></h1>
       </div>
       <div class="topbar-actions">
         <input type="file" id="jarUploadInput" accept=".jar" style="display:none;" />
@@ -176,7 +177,7 @@ async function loadOfficial() {
         <div><h4>${t.name}</h4><div class="meta" id="ver_${t.id}">loading…</div></div>
       </div>
       <p class="desc">${t.desc}</p>
-      <div class="stats"><span>🔄 Live from official API</span></div>
+      <div class="stats"><span><span class="msr">sync</span> Live from official API</span></div>
       <a href="/dashboard.html?type=${t.id}" class="btn btn-primary btn-block btn-sm">Deploy with ${t.name}</a>
     </div>
   `).join('');
@@ -208,7 +209,7 @@ async function loadCustom() {
     grid.innerHTML = jars.map(j => `
       <div class="jar-card">
         <div class="jar-head">
-          <div class="jar-logo" style="background:linear-gradient(135deg,#A855F7,#A855F799);">📦</div>
+          <div class="jar-logo" style="background:linear-gradient(135deg,#A855F7,#A855F799);"><span class="msr">deployed_code</span></div>
           <div style="overflow:hidden;flex:1;">
             <h4 style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(j.filename)}</h4>
             <div class="meta">${fmtBytes(j.size)} · ${fmtRel(j.created_at)}</div>
@@ -216,8 +217,8 @@ async function loadCustom() {
         </div>
         <p class="desc" style="font-family:var(--font-mono);font-size:11px;word-break:break-all;">sha256: ${escapeHtml((j.sha256 || '').slice(0, 32))}…</p>
         <div style="display:flex;gap:6px;">
-          <a href="/api/jars/${encodeURIComponent(j.id)}/download" class="btn btn-secondary btn-sm" style="flex:1;">↓ Download</a>
-          <button class="btn btn-ghost btn-sm" data-del="${escapeHtml(j.id)}" data-name="${escapeHtml(j.filename)}">🗑</button>
+          <a href="/api/jars/${encodeURIComponent(j.id)}/download" class="btn btn-secondary btn-sm" style="flex:1;"><span class="msr">download</span> Download</a>
+          <button class="btn btn-ghost btn-sm" data-del="${escapeHtml(j.id)}" data-name="${escapeHtml(j.filename)}"><span class="msr">delete</span></button>
         </div>
       </div>
     `).join('');

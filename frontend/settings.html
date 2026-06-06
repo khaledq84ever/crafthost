@@ -18,6 +18,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/css/theme.css" />
 <link rel="stylesheet" href="/css/dashboard.css" />
 <style>
@@ -57,7 +58,7 @@
   <div>
     <div class="topbar">
       <div class="topbar-title">
-        <h1>⚙️ <span data-i18n="nav_settings">Settings</span></h1>
+        <h1><span class="msr">settings</span> <span data-i18n="nav_settings">Settings</span></h1>
       </div>
       <div class="topbar-actions"><div class="avatar" id="avatar">?</div></div>
     </div>
@@ -91,7 +92,7 @@
       </div>
 
       <div class="card mb-4 danger-zone">
-        <h3 style="margin-bottom:8px;">⚠ Danger zone</h3>
+        <h3 style="margin-bottom:8px;"><span class="msr" style="color:var(--danger,#EF4444);">warning</span> Danger zone</h3>
         <div class="setting-row">
           <div><div class="label-l">Delete account</div><div class="desc">Permanently deletes your account, all servers, and all backups. This cannot be undone.</div></div>
           <button class="btn btn-secondary btn-sm" style="color:var(--red);" onclick="openDelete()">Delete</button>

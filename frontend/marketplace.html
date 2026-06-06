@@ -1,575 +1,952 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#07090F" media="(prefers-color-scheme: dark)" />
-<meta name="theme-color" content="#07090F" />
-<meta name="color-scheme" content="dark" />
-<meta name="mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="CraftHost" />
-<meta name="format-detection" content="telephone=no" />
-<link rel="icon" type="image/svg+xml" href="/icon.svg" />
-<link rel="apple-touch-icon" href="/icon.svg" />
-<link rel="manifest" href="/manifest.json" />
-<title>Plugins & Mods · CraftHost</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="/css/theme.css" />
-<link rel="stylesheet" href="/css/dashboard.css" />
-<style>
-/* Pro-grade compact marketplace — pattern: tiny uppercase section labels,
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta
+      name="theme-color"
+      content="#07090F"
+      media="(prefers-color-scheme: dark)"
+    />
+    <meta name="theme-color" content="#07090F" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="CraftHost" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <title>Plugins & Mods · CraftHost</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Tajawal:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/theme.css" />
+    <link rel="stylesheet" href="/css/dashboard.css" />
+    <style>
+      /* Pro-grade compact marketplace — pattern: tiny uppercase section labels,
    dense cards, refined hierarchy. */
 
-/* Section header — small uppercase Stripe/Linear-style instead of huge h3. */
-.mp-section {
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: 8px; margin: 26px 0 10px;
-}
-.mp-section:first-of-type { margin-top: 4px; }
-.mp-section-label {
-  font-size: 11px; font-weight: 700;
-  letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--text-strong);
-  display: inline-flex; align-items: center; gap: 6px;
-}
-.mp-section-label .ico { font-size: 13px; }
-.mp-section-sub {
-  font-size: 11px; color: var(--slate-500);
-  letter-spacing: 0.01em;
-}
+      /* Section header — small uppercase Stripe/Linear-style instead of huge h3. */
+      .mp-section {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        margin: 26px 0 10px;
+      }
+      .mp-section:first-of-type {
+        margin-top: 4px;
+      }
+      .mp-section-label {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-strong);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .mp-section-label .ico {
+        font-size: 13px;
+      }
+      .mp-section-sub {
+        font-size: 11px;
+        color: var(--slate-500);
+        letter-spacing: 0.01em;
+      }
 
-/* Page-lead summary line under the topbar. */
-.mp-lead { font-size: 12.5px; color: var(--slate-400); margin: 0 0 12px; }
+      /* Page-lead summary line under the topbar. */
+      .mp-lead {
+        font-size: 12.5px;
+        color: var(--slate-400);
+        margin: 0 0 12px;
+      }
 
-/* Top picks (curated) — denser tiles. */
-.mp-top-picks {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 8px;
-}
-.mp-pick {
-  display: flex; align-items: center; gap: 9px;
-  padding: 9px 10px;
-  background: var(--slate-800);
-  border: 1px solid var(--glass-border);
-  border-left: 3px solid var(--c);
-  border-radius: 9px;
-  transition: transform .15s, border-color .15s, background .15s;
-}
-.mp-pick:hover { transform: translateY(-1px); background: var(--slate-700); border-color: color-mix(in srgb, var(--c) 60%, var(--glass-border)); }
-.mp-pick-icon {
-  width: 30px; height: 30px;
-  display: grid; place-items: center;
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--c) 20%, var(--slate-700));
-  font-size: 15px;
-  flex-shrink: 0;
-}
-.mp-pick-text { flex: 1; min-width: 0; }
-.mp-pick-name {
-  font-weight: 700; font-size: 12.5px;
-  color: var(--text-strong);
-  letter-spacing: -0.005em;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.mp-pick-desc {
-  font-size: 10.5px; color: var(--slate-400);
-  white-space: nowrap; text-overflow: ellipsis; overflow: hidden;
-}
-.mp-pick-btn {
-  flex-shrink: 0;
-  font-size: 11px; font-weight: 600;
-  padding: 4px 10px;
-  min-height: 26px;
-}
+      /* Top picks (curated) — denser tiles. */
+      .mp-top-picks {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 8px;
+      }
+      .mp-pick {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 9px 10px;
+        background: var(--slate-800);
+        border: 1px solid var(--glass-border);
+        border-left: 3px solid var(--c);
+        border-radius: 9px;
+        transition:
+          transform 0.15s,
+          border-color 0.15s,
+          background 0.15s;
+      }
+      .mp-pick:hover {
+        transform: translateY(-1px);
+        background: var(--slate-700);
+        border-color: color-mix(in srgb, var(--c) 60%, var(--glass-border));
+      }
+      .mp-pick-icon {
+        width: 30px;
+        height: 30px;
+        display: grid;
+        place-items: center;
+        border-radius: 7px;
+        background: color-mix(in srgb, var(--c) 20%, var(--slate-700));
+        font-size: 15px;
+        flex-shrink: 0;
+      }
+      .mp-pick-text {
+        flex: 1;
+        min-width: 0;
+      }
+      .mp-pick-name {
+        font-weight: 700;
+        font-size: 12.5px;
+        color: var(--text-strong);
+        letter-spacing: -0.005em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .mp-pick-desc {
+        font-size: 10.5px;
+        color: var(--slate-400);
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+      }
+      .mp-pick-btn {
+        flex-shrink: 0;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 4px 10px;
+        min-height: 26px;
+      }
 
-/* Modrinth live feeds — same denser tile pattern. */
-.mp-feed {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 8px;
-}
-.mp-feed-loading {
-  color: var(--slate-500);
-  font-size: 11.5px; padding: 12px 0;
-}
-.mp-feed-card {
-  display: flex; align-items: center; gap: 9px;
-  padding: 9px 10px;
-  background: var(--slate-800);
-  border: 1px solid var(--glass-border);
-  border-radius: 9px;
-  transition: transform .15s, border-color .15s, background .15s;
-  text-decoration: none; color: inherit;
-}
-.mp-feed-card:hover { transform: translateY(-1px); background: var(--slate-700); border-color: var(--emerald); }
-.mp-feed-icon {
-  width: 30px; height: 30px;
-  border-radius: 7px;
-  background: var(--slate-700);
-  object-fit: cover; flex-shrink: 0;
-}
-.mp-feed-text { flex: 1; min-width: 0; line-height: 1.25; }
-.mp-feed-name {
-  font-weight: 700; font-size: 12.5px;
-  color: var(--text-strong);
-  letter-spacing: -0.005em;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.mp-feed-desc {
-  font-size: 10.5px; color: var(--slate-400);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.mp-feed-meta {
-  font-size: 10px; color: var(--slate-500);
-  margin-top: 1px;
-  display: flex; gap: 6px; align-items: center;
-}
+      /* Modrinth live feeds — same denser tile pattern. */
+      .mp-feed {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 8px;
+      }
+      .mp-feed-loading {
+        color: var(--slate-500);
+        font-size: 11.5px;
+        padding: 12px 0;
+      }
+      .mp-feed-card {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 9px 10px;
+        background: var(--slate-800);
+        border: 1px solid var(--glass-border);
+        border-radius: 9px;
+        transition:
+          transform 0.15s,
+          border-color 0.15s,
+          background 0.15s;
+        text-decoration: none;
+        color: inherit;
+      }
+      .mp-feed-card:hover {
+        transform: translateY(-1px);
+        background: var(--slate-700);
+        border-color: var(--emerald);
+      }
+      .mp-feed-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 7px;
+        background: var(--slate-700);
+        object-fit: cover;
+        flex-shrink: 0;
+      }
+      .mp-feed-text {
+        flex: 1;
+        min-width: 0;
+        line-height: 1.25;
+      }
+      .mp-feed-name {
+        font-weight: 700;
+        font-size: 12.5px;
+        color: var(--text-strong);
+        letter-spacing: -0.005em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .mp-feed-desc {
+        font-size: 10.5px;
+        color: var(--slate-400);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .mp-feed-meta {
+        font-size: 10px;
+        color: var(--slate-500);
+        margin-top: 1px;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
 
-/* Search bar + result grid */
-.mp-search-bar {
-  display: flex; gap: 8px; align-items: stretch;
-  margin: 6px 0 12px;
-}
-.mp-search-input {
-  flex: 1;
-  background: var(--slate-800);
-  color: var(--text-strong);
-  border: 1px solid var(--glass-border);
-  border-radius: 9px;
-  padding: 9px 12px;
-  font-size: 13px;
-  font-family: inherit;
-  transition: border-color .15s, background .15s;
-}
-.mp-search-input::placeholder { color: var(--slate-500); }
-.mp-search-input:focus {
-  outline: none;
-  border-color: var(--emerald);
-  background: var(--slate-700);
-}
-.mp-search-sel {
-  flex: 0 0 auto;
-  min-width: 130px;
-  background: var(--slate-800);
-  border: 1px solid var(--glass-border);
-  border-radius: 9px;
-  font-size: 12px;
-  padding: 4px 8px;
-}
-.mp-results {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 8px;
-  min-height: 1px;
-}
-.mp-result {
-  display: flex; align-items: center; gap: 9px;
-  padding: 9px 10px;
-  background: var(--slate-800);
-  border: 1px solid var(--glass-border);
-  border-radius: 9px;
-  transition: transform .15s, border-color .15s, background .15s;
-}
-.mp-result:hover { transform: translateY(-1px); background: var(--slate-700); border-color: var(--emerald); }
-.mp-result-icon {
-  width: 38px; height: 38px;
-  border-radius: 8px;
-  background: var(--slate-700);
-  object-fit: cover;
-  flex-shrink: 0;
-}
-.mp-result-text { flex: 1; min-width: 0; line-height: 1.3; }
-.mp-result-name {
-  font-weight: 700; font-size: 12.5px;
-  color: var(--text-strong);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.mp-result-desc {
-  font-size: 10.5px; color: var(--slate-400);
-  overflow: hidden; text-overflow: ellipsis;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  white-space: normal;
-}
-.mp-result-meta {
-  font-size: 10px; color: var(--slate-500);
-  display: flex; gap: 8px; margin-top: 2px;
-}
-.mp-result-btn {
-  flex-shrink: 0;
-  font-size: 11px; font-weight: 600;
-  padding: 4px 10px;
-  min-height: 26px;
-}
-.mp-result-tag {
-  display: inline-block;
-  font-size: 9px; font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 1px 6px; border-radius: 4px;
-  text-transform: uppercase;
-  background: color-mix(in srgb, var(--emerald) 18%, transparent);
-  color: var(--emerald);
-  margin-right: 4px;
-}
-.mp-search-foot {
-  display: flex; justify-content: center;
-  margin: 12px 0 4px;
-}
-.mp-results-empty, .mp-results-loading, .mp-results-error {
-  grid-column: 1 / -1;
-  text-align: center;
-  color: var(--slate-500);
-  font-size: 11.5px;
-  padding: 18px 0;
-}
-.mp-results-error { color: var(--rose, #f87171); }
+      /* Search bar + result grid */
+      .mp-search-bar {
+        display: flex;
+        gap: 8px;
+        align-items: stretch;
+        margin: 6px 0 12px;
+      }
+      .mp-search-input {
+        flex: 1;
+        background: var(--slate-800);
+        color: var(--text-strong);
+        border: 1px solid var(--glass-border);
+        border-radius: 9px;
+        padding: 9px 12px;
+        font-size: 13px;
+        font-family: inherit;
+        transition:
+          border-color 0.15s,
+          background 0.15s;
+      }
+      .mp-search-input::placeholder {
+        color: var(--slate-500);
+      }
+      .mp-search-input:focus {
+        outline: none;
+        border-color: var(--emerald);
+        background: var(--slate-700);
+      }
+      .mp-search-sel {
+        flex: 0 0 auto;
+        min-width: 130px;
+        background: var(--slate-800);
+        border: 1px solid var(--glass-border);
+        border-radius: 9px;
+        font-size: 12px;
+        padding: 4px 8px;
+      }
+      .mp-results {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 8px;
+        min-height: 1px;
+      }
+      .mp-result {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 9px 10px;
+        background: var(--slate-800);
+        border: 1px solid var(--glass-border);
+        border-radius: 9px;
+        transition:
+          transform 0.15s,
+          border-color 0.15s,
+          background 0.15s;
+      }
+      .mp-result:hover {
+        transform: translateY(-1px);
+        background: var(--slate-700);
+        border-color: var(--emerald);
+      }
+      .mp-result-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 8px;
+        background: var(--slate-700);
+        object-fit: cover;
+        flex-shrink: 0;
+      }
+      .mp-result-text {
+        flex: 1;
+        min-width: 0;
+        line-height: 1.3;
+      }
+      .mp-result-name {
+        font-weight: 700;
+        font-size: 12.5px;
+        color: var(--text-strong);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .mp-result-desc {
+        font-size: 10.5px;
+        color: var(--slate-400);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        white-space: normal;
+      }
+      .mp-result-meta {
+        font-size: 10px;
+        color: var(--slate-500);
+        display: flex;
+        gap: 8px;
+        margin-top: 2px;
+      }
+      .mp-result-btn {
+        flex-shrink: 0;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 4px 10px;
+        min-height: 26px;
+      }
+      .mp-result-tag {
+        display: inline-block;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        padding: 1px 6px;
+        border-radius: 4px;
+        text-transform: uppercase;
+        background: color-mix(in srgb, var(--emerald) 18%, transparent);
+        color: var(--emerald);
+        margin-right: 4px;
+      }
+      .mp-search-foot {
+        display: flex;
+        justify-content: center;
+        margin: 12px 0 4px;
+      }
+      .mp-results-empty,
+      .mp-results-loading,
+      .mp-results-error {
+        grid-column: 1 / -1;
+        text-align: center;
+        color: var(--slate-500);
+        font-size: 11.5px;
+        padding: 18px 0;
+      }
+      .mp-results-error {
+        color: var(--rose, #f87171);
+      }
 
-/* Mobile — single col, even tighter. */
-@media (max-width: 600px) {
-  .mp-top-picks, .mp-feed, .mp-results { grid-template-columns: 1fr; gap: 6px; }
-  .mp-search-bar { flex-wrap: wrap; }
-  .mp-search-input { width: 100%; flex: 1 1 100%; }
-  .mp-search-sel { flex: 1 1 calc(50% - 4px); min-width: 0; }
-  .mp-section { margin: 20px 0 8px; }
-  .mp-section-label { font-size: 10.5px; }
-  .mp-pick, .mp-feed-card, .mp-result { padding: 8px 9px; gap: 8px; }
-  .mp-pick-icon, .mp-feed-icon { width: 28px; height: 28px; }
-  .mp-result-icon { width: 34px; height: 34px; }
-  .mp-result-desc { -webkit-line-clamp: 1; }
-  .mp-pick-name, .mp-feed-name {
-    font-size: 12px;
-    /* Force single-line + ellipsis even when the global overflow-wrap:
+      /* Mobile — single col, even tighter. */
+      @media (max-width: 600px) {
+        .mp-top-picks,
+        .mp-feed,
+        .mp-results {
+          grid-template-columns: 1fr;
+          gap: 6px;
+        }
+        .mp-search-bar {
+          flex-wrap: wrap;
+        }
+        .mp-search-input {
+          width: 100%;
+          flex: 1 1 100%;
+        }
+        .mp-search-sel {
+          flex: 1 1 calc(50% - 4px);
+          min-width: 0;
+        }
+        .mp-section {
+          margin: 20px 0 8px;
+        }
+        .mp-section-label {
+          font-size: 10.5px;
+        }
+        .mp-pick,
+        .mp-feed-card,
+        .mp-result {
+          padding: 8px 9px;
+          gap: 8px;
+        }
+        .mp-pick-icon,
+        .mp-feed-icon {
+          width: 28px;
+          height: 28px;
+        }
+        .mp-result-icon {
+          width: 34px;
+          height: 34px;
+        }
+        .mp-result-desc {
+          -webkit-line-clamp: 1;
+        }
+        .mp-pick-name,
+        .mp-feed-name {
+          font-size: 12px;
+          /* Force single-line + ellipsis even when the global overflow-wrap:
        anywhere rule on .mp-feed-card tries to break long names. */
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    word-break: keep-all !important;
-    overflow-wrap: normal !important;
-  }
-  /* Hide descriptions entirely on mobile — too much vertical space.
+          white-space: nowrap !important;
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+          word-break: keep-all !important;
+          overflow-wrap: normal !important;
+        }
+        /* Hide descriptions entirely on mobile — too much vertical space.
      Icon + name + downloads is enough info to recognize a mod. */
-  .mp-pick-desc, .mp-feed-desc { display: none !important; }
-  .mp-feed-meta { font-size: 9.5px; }
-  .mp-pick-btn { font-size: 10.5px; padding: 3px 8px; min-height: 24px; }
-  .mp-lead { font-size: 11.5px; }
-}
-</style>
-</head>
-<body>
-<div class="dash">
-  <aside class="side">
-    <a href="/" class="brand"><span class="brand-mark">C</span><span>CraftHost</span></a>
-    <nav class="side-nav">
-      <a href="/dashboard.html">My Servers</a>
-      <a href="/marketplace.html" class="active">Plugins & Mods</a>
-      <a href="/files.html">File Manager</a>
-      <a href="/jars.html">JAR Library</a>
-      <a href="/console.html">Live Console</a>
-      <div class="side-section">Account</div>
-      <a href="/settings.html">Settings</a>
-    </nav>
-  </aside>
+        .mp-pick-desc,
+        .mp-feed-desc {
+          display: none !important;
+        }
+        .mp-feed-meta {
+          font-size: 9.5px;
+        }
+        .mp-pick-btn {
+          font-size: 10.5px;
+          padding: 3px 8px;
+          min-height: 24px;
+        }
+        .mp-lead {
+          font-size: 11.5px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="dash">
+      <aside class="side">
+        <a href="/" class="brand"
+          ><span class="brand-mark">C</span><span>CraftHost</span></a
+        >
+        <nav class="side-nav">
+          <a href="/dashboard.html">My Servers</a>
+          <a href="/marketplace.html" class="active">Plugins & Mods</a>
+          <a href="/files.html">File Manager</a>
+          <a href="/jars.html">JAR Library</a>
+          <a href="/console.html">Live Console</a>
+          <div class="side-section">Account</div>
+          <a href="/settings.html">Settings</a>
+        </nav>
+      </aside>
 
-  <div>
-    <div class="topbar">
-      <div class="topbar-title">
-        <h1>🧩 <span data-i18n="market_title">Plugins & Mods</span></h1>
-      </div>
-      <div class="topbar-actions">
-        <select class="select" id="serverPicker" style="max-width:220px;min-width:120px;width:auto;flex:0 1 220px;"></select>
-        <div class="avatar">K</div>
+      <div>
+        <div class="topbar">
+          <div class="topbar-title">
+            <h1>
+              <span class="msr">extension</span>
+              <span data-i18n="market_title">Plugins & Mods</span>
+            </h1>
+          </div>
+          <div class="topbar-actions">
+            <select
+              class="select"
+              id="serverPicker"
+              style="
+                max-width: 220px;
+                min-width: 120px;
+                width: auto;
+                flex: 0 1 220px;
+              "
+            ></select>
+            <div class="avatar">K</div>
+          </div>
+        </div>
+
+        <main class="main">
+          <p class="mp-lead" data-i18n="market_sub">
+            200,000+ from Modrinth & CurseForge. One-click install on your
+            server.
+          </p>
+
+          <div class="mp-section">
+            <span class="mp-section-label"
+              ><span class="msr">search</span> Search Modrinth</span
+            >
+            <span class="mp-section-sub" id="searchHint"
+              >Browse · install · auto-cached per MC version</span
+            >
+          </div>
+          <div class="mp-search-bar">
+            <input
+              type="text"
+              class="mp-search-input"
+              id="searchInput"
+              placeholder="Search plugins, mods, modpacks…"
+              autocomplete="off"
+            />
+            <select class="select mp-search-sel" id="searchSort">
+              <option value="relevance">Relevance</option>
+              <option value="downloads">Most downloads</option>
+              <option value="updated">Recently updated</option>
+              <option value="newest">Newest</option>
+              <option value="follows">Most followed</option>
+            </select>
+            <select class="select mp-search-sel" id="searchType">
+              <option value="">Plugins + Mods</option>
+              <option value="plugin">Plugins only</option>
+              <option value="mod">Mods only</option>
+              <option value="modpack">Modpacks</option>
+            </select>
+          </div>
+          <div class="mp-results" id="searchResults"></div>
+          <div class="mp-search-foot" id="searchFoot" style="display: none">
+            <button class="btn btn-secondary btn-sm" id="loadMoreBtn">
+              Load 24 more
+            </button>
+          </div>
+
+          <div class="mp-section">
+            <span class="mp-section-label"
+              ><span class="msr">star</span>
+              <span data-i18n="market_top_picks"
+                >Top Plugins · One-Click</span
+              ></span
+            >
+            <span class="mp-section-sub" data-i18n="market_top_sub"
+              >Curated · paper/spigot/purpur</span
+            >
+          </div>
+          <div class="mp-top-picks" id="topPicksRow"></div>
+
+          <div class="mp-section">
+            <span class="mp-section-label"
+              ><span class="msr">local_fire_department</span> Trending Now</span
+            >
+            <span class="mp-section-sub"
+              >Live · most downloaded on Modrinth</span
+            >
+          </div>
+          <div class="mp-feed" id="trendingRow">
+            <div class="mp-feed-loading">Loading…</div>
+          </div>
+
+          <div class="mp-section">
+            <span class="mp-section-label"
+              ><span class="msr">auto_awesome</span> Recently Updated</span
+            >
+            <span class="mp-section-sub"
+              >Live · fresh releases on Modrinth</span
+            >
+          </div>
+          <div class="mp-feed" id="recentRow">
+            <div class="mp-feed-loading">Loading…</div>
+          </div>
+
+          <p
+            style="
+              text-align: center;
+              margin: 28px 0 16px;
+              font-size: 11.5px;
+              color: var(--slate-500);
+            "
+          >
+            Want to install? Sign in and create a server first.
+          </p>
+        </main>
       </div>
     </div>
 
-    <main class="main">
-      <p class="mp-lead" data-i18n="market_sub">200,000+ from Modrinth & CurseForge. One-click install on your server.</p>
+    <div class="toast-host" id="toasts"></div>
+    <script src="/js/app.js"></script>
+    <script>
+      let picker = null;
 
-      <div class="mp-section">
-        <span class="mp-section-label"><span class="ico">🔍</span> Search Modrinth</span>
-        <span class="mp-section-sub" id="searchHint">Browse · install · auto-cached per MC version</span>
-      </div>
-      <div class="mp-search-bar">
-        <input type="text" class="mp-search-input" id="searchInput" placeholder="Search plugins, mods, modpacks…" autocomplete="off" />
-        <select class="select mp-search-sel" id="searchSort">
-          <option value="relevance">Relevance</option>
-          <option value="downloads">Most downloads</option>
-          <option value="updated">Recently updated</option>
-          <option value="newest">Newest</option>
-          <option value="follows">Most followed</option>
-        </select>
-        <select class="select mp-search-sel" id="searchType">
-          <option value="">Plugins + Mods</option>
-          <option value="plugin">Plugins only</option>
-          <option value="mod">Mods only</option>
-          <option value="modpack">Modpacks</option>
-        </select>
-      </div>
-      <div class="mp-results" id="searchResults"></div>
-      <div class="mp-search-foot" id="searchFoot" style="display:none;">
-        <button class="btn btn-secondary btn-sm" id="loadMoreBtn">Load 24 more</button>
-      </div>
+      function escapeHtml(s) {
+        return String(s).replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[c],
+        );
+      }
 
-      <div class="mp-section">
-        <span class="mp-section-label"><span class="ico">⭐</span> <span data-i18n="market_top_picks">Top Plugins · One-Click</span></span>
-        <span class="mp-section-sub" data-i18n="market_top_sub">Curated · paper/spigot/purpur</span>
-      </div>
-      <div class="mp-top-picks" id="topPicksRow"></div>
-
-      <div class="mp-section">
-        <span class="mp-section-label"><span class="ico">🔥</span> Trending Now</span>
-        <span class="mp-section-sub">Live · most downloaded on Modrinth</span>
-      </div>
-      <div class="mp-feed" id="trendingRow">
-        <div class="mp-feed-loading">Loading…</div>
-      </div>
-
-      <div class="mp-section">
-        <span class="mp-section-label"><span class="ico">✨</span> Recently Updated</span>
-        <span class="mp-section-sub">Live · fresh releases on Modrinth</span>
-      </div>
-      <div class="mp-feed" id="recentRow">
-        <div class="mp-feed-loading">Loading…</div>
-      </div>
-
-      <p style="text-align:center;margin:28px 0 16px;font-size:11.5px;color:var(--slate-500);">
-        Want to install? Sign in and create a server first.
-      </p>
-    </main>
-  </div>
-</div>
-
-<div class="toast-host" id="toasts"></div>
-<script src="/js/app.js"></script>
-<script>
-let picker = null;
-
-function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
-
-// Curated top picks — slugs accepted by Modrinth /v2/project/<slug_or_id>.
-// One-click install via existing /plugins/install endpoint.
-const TOP_PICKS = [
-  { slug: 'luckperms',      name: 'LuckPerms',      icon: '🔒', c: '#10B981', desc: 'Permissions & ranks' },
-  { slug: 'essentialsx',    name: 'EssentialsX',    icon: '⚙️', c: '#F59E0B', desc: 'Server essentials' },
-  { slug: 'worldedit',      name: 'WorldEdit',      icon: '🗺️', c: '#3B82F6', desc: 'Terrain editor' },
-  { slug: 'worldguard',     name: 'WorldGuard',     icon: '🛡️', c: '#A855F7', desc: 'Region protection' },
-  { slug: 'viaversion',     name: 'ViaVersion',     icon: '🔄', c: '#06B6D4', desc: 'Cross-version compat' },
-  { slug: 'coreprotect',    name: 'CoreProtect',    icon: '📜', c: '#EF4444', desc: 'Block logging' },
-  { slug: 'squaremap',      name: 'squaremap',      icon: '🗺️', c: '#FBBF24', desc: 'Lightweight web map' },
-  { slug: 'placeholderapi', name: 'PlaceholderAPI', icon: '🔧', c: '#8B5CF6', desc: 'Dynamic placeholders' },
-  { slug: 'geyser',         name: 'Geyser',         icon: '📱', c: '#10B981', desc: 'Bedrock players → Java' },
-  { slug: 'skinsrestorer',  name: 'SkinsRestorer',  icon: '👤', c: '#0284C7', desc: 'Keep skins on offline mode' },
-  { slug: 'multiverse-core',name: 'Multiverse',     icon: '🌌', c: '#6366F1', desc: 'Multiple worlds' },
-  { slug: 'discordsrv',     name: 'DiscordSRV',     icon: '💬', c: '#5865F2', desc: 'Discord bridge' },
-  { slug: 'bluemap',        name: 'BlueMap',        icon: '🌍', c: '#0EA5E9', desc: '3D web map' },
-  { slug: 'chunky',         name: 'Chunky',         icon: '⛰️', c: '#92400E', desc: 'Pre-generate chunks' },
-];
-function renderTopPicks() {
-  const row = document.getElementById('topPicksRow');
-  if (!row) return;
-  row.innerHTML = TOP_PICKS.map(p => `
+      // Curated top picks — slugs accepted by Modrinth /v2/project/<slug_or_id>.
+      // One-click install via existing /plugins/install endpoint.
+      const TOP_PICKS = [
+        {
+          slug: "luckperms",
+          name: "LuckPerms",
+          icon: "lock",
+          c: "#10B981",
+          desc: "Permissions & ranks",
+        },
+        {
+          slug: "essentialsx",
+          name: "EssentialsX",
+          icon: "settings",
+          c: "#F59E0B",
+          desc: "Server essentials",
+        },
+        {
+          slug: "worldedit",
+          name: "WorldEdit",
+          icon: "public",
+          c: "#3B82F6",
+          desc: "Terrain editor",
+        },
+        {
+          slug: "worldguard",
+          name: "WorldGuard",
+          icon: "shield",
+          c: "#A855F7",
+          desc: "Region protection",
+        },
+        {
+          slug: "viaversion",
+          name: "ViaVersion",
+          icon: "sync",
+          c: "#06B6D4",
+          desc: "Cross-version compat",
+        },
+        {
+          slug: "coreprotect",
+          name: "CoreProtect",
+          icon: "history",
+          c: "#EF4444",
+          desc: "Block logging",
+        },
+        {
+          slug: "squaremap",
+          name: "squaremap",
+          icon: "map",
+          c: "#FBBF24",
+          desc: "Lightweight web map",
+        },
+        {
+          slug: "placeholderapi",
+          name: "PlaceholderAPI",
+          icon: "build",
+          c: "#8B5CF6",
+          desc: "Dynamic placeholders",
+        },
+        {
+          slug: "geyser",
+          name: "Geyser",
+          icon: "smartphone",
+          c: "#10B981",
+          desc: "Bedrock players → Java",
+        },
+        {
+          slug: "skinsrestorer",
+          name: "SkinsRestorer",
+          icon: "person",
+          c: "#0284C7",
+          desc: "Keep skins on offline mode",
+        },
+        {
+          slug: "multiverse-core",
+          name: "Multiverse",
+          icon: "travel_explore",
+          c: "#6366F1",
+          desc: "Multiple worlds",
+        },
+        {
+          slug: "discordsrv",
+          name: "DiscordSRV",
+          icon: "forum",
+          c: "#5865F2",
+          desc: "Discord bridge",
+        },
+        {
+          slug: "bluemap",
+          name: "BlueMap",
+          icon: "language",
+          c: "#0EA5E9",
+          desc: "3D web map",
+        },
+        {
+          slug: "chunky",
+          name: "Chunky",
+          icon: "terrain",
+          c: "#92400E",
+          desc: "Pre-generate chunks",
+        },
+      ];
+      function renderTopPicks() {
+        const row = document.getElementById("topPicksRow");
+        if (!row) return;
+        row.innerHTML = TOP_PICKS.map(
+          (p) => `
     <div class="mp-pick" style="--c:${p.c};" data-slug="${p.slug}" data-name="${escapeHtml(p.name)}">
-      <div class="mp-pick-icon">${p.icon}</div>
+      <div class="mp-pick-icon"><span class="msr">${p.icon}</span></div>
       <div class="mp-pick-text">
         <div class="mp-pick-name">${p.name}</div>
         <div class="mp-pick-desc">${escapeHtml(p.desc)}</div>
       </div>
       <button class="btn btn-secondary btn-sm mp-pick-btn" data-slug="${p.slug}" data-name="${escapeHtml(p.name)}">Install</button>
     </div>
-  `).join('');
-  row.querySelectorAll('.mp-pick-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      installPlugin(btn.dataset.slug, btn.dataset.name, btn, 'plugin');
-    });
-  });
-}
+  `,
+        ).join("");
+        row.querySelectorAll(".mp-pick-btn").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            installPlugin(btn.dataset.slug, btn.dataset.name, btn, "plugin");
+          });
+        });
+      }
 
-async function installPlugin(projectId, title, btn, projectType) {
-  const sid = picker?.current?.id;
-  if (!sid || picker.demo || sid.startsWith('demo-')) {
-    toast('Sign in and create a server first.', 'warn');
-    return;
-  }
-  const isModpack = projectType === 'modpack';
-  if (isModpack && !confirm(`Install modpack "${title}"? This may add many mods to your server's mods/ folder and could take a moment.`)) return;
+      async function installPlugin(projectId, title, btn, projectType) {
+        const sid = picker?.current?.id;
+        if (!sid || picker.demo || sid.startsWith("demo-")) {
+          toast("Sign in and create a server first.", "warn");
+          return;
+        }
+        const isModpack = projectType === "modpack";
+        if (
+          isModpack &&
+          !confirm(
+            `Install modpack "${title}"? This may add many mods to your server's mods/ folder and could take a moment.`,
+          )
+        )
+          return;
 
-  const orig = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Installing…'; }
-  toast(`Installing ${title}…`);
-  try {
-    const endpoint = isModpack
-      ? `/api/servers/${sid}/plugins/install-modpack`
-      : `/api/servers/${sid}/plugins/install`;
-    const r = await api(endpoint, { method: 'POST', body: { project_id: projectId } });
-    if (r.installed != null) {
-      toast(`✓ Modpack "${title}" — ${r.installed} mods installed`);
-    } else {
-      toast(`✓ Installed ${r.name} (v${r.version})`);
-    }
-    if (btn) {
-      btn.textContent = '✓ Installed';
-      setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 2500);
-    }
-  } catch (err) {
-    toast(err.message, 'error');
-    if (btn) { btn.disabled = false; btn.textContent = orig; }
-  }
-}
+        const orig = btn ? btn.textContent : "";
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "⏳ Installing…";
+        }
+        toast(`Installing ${title}…`);
+        try {
+          const endpoint = isModpack
+            ? `/api/servers/${sid}/plugins/install-modpack`
+            : `/api/servers/${sid}/plugins/install`;
+          const r = await api(endpoint, {
+            method: "POST",
+            body: { project_id: projectId },
+          });
+          if (r.installed != null) {
+            toast(`✓ Modpack "${title}" — ${r.installed} mods installed`);
+          } else {
+            toast(`✓ Installed ${r.name} (v${r.version})`);
+          }
+          if (btn) {
+            btn.textContent = "✓ Installed";
+            setTimeout(() => {
+              btn.disabled = false;
+              btn.textContent = orig;
+            }, 2500);
+          }
+        } catch (err) {
+          toast(err.message, "error");
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = orig;
+          }
+        }
+      }
 
-// Live Modrinth feeds — public, no auth required. Sorted by downloads / updated.
-function fmtDownloads(n) {
-  if (!n) return '0';
-  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
-  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
-  return String(n);
-}
-async function loadFeed(targetId, sort) {
-  const row = document.getElementById(targetId);
-  if (!row) return;
-  // Mobile gets 4 items per feed; desktop gets 12. Saves vertical scroll
-  // on phones where the curated Top Picks already gives plenty to browse.
-  const isMobile = window.matchMedia && window.matchMedia('(max-width: 700px)').matches;
-  const limit = isMobile ? 4 : 12;
-  try {
-    const r = await fetch(`/api/modrinth/search?type=mod&sort=${sort}&limit=${limit}`, { credentials: 'include' });
-    const data = await r.json();
-    const hits = data.hits || [];
-    if (!hits.length) { row.innerHTML = '<div class="mp-feed-loading">No results</div>'; return; }
-    row.innerHTML = hits.map(m => {
-      const icon = m.icon_url
-        ? `<img class="mp-feed-icon" src="${escapeHtml(m.icon_url)}" loading="lazy" alt="" />`
-        : `<div class="mp-feed-icon"></div>`;
-      // Compact card: icon + name + downloads only. Description removed
-      // because it's pure clutter at this density on mobile.
-      return `
+      // Live Modrinth feeds — public, no auth required. Sorted by downloads / updated.
+      function fmtDownloads(n) {
+        if (!n) return "0";
+        if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
+        if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
+        return String(n);
+      }
+      async function loadFeed(targetId, sort) {
+        const row = document.getElementById(targetId);
+        if (!row) return;
+        // Mobile gets 4 items per feed; desktop gets 12. Saves vertical scroll
+        // on phones where the curated Top Picks already gives plenty to browse.
+        const isMobile =
+          window.matchMedia && window.matchMedia("(max-width: 700px)").matches;
+        const limit = isMobile ? 4 : 12;
+        try {
+          const r = await fetch(
+            `/api/modrinth/search?type=mod&sort=${sort}&limit=${limit}`,
+            { credentials: "include" },
+          );
+          const data = await r.json();
+          const hits = data.hits || [];
+          if (!hits.length) {
+            row.innerHTML = '<div class="mp-feed-loading">No results</div>';
+            return;
+          }
+          row.innerHTML = hits
+            .map((m) => {
+              const icon = m.icon_url
+                ? `<img class="mp-feed-icon" src="${escapeHtml(m.icon_url)}" loading="lazy" alt="" />`
+                : `<div class="mp-feed-icon"></div>`;
+              // Compact card: icon + name + downloads only. Description removed
+              // because it's pure clutter at this density on mobile.
+              return `
         <a class="mp-feed-card" href="https://modrinth.com/mod/${escapeHtml(m.slug || m.project_id)}" target="_blank" rel="noopener">
           ${icon}
           <div class="mp-feed-text">
-            <div class="mp-feed-name">${escapeHtml(m.title || '?')}</div>
+            <div class="mp-feed-name">${escapeHtml(m.title || "?")}</div>
             <div class="mp-feed-meta">⬇ ${fmtDownloads(m.downloads)}</div>
           </div>
         </a>
       `;
-    }).join('');
-  } catch (err) {
-    row.innerHTML = `<div class="mp-feed-loading">Failed to load (${escapeHtml(err.message)})</div>`;
-  }
-}
+            })
+            .join("");
+        } catch (err) {
+          row.innerHTML = `<div class="mp-feed-loading">Failed to load (${escapeHtml(err.message)})</div>`;
+        }
+      }
 
-// ── Search: live Modrinth search with sort + type filters + pagination ────
-let searchState = { q: '', sort: 'relevance', type: '', offset: 0, hits: [], hasMore: false, busy: false };
-let searchTimer = null;
+      // ── Search: live Modrinth search with sort + type filters + pagination ────
+      let searchState = {
+        q: "",
+        sort: "relevance",
+        type: "",
+        offset: 0,
+        hits: [],
+        hasMore: false,
+        busy: false,
+      };
+      let searchTimer = null;
 
-async function runSearch(append = false) {
-  const grid = document.getElementById('searchResults');
-  const foot = document.getElementById('searchFoot');
-  if (!grid) return;
-  if (searchState.busy) return;
-  searchState.busy = true;
+      async function runSearch(append = false) {
+        const grid = document.getElementById("searchResults");
+        const foot = document.getElementById("searchFoot");
+        if (!grid) return;
+        if (searchState.busy) return;
+        searchState.busy = true;
 
-  if (!append) {
-    searchState.offset = 0;
-    searchState.hits = [];
-    grid.innerHTML = '<div class="mp-results-loading">Searching…</div>';
-  }
-  const LIMIT = 24;
-  try {
-    const params = new URLSearchParams({
-      q: searchState.q,
-      sort: searchState.sort,
-      limit: String(LIMIT),
-      offset: String(searchState.offset),
-    });
-    if (searchState.type) params.set('type', searchState.type);
-    // Pin loader + game_version to currently-selected server so results match
-    if (picker?.current && !picker.demo && !picker.current.id?.startsWith?.('demo-')) {
-      if (picker.current.type) params.set('loader', String(picker.current.type).toLowerCase());
-      if (picker.current.version) params.set('version', picker.current.version);
-    }
-    const r = await fetch(`/api/modrinth/search?${params}`, { credentials: 'include' });
-    const data = await r.json();
-    const hits = data.hits || [];
-    searchState.hits = append ? [...searchState.hits, ...hits] : hits;
-    const total = data.total_hits || searchState.hits.length;
-    searchState.hasMore = searchState.hits.length < total && hits.length === LIMIT;
+        if (!append) {
+          searchState.offset = 0;
+          searchState.hits = [];
+          grid.innerHTML = '<div class="mp-results-loading">Searching…</div>';
+        }
+        const LIMIT = 24;
+        try {
+          const params = new URLSearchParams({
+            q: searchState.q,
+            sort: searchState.sort,
+            limit: String(LIMIT),
+            offset: String(searchState.offset),
+          });
+          if (searchState.type) params.set("type", searchState.type);
+          // Pin loader + game_version to currently-selected server so results match
+          if (
+            picker?.current &&
+            !picker.demo &&
+            !picker.current.id?.startsWith?.("demo-")
+          ) {
+            if (picker.current.type)
+              params.set("loader", String(picker.current.type).toLowerCase());
+            if (picker.current.version)
+              params.set("version", picker.current.version);
+          }
+          const r = await fetch(`/api/modrinth/search?${params}`, {
+            credentials: "include",
+          });
+          const data = await r.json();
+          const hits = data.hits || [];
+          searchState.hits = append ? [...searchState.hits, ...hits] : hits;
+          const total = data.total_hits || searchState.hits.length;
+          searchState.hasMore =
+            searchState.hits.length < total && hits.length === LIMIT;
 
-    if (!searchState.hits.length) {
-      grid.innerHTML = '<div class="mp-results-empty">No results. Try a different query or filter.</div>';
-      foot.style.display = 'none';
-    } else {
-      renderResultsGrid(grid, searchState.hits);
-      foot.style.display = searchState.hasMore ? 'flex' : 'none';
-    }
-    document.getElementById('searchHint').textContent =
-      `${searchState.hits.length}${searchState.hasMore ? '+' : ''} result${searchState.hits.length === 1 ? '' : 's'} · install auto-caches per MC version`;
-  } catch (err) {
-    grid.innerHTML = `<div class="mp-results-error">Search failed: ${escapeHtml(err.message)}</div>`;
-    foot.style.display = 'none';
-  } finally {
-    searchState.busy = false;
-  }
-}
+          if (!searchState.hits.length) {
+            grid.innerHTML =
+              '<div class="mp-results-empty">No results. Try a different query or filter.</div>';
+            foot.style.display = "none";
+          } else {
+            renderResultsGrid(grid, searchState.hits);
+            foot.style.display = searchState.hasMore ? "flex" : "none";
+          }
+          document.getElementById("searchHint").textContent =
+            `${searchState.hits.length}${searchState.hasMore ? "+" : ""} result${searchState.hits.length === 1 ? "" : "s"} · install auto-caches per MC version`;
+        } catch (err) {
+          grid.innerHTML = `<div class="mp-results-error">Search failed: ${escapeHtml(err.message)}</div>`;
+          foot.style.display = "none";
+        } finally {
+          searchState.busy = false;
+        }
+      }
 
-function renderResultsGrid(grid, hits) {
-  grid.innerHTML = hits.map(m => {
-    const icon = m.icon_url
-      ? `<img class="mp-result-icon" src="${escapeHtml(m.icon_url)}" loading="lazy" alt="" />`
-      : `<div class="mp-result-icon"></div>`;
-    const type = m.project_type || 'plugin';
-    const tag = type === 'modpack' ? '<span class="mp-result-tag">Modpack</span>' : '';
-    return `
+      function renderResultsGrid(grid, hits) {
+        grid.innerHTML = hits
+          .map((m) => {
+            const icon = m.icon_url
+              ? `<img class="mp-result-icon" src="${escapeHtml(m.icon_url)}" loading="lazy" alt="" />`
+              : `<div class="mp-result-icon"></div>`;
+            const type = m.project_type || "plugin";
+            const tag =
+              type === "modpack"
+                ? '<span class="mp-result-tag">Modpack</span>'
+                : "";
+            return `
       <div class="mp-result">
         ${icon}
         <div class="mp-result-text">
-          <div class="mp-result-name">${tag}${escapeHtml(m.title || '?')}</div>
-          <div class="mp-result-desc">${escapeHtml(m.description || '')}</div>
+          <div class="mp-result-name">${tag}${escapeHtml(m.title || "?")}</div>
+          <div class="mp-result-desc">${escapeHtml(m.description || "")}</div>
           <div class="mp-result-meta">⬇ ${fmtDownloads(m.downloads)} · ★ ${fmtDownloads(m.follows)}</div>
         </div>
         <button class="btn btn-secondary btn-sm mp-result-btn"
                 data-slug="${escapeHtml(m.slug || m.project_id)}"
-                data-name="${escapeHtml(m.title || '?')}"
+                data-name="${escapeHtml(m.title || "?")}"
                 data-type="${escapeHtml(type)}">Install</button>
       </div>
     `;
-  }).join('');
-  grid.querySelectorAll('.mp-result-btn').forEach(btn => {
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      installPlugin(btn.dataset.slug, btn.dataset.name, btn, btn.dataset.type);
-    });
-  });
-}
+          })
+          .join("");
+        grid.querySelectorAll(".mp-result-btn").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            installPlugin(
+              btn.dataset.slug,
+              btn.dataset.name,
+              btn,
+              btn.dataset.type,
+            );
+          });
+        });
+      }
 
-(async function init() {
-  picker = await useServerPicker(document.getElementById('serverPicker'));
-  picker.onChange(() => { if (searchState.hits.length || searchState.q) runSearch(false); });
-  if (picker.demo) toast('Sign in and create a server to install plugins for real.', 'warn');
+      (async function init() {
+        picker = await useServerPicker(document.getElementById("serverPicker"));
+        picker.onChange(() => {
+          if (searchState.hits.length || searchState.q) runSearch(false);
+        });
+        if (picker.demo)
+          toast(
+            "Sign in and create a server to install plugins for real.",
+            "warn",
+          );
 
-  // Search wiring — 250ms debounce on input, instant on select change
-  const input = document.getElementById('searchInput');
-  const sortSel = document.getElementById('searchSort');
-  const typeSel = document.getElementById('searchType');
-  const moreBtn = document.getElementById('loadMoreBtn');
-  input.addEventListener('input', () => {
-    searchState.q = input.value.trim();
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => runSearch(false), 250);
-  });
-  sortSel.addEventListener('change', () => { searchState.sort = sortSel.value; runSearch(false); });
-  typeSel.addEventListener('change', () => { searchState.type = typeSel.value; runSearch(false); });
-  moreBtn.addEventListener('click', () => {
-    searchState.offset += 24;
-    runSearch(true);
-  });
+        // Search wiring — 250ms debounce on input, instant on select change
+        const input = document.getElementById("searchInput");
+        const sortSel = document.getElementById("searchSort");
+        const typeSel = document.getElementById("searchType");
+        const moreBtn = document.getElementById("loadMoreBtn");
+        input.addEventListener("input", () => {
+          searchState.q = input.value.trim();
+          clearTimeout(searchTimer);
+          searchTimer = setTimeout(() => runSearch(false), 250);
+        });
+        sortSel.addEventListener("change", () => {
+          searchState.sort = sortSel.value;
+          runSearch(false);
+        });
+        typeSel.addEventListener("change", () => {
+          searchState.type = typeSel.value;
+          runSearch(false);
+        });
+        moreBtn.addEventListener("click", () => {
+          searchState.offset += 24;
+          runSearch(true);
+        });
 
-  renderTopPicks();
-  loadFeed('trendingRow', 'downloads');
-  loadFeed('recentRow', 'updated');
-})();
-</script>
-</body>
+        renderTopPicks();
+        loadFeed("trendingRow", "downloads");
+        loadFeed("recentRow", "updated");
+      })();
+    </script>
+  </body>
 </html>

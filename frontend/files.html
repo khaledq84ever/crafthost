@@ -18,6 +18,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/css/theme.css" />
 <link rel="stylesheet" href="/css/dashboard.css" />
 <style>
@@ -241,9 +242,9 @@
       <select class="select" style="width:220px;max-width:42vw;" id="serverPicker"></select>
       <div class="topbar-actions">
         <input type="file" id="uploadInput" multiple style="display:none;" />
-        <button class="btn btn-secondary btn-sm" id="uploadBtn" title="Upload"><span class="lbl-full">⬆ Upload</span><span class="lbl-short">⬆</span></button>
-        <button class="btn btn-primary btn-sm" id="newFileBtn" title="New File"><span class="lbl-full">+ New File</span><span class="lbl-short">+</span></button>
-        <button class="btn btn-ghost btn-sm" id="newFolderBtn" title="New Folder"><span class="lbl-full">+ New Folder</span><span class="lbl-short">📁+</span></button>
+        <button class="btn btn-secondary btn-sm" id="uploadBtn" title="Upload"><span class="lbl-full"><span class="msr">upload</span> Upload</span><span class="lbl-short"><span class="msr">upload</span></span></button>
+        <button class="btn btn-primary btn-sm" id="newFileBtn" title="New File"><span class="lbl-full"><span class="msr">note_add</span> New File</span><span class="lbl-short"><span class="msr">note_add</span></span></button>
+        <button class="btn btn-ghost btn-sm" id="newFolderBtn" title="New Folder"><span class="lbl-full"><span class="msr">create_new_folder</span> New Folder</span><span class="lbl-short"><span class="msr">create_new_folder</span></span></button>
         <div class="avatar">K</div>
       </div>
     </div>
@@ -251,7 +252,7 @@
     <main class="main">
       <div class="page-head">
         <div>
-          <h1>📁 <span data-i18n="files_title">File Manager</span></h1>
+          <h1><span class="msr">folder_open</span> <span data-i18n="files_title">File Manager</span></h1>
           <p class="sub" data-i18n="files_sub">Browse, edit, and upload files on your server.</p>
         </div>
       </div>
@@ -267,7 +268,7 @@
           <div class="fm-tree" id="tree"></div>
           <div class="fm-view">
             <div class="fm-toolbar">
-              <button class="btn btn-ghost btn-sm" id="upBtn" title="Up one level">←</button>
+              <button class="btn btn-ghost btn-sm" id="upBtn" title="Up one level"><span class="msr">arrow_upward</span></button>
               <div class="fm-crumb" id="crumb">/</div>
               <button class="btn btn-secondary btn-sm" id="refreshBtn" title="Refresh">↻</button>
             </div>
@@ -286,8 +287,8 @@
               <span id="editorDirty" class="editor-dirty">● UNSAVED</span>
             </div>
             <div class="editor-actions">
-              <button class="btn btn-primary btn-sm" id="editorSave">💾 Save</button>
-              <button class="btn btn-ghost btn-sm" id="editorClose">✕ Close</button>
+              <button class="btn btn-primary btn-sm" id="editorSave"><span class="msr">save</span> Save</button>
+              <button class="btn btn-ghost btn-sm" id="editorClose"><span class="msr">close</span> Close</button>
             </div>
           </div>
           <textarea id="editorArea" spellcheck="false" style="flex:1;background:#0d1117;color:#c9d1d9;font-family:var(--font-mono);font-size:13px;padding:16px;border:none;outline:none;resize:none;white-space:pre;"></textarea>
@@ -316,7 +317,7 @@
           </div>
           <div style="margin-top:24px;display:flex;gap:10px;justify-content:end;">
             <label class="flex items-center gap-2"><input type="checkbox" id="p_restart" checked /> Restart to apply</label>
-            <button class="btn btn-primary" id="p_save">💾 Save</button>
+            <button class="btn btn-primary" id="p_save"><span class="msr">save</span> Save</button>
           </div>
         </div>
       </div>
@@ -541,7 +542,7 @@ function renderFiles(items) {
         ${f.type === 'file' ? `<button data-act="download" title="Download">↓</button>` : ''}
         ${f.type === 'file' && f.editable ? `<button data-act="edit" title="Edit">✎</button>` : ''}
         ${f.type === 'file' && !f.editable ? `<button data-act="info" title="Too large or binary" disabled style="opacity:.4;">—</button>` : ''}
-        <button data-act="delete" title="Delete">🗑</button>
+        <button data-act="delete" title="Delete"><span class="msr">delete</span></button>
       </div>
     </div>
   `).join('');
@@ -634,7 +635,7 @@ function setSaveButtonState(state) {
   if (state === 'saving') { btn.classList.add('saving'); btn.innerHTML = '<span class="ed-spin"></span> Saving…'; }
   else if (state === 'saved') { btn.classList.add('saved'); btn.innerHTML = '✓ Saved'; }
   else if (state === 'error') { btn.classList.add('error'); btn.innerHTML = '✗ Save failed'; }
-  else { btn.innerHTML = '💾 Save'; }
+  else { btn.innerHTML = '<span class="msr">save</span> Save'; }
 }
 
 // Live dirty detection
@@ -772,7 +773,7 @@ async function loadBackups() {
         <div class="act">
           <button data-act="restore" title="Restore — replaces current world">↻ Restore</button>
           <button data-act="download" title="Download as .zip">↓</button>
-          <button data-act="delete" title="Delete">🗑</button>
+          <button data-act="delete" title="Delete"><span class="msr">delete</span></button>
         </div>
       </div>
     `).join('');
