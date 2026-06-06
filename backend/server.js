@@ -1235,7 +1235,11 @@ server.listen(PORT, async () => {
   // Pre-warm the JAR cache in background so the FIRST user deploying any
   // engine gets a cache HIT (5s boot) instead of a MISS (60s+ download).
   // Re-runs every 24h to pick up new LATEST builds from Paper/Fabric/Purpur.
-  if (backend === "jvm" && jvmCtl.prewarmJarCache) {
+  if (
+    backend === "jvm" &&
+    jvmCtl.prewarmJarCache &&
+    process.env.PREWARM !== "0"
+  ) {
     // Run after a short delay so it doesn't compete with auto-resume of
     // existing servers for bandwidth.
     setTimeout(() => {
@@ -1259,22 +1263,26 @@ server.listen(PORT, async () => {
   // plugins/ dir. Eliminates the 2-8s Modrinth fetch per plugin at create time.
   try {
     const pluginCache = require("./lib/plugin-cache");
-    setTimeout(() => {
-      pluginCache
-        .prewarmPluginCache()
-        .catch((err) => console.warn("[plugin-prewarm] failed:", err.message));
-    }, 12_000);
-    setInterval(
-      () => {
+    if (process.env.PREWARM !== "0") {
+      setTimeout(() => {
         pluginCache
           .prewarmPluginCache()
           .catch((err) =>
             console.warn("[plugin-prewarm] failed:", err.message),
           );
-      },
-      24 * 60 * 60 * 1000,
-    );
-    console.log("🧩 Plugin pre-warm scheduled (12s + every 24h)");
+      }, 12_000);
+      setInterval(
+        () => {
+          pluginCache
+            .prewarmPluginCache()
+            .catch((err) =>
+              console.warn("[plugin-prewarm] failed:", err.message),
+            );
+        },
+        24 * 60 * 60 * 1000,
+      );
+      console.log("🧩 Plugin pre-warm scheduled (12s + every 24h)");
+    }
   } catch (err) {
     console.warn("[plugin-prewarm] init failed:", err.message);
   }
@@ -1429,7 +1437,27 @@ server.listen(PORT, async () => {
         console.log(
           `↻ Auto-resuming ${rows.length} server(s) from previous run…`,
         );
-      const tunnel = require("./lib/tunnel");
+      const pubtun = require("./lib/public-tunnel");
+      const playit = require("./lib/playit");
+      // Resolve the shared playit secret (env first, then the owner's stored
+      // one-time claim) so Bedrock cross-play is restored automatically on
+      // resume — matching the manual start route. Previously resume only opened
+      // a raw bore (Java/TCP) tunnel, so after any restart/redeploy Bedrock
+      // (UDP via Geyser) silently stayed down until each server was hand-restarted.
+      const sharedPlayitSecret = () => {
+        if (process.env.PLAYIT_SHARED_SECRET)
+          return process.env.PLAYIT_SHARED_SECRET;
+        try {
+          const row = db
+            .prepare(
+              "SELECT value FROM app_settings WHERE key = 'playit_shared_secret'",
+            )
+            .get();
+          return row?.value || null;
+        } catch {
+          return null;
+        }
+      };
       // Stagger restarts: free-tier RAM can't handle 8 simultaneous JVM boots.
       // Sleep ~6s between each so the previous server has a chance to settle.
       for (const s of rows) {
@@ -1440,13 +1468,24 @@ server.listen(PORT, async () => {
             s.id,
           );
           console.log(`  ↻ ${s.name} (#${s.user_slot}) — resumed`);
-          if (tunnel.isAvailable()) {
-            const offset = Math.max(0, parseInt(s.port, 10) - 25565);
-            const internal = 26000 + (offset % 1000);
-            tunnel
+          const offset = Math.max(0, parseInt(s.port, 10) - 25565);
+          const internal = 26000 + (offset % 1000);
+          // Java tunnel: playit-preferred with bore fallback (was raw bore).
+          if (pubtun.isAvailable()) {
+            pubtun
               .start(s.id, internal)
               .catch((err) =>
                 console.warn(`  ! ${s.name} tunnel:`, err.message),
+              );
+          }
+          // Bedrock cross-play (UDP via Geyser) — needs a playit secret, either
+          // configured per-server or the shared owner claim.
+          const secret = s.playit_secret || sharedPlayitSecret();
+          if (secret && playit.isAvailable()) {
+            playit
+              .start(s.id, internal, secret)
+              .catch((err) =>
+                console.warn(`  ! ${s.name} bedrock:`, err.message),
               );
           }
         } catch (err) {

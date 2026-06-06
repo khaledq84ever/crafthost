@@ -31,6 +31,10 @@ let cookie = '';
 function fetchJson(path, opts = {}) {
   const url = new URL(BASE + path);
   const fn = url.protocol === 'https:' ? httpsRequest : request;
+  // Serialize up front so we can send a real Content-Length. Writing a body
+  // without one makes Node use Transfer-Encoding: chunked, which the API
+  // rejects (real browsers/fetch/curl always send Content-Length).
+  const payload = opts.body != null ? Buffer.from(JSON.stringify(opts.body)) : null;
   return new Promise((resolve, reject) => {
     const req = fn({
       method: opts.method || 'GET',
@@ -39,6 +43,7 @@ function fetchJson(path, opts = {}) {
       path: url.pathname + url.search,
       headers: {
         'Content-Type': 'application/json',
+        ...(payload ? { 'Content-Length': payload.length } : {}),
         ...(cookie ? { Cookie: cookie } : {}),
         ...(opts.headers || {}),
       },
@@ -59,7 +64,7 @@ function fetchJson(path, opts = {}) {
     });
     req.on('error', reject);
     req.on('timeout', () => { req.destroy(); reject(new Error(`${path} → timeout`)); });
-    if (opts.body) req.write(JSON.stringify(opts.body));
+    if (payload) req.write(payload);
     req.end();
   });
 }
