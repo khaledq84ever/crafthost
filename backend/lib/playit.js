@@ -553,6 +553,99 @@ async function deleteServerTunnels(secret, serverId) {
   }
 }
 
+// Per-server Geyser UDP port — mirrors jvm-controller.geyserUdpPort and
+// routes/servers.bedrockLocalPort. Each server's Geyser binds a distinct local
+// UDP port derived from its DB port; the per-server Bedrock tunnel forwards here.
+function geyserUdpPortFor(server) {
+  const off = Math.max(0, parseInt(server.port, 10) - 25565);
+  return 40000 + (off % 20000);
+}
+
+// Boot reconcile (per-server Bedrock mode only). Guarantees every cross-play-
+// enabled server owns a UNIQUE, working Bedrock address — independent of whether
+// it's online — and clears the legacy sprawl that left Bedrock broken:
+//
+//  • Each server with a playit_secret gets/repairs its chb-<id> UDP tunnel
+//    pointed at its OWN Geyser port (40xxx), and its address is persisted to
+//    servers.playit_host/playit_port. This fixes servers that were stuck on the
+//    old shared "CraftHost Bedrock" address (→ 127.0.0.1:19132), which now
+//    forwards to a dead port because per-server Geyser binds 40xxx instead.
+//  • Dead legacy shared UDP tunnels (local_port == GEYSER_UDP_PORT/19132) are
+//    deleted — nothing binds 19132 in per-server mode.
+//  • Duplicate chb-/chj- tunnels for the same server are pruned to one.
+//
+// Runs in the background, throttled, so it never blocks boot. Idempotent: the
+// ensure* helpers reuse tunnels by name, so re-running just re-confirms.
+async function reconcilePerServerBedrock(secret) {
+  if (process.env.BEDROCK_PER_SERVER !== "1") return;
+  if (!secret || !isAvailable()) return;
+  try {
+    ensureAgent(secret);
+    let data = await apiCall(secret, "/agents/rundata", {});
+    const tunnels = data.tunnels || [];
+
+    // 1) Delete dead legacy shared UDP tunnels (forward to unused 19132).
+    for (const t of tunnels) {
+      if (t.proto === "udp" && t.local_port === GEYSER_UDP_PORT) {
+        try {
+          await apiCall(secret, "/tunnels/delete", { tunnel_id: t.id });
+          console.log(
+            `[playit reconcile] removed dead shared Bedrock tunnel "${t.name}" (→127.0.0.1:${GEYSER_UDP_PORT})`,
+          );
+        } catch (e) {
+          console.warn("[playit reconcile] delete shared:", e.message);
+        }
+      }
+    }
+
+    // 2) Prune duplicate per-server tunnels (same name → keep first, drop rest).
+    const seen = new Set();
+    for (const t of tunnels) {
+      if (!t.name || !/^ch[bj]-/.test(t.name)) continue;
+      if (seen.has(t.name)) {
+        try {
+          await apiCall(secret, "/tunnels/delete", { tunnel_id: t.id });
+          console.log(
+            `[playit reconcile] pruned duplicate tunnel "${t.name}" (${t.assigned_domain}:${t.port && t.port.from})`,
+          );
+        } catch (e) {
+          console.warn("[playit reconcile] prune dup:", e.message);
+        }
+      } else {
+        seen.add(t.name);
+      }
+    }
+
+    // 3) Ensure each cross-play-enabled server has its own Bedrock address.
+    let enabled = [];
+    try {
+      enabled = db
+        .prepare(
+          "SELECT id, port FROM servers WHERE playit_secret IS NOT NULL ORDER BY created_at ASC",
+        )
+        .all();
+    } catch (e) {
+      console.warn("[playit reconcile] db read:", e.message);
+      return;
+    }
+    for (const s of enabled) {
+      try {
+        const addr = await startBedrock(s.id, geyserUdpPortFor(s), secret);
+        if (addr) {
+          console.log(
+            `[playit reconcile] ${s.id}: Bedrock ready @ ${addr.host}:${addr.port}`,
+          );
+        }
+      } catch (e) {
+        console.warn(`[playit reconcile] ${s.id}:`, e.message);
+      }
+      await new Promise((r) => setTimeout(r, 1500)); // throttle API
+    }
+  } catch (e) {
+    console.warn("[playit reconcile] failed:", e.message);
+  }
+}
+
 function info(serverId) {
   const a = addrCache.get(serverId);
   if (!a) return null;
@@ -584,6 +677,7 @@ module.exports = {
   claimStatus,
   claimCancel,
   ensureBedrockTunnel,
+  reconcilePerServerBedrock,
   apiCall,
   GEYSER_UDP_PORT,
 };

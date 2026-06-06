@@ -1500,6 +1500,17 @@ server.listen(PORT, async () => {
         }
         await new Promise((r) => setTimeout(r, 6000));
       }
+      // Reconcile Bedrock cross-play for ALL enabled servers (online or not):
+      // give each its own working per-server tunnel/address and clean up the
+      // dead legacy shared tunnels. Background — must not block boot.
+      const reconcileSecret = sharedPlayitSecret();
+      if (reconcileSecret && playit.isAvailable()) {
+        playit
+          .reconcilePerServerBedrock(reconcileSecret)
+          .catch((err) =>
+            console.warn("[playit reconcile] boot:", err.message),
+          );
+      }
     } catch (err) {
       console.warn("[auto-resume] failed:", err.message);
     }
