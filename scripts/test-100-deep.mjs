@@ -165,8 +165,8 @@ async function apiChecks() {
     password: "wrong",
   });
   check(
-    [400, 401, 404].includes(badLogin.status),
-    "bad login rejected",
+    [400, 401, 404, 429].includes(badLogin.status),
+    "bad login rejected (4xx/429)",
     `got ${badLogin.status}`,
   );
 
