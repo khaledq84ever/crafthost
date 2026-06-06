@@ -37,6 +37,9 @@ const MAX_HEAP_MB = parseInt(process.env.MAX_HEAP_MB || "1024", 10);
 // crash-looping the server. Pinning to 2 keeps every auto-sized pool tiny.
 const JVM_CPUS = Math.max(1, parseInt(process.env.JVM_CPUS || "2", 10));
 const INTERNAL_PORT_BASE = 26000;
+// When set, each server gets its own Geyser UDP port + its own playit Bedrock
+// tunnel (per-server Bedrock IP). Off = single shared Bedrock tunnel (legacy).
+const BEDROCK_PER_SERVER = process.env.BEDROCK_PER_SERVER === "1";
 const LOG_RING_SIZE = 1000;
 
 const PAPER_API = process.env.PAPER_API || "https://api.papermc.io/v2";
@@ -89,6 +92,16 @@ function pickHostPort(server) {
     if (state.hostPort === PUBLIC_PORT) return internal;
   }
   return PUBLIC_PORT;
+}
+
+// Unique local UDP port for THIS server's Geyser (Bedrock). Multiple servers
+// share one container, so each Geyser must bind a distinct UDP port. Derived
+// deterministically from the server's DB-assigned port so it's stable across
+// restarts and collision-free. Used both to write Geyser's config and to point
+// this server's playit Bedrock tunnel at it.
+function geyserUdpPort(server) {
+  const off = Math.max(0, parseInt(server.port, 10) - 25565);
+  return 40000 + (off % 20000); // 40000–59999, unique per server
 }
 
 async function downloadFile(url, dest, label) {
@@ -460,7 +473,7 @@ function writeServerConfig(server, dir, hostPort) {
 // (resource-pack stack + start-game + chunks) get dropped, stranding Bedrock
 // players on "Loading resource pack". Lowering Geyser's MTU makes it fragment
 // game data to fit. Also pins remote/auth so Floodgate cross-play works.
-function ensureGeyserConfig(dir) {
+function ensureGeyserConfig(dir, bedrockPort) {
   const TARGET_MTU = parseInt(process.env.GEYSER_MTU || "1200", 10);
   try {
     const pluginsDir = path.join(dir, "plugins");
@@ -482,6 +495,7 @@ function ensureGeyserConfig(dir) {
       );
       return;
     }
+    let changed = false;
     // Valid config: surgically lower only the MTU number so Bedrock's larger
     // in-session packets fit the playit tunnel (fixes "Loading resource pack").
     if (/^\s*mtu:\s*\d+/m.test(txt)) {
@@ -489,8 +503,25 @@ function ensureGeyserConfig(dir) {
         /^(\s*)mtu:\s*\d+.*$/m,
         `$1mtu: ${TARGET_MTU}`,
       );
-      if (patched !== txt) fs.writeFileSync(cfg, patched);
+      if (patched !== txt) {
+        txt = patched;
+        changed = true;
+      }
     }
+    // Per-server Bedrock: pin Geyser's bedrock listen port to this server's
+    // unique UDP port so multiple Geysers can coexist in one container. Targets
+    // the first `port:` inside the `bedrock:` section only.
+    if (Number.isInteger(bedrockPort) && bedrockPort > 0) {
+      const patched = txt.replace(
+        /(^bedrock:[\s\S]*?\n\s*port:\s*)\d+/m,
+        `$1${bedrockPort}`,
+      );
+      if (patched !== txt) {
+        txt = patched;
+        changed = true;
+      }
+    }
+    if (changed) fs.writeFileSync(cfg, txt);
   } catch (e) {
     console.warn(`[geyser-config] ${path.basename(dir)}:`, e.message);
   }
@@ -537,7 +568,11 @@ function scheduleGeyserFirstBootFix(id, server, dir) {
         /config-version:/.test(fs.readFileSync(cfg, "utf8"));
     } catch {}
     if (ready) {
-      ensureGeyserConfig(dir); // lower MTU on the now-existing config
+      // lower MTU + (if per-server) pin this server's Bedrock port on the now-existing config
+      ensureGeyserConfig(
+        dir,
+        BEDROCK_PER_SERVER ? geyserUdpPort(server) : undefined,
+      );
       try {
         fs.writeFileSync(sentinel, new Date().toISOString());
       } catch {}
@@ -626,7 +661,9 @@ async function startServer(containerId, server) {
   // Detect a fresh-Bedrock first boot BEFORE Geyser generates its config, so we
   // can self-heal the MTU right after (see scheduleGeyserFirstBootFix below).
   const geyserFirstBoot = geyserNeedsFirstBootFix(dir);
-  ensureGeyserConfig(dir); // tunnel-safe Bedrock MTU (fixes "Loading resource pack")
+  // Per-server Bedrock (flagged): give this server's Geyser its own UDP port.
+  const bedrockPort = BEDROCK_PER_SERVER ? geyserUdpPort(server) : undefined;
+  ensureGeyserConfig(dir, bedrockPort); // MTU 1200 + (optional) per-server port
 
   // Heap: respect plan but cap to fit Railway free tier
   const planRam = parseInt(server.ram_mb || 512, 10);
@@ -1732,6 +1769,7 @@ async function checkJarCacheHealth() {
 module.exports = {
   isAvailable,
   makeRconPassword,
+  geyserUdpPort,
   createServer,
   startServer,
   stopServer,

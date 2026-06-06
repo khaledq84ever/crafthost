@@ -19,13 +19,13 @@
 //        assigned tunnel address, persists to DB.
 //      - stop(serverId) → SIGTERMs the agent, clears tunnel from DB.
 
-const { spawn, spawnSync, execFileSync } = require('child_process');
-const path = require('path');
-const fs = require('fs');
-const db = require('../db');
+const { spawn, spawnSync, execFileSync } = require("child_process");
+const path = require("path");
+const fs = require("fs");
+const db = require("../db");
 
-const PLAYIT_CLI = process.env.PLAYIT_CLI || 'playit-cli';
-const PLAYIT_AGENT = process.env.PLAYIT_AGENT || 'playit-agent';
+const PLAYIT_CLI = process.env.PLAYIT_CLI || "playit-cli";
+const PLAYIT_AGENT = process.env.PLAYIT_AGENT || "playit-agent";
 const STARTUP_TIMEOUT_MS = 30_000;
 
 // playit REST API — used to CREATE the Bedrock tunnel and read its assigned
@@ -33,25 +33,28 @@ const STARTUP_TIMEOUT_MS = 30_000;
 // agent emits no address to scrape; we must provision one ourselves.
 // Auth header is `Agent-Key <secret>`. Response envelope:
 //   { status: 'success', data } | { status: 'fail', data } | { status: 'error', data }
-const PLAYIT_API_BASE = process.env.PLAYIT_API_BASE || 'https://api.playit.gg';
+const PLAYIT_API_BASE = process.env.PLAYIT_API_BASE || "https://api.playit.gg";
 // Geyser's default Bedrock UDP listen port. CraftHost doesn't override Geyser's
 // config, so it binds 19132 inside the container; the tunnel forwards here.
-const GEYSER_UDP_PORT = parseInt(process.env.GEYSER_PORT || '19132', 10);
+const GEYSER_UDP_PORT = parseInt(process.env.GEYSER_PORT || "19132", 10);
 
 async function apiCall(secret, apiPath, body = {}) {
   const r = await fetch(PLAYIT_API_BASE + apiPath, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       Authorization: `Agent-Key ${String(secret).trim()}`,
     },
     body: JSON.stringify(body),
   });
   let j = null;
-  try { j = await r.json(); } catch {}
-  if (!j) throw new Error(`playit ${apiPath}: HTTP ${r.status} (non-JSON body)`);
-  if (j.status === 'success') return j.data;
-  const detail = typeof j.data === 'string' ? j.data : JSON.stringify(j.data);
+  try {
+    j = await r.json();
+  } catch {}
+  if (!j)
+    throw new Error(`playit ${apiPath}: HTTP ${r.status} (non-JSON body)`);
+  if (j.status === "success") return j.data;
+  const detail = typeof j.data === "string" ? j.data : JSON.stringify(j.data);
   throw new Error(`playit ${apiPath} ${j.status}: ${detail}`);
 }
 
@@ -60,39 +63,51 @@ async function apiCall(secret, apiPath, body = {}) {
 // tunnel rather than piling up duplicates — matches the one-shared-agent model.
 // Returns { host, port } = the public Bedrock address, or throws.
 async function ensureBedrockTunnel(secret, localPort = GEYSER_UDP_PORT) {
-  const data = await apiCall(secret, '/agents/rundata', {});
+  const data = await apiCall(secret, "/agents/rundata", {});
   const agentId = data.agent_id;
   const status = data.account_status;
-  if (['banned', 'account-delete-scheduled', 'agent-disabled'].includes(status)) {
+  if (
+    ["banned", "account-delete-scheduled", "agent-disabled"].includes(status)
+  ) {
     throw new Error(`playit account not usable (status=${status})`);
   }
 
-  const addrOf = (t) => ({ host: t.assigned_domain, port: t.port && t.port.from });
+  const addrOf = (t) => ({
+    host: t.assigned_domain,
+    port: t.port && t.port.from,
+  });
   // This agent is dedicated to CraftHost Bedrock — any UDP tunnel on it is ours.
-  let tun = (data.tunnels || []).find((t) => t.proto === 'udp');
+  let tun = (data.tunnels || []).find((t) => t.proto === "udp");
 
   if (tun) {
-    const needsFix = tun.local_port !== localPort
-      || String(tun.local_ip) !== '127.0.0.1'
-      || !!tun.disabled;
+    const needsFix =
+      tun.local_port !== localPort ||
+      String(tun.local_ip) !== "127.0.0.1" ||
+      !!tun.disabled;
     if (needsFix) {
-      await apiCall(secret, '/tunnels/update', {
-        tunnel_id: tun.id, local_ip: '127.0.0.1', local_port: localPort,
-        agent_id: agentId, enabled: true,
+      await apiCall(secret, "/tunnels/update", {
+        tunnel_id: tun.id,
+        local_ip: "127.0.0.1",
+        local_port: localPort,
+        agent_id: agentId,
+        enabled: true,
       });
-      const fresh = await apiCall(secret, '/agents/rundata', {});
+      const fresh = await apiCall(secret, "/agents/rundata", {});
       tun = (fresh.tunnels || []).find((t) => t.id === tun.id) || tun;
     }
     return addrOf(tun);
   }
 
   // None yet — create it. alloc:null = the free shared/global allocation.
-  await apiCall(secret, '/tunnels/create', {
-    name: 'CraftHost Bedrock',
-    tunnel_type: 'minecraft-bedrock',
-    port_type: 'udp',
+  await apiCall(secret, "/tunnels/create", {
+    name: "CraftHost Bedrock",
+    tunnel_type: "minecraft-bedrock",
+    port_type: "udp",
     port_count: 1,
-    origin: { type: 'agent', data: { agent_id: agentId, local_ip: '127.0.0.1', local_port: localPort } },
+    origin: {
+      type: "agent",
+      data: { agent_id: agentId, local_ip: "127.0.0.1", local_port: localPort },
+    },
     enabled: true,
     alloc: null,
     firewall_id: null,
@@ -101,24 +116,88 @@ async function ensureBedrockTunnel(secret, localPort = GEYSER_UDP_PORT) {
 
   // Allocation is usually instant, but poll a few times to be safe.
   for (let i = 0; i < 10; i++) {
-    const fresh = await apiCall(secret, '/agents/rundata', {});
-    const t = (fresh.tunnels || []).find((x) => x.proto === 'udp');
+    const fresh = await apiCall(secret, "/agents/rundata", {});
+    const t = (fresh.tunnels || []).find((x) => x.proto === "udp");
     if (t && t.assigned_domain && t.port && t.port.from) return addrOf(t);
     await new Promise((r) => setTimeout(r, 1500));
   }
-  throw new Error('bedrock tunnel created but no address assigned yet');
+  throw new Error("bedrock tunnel created but no address assigned yet");
+}
+
+// Per-server Bedrock UDP tunnel. Like ensureJavaTunnel but UDP + bedrock type,
+// named chb-<serverId> and REUSED by name (never creates a duplicate), pointing
+// at THIS server's unique Geyser UDP port. Gives each server its own Bedrock
+// address — requires a playit plan that allows multiple UDP allocations.
+async function ensureBedrockTunnelForServer(secret, serverId, localPort) {
+  const name = `chb-${serverId}`;
+  const data = await apiCall(secret, "/agents/rundata", {});
+  const agentId = data.agent_id;
+  const addrOf = (t) => ({
+    host: t.assigned_domain,
+    port: t.port && t.port.from,
+  });
+  let tun = (data.tunnels || []).find(
+    (t) => t.proto === "udp" && t.name === name,
+  );
+
+  if (tun) {
+    const needsFix =
+      tun.local_port !== localPort ||
+      String(tun.local_ip) !== "127.0.0.1" ||
+      !!tun.disabled;
+    if (needsFix) {
+      await apiCall(secret, "/tunnels/update", {
+        tunnel_id: tun.id,
+        local_ip: "127.0.0.1",
+        local_port: localPort,
+        agent_id: agentId,
+        enabled: true,
+      });
+      const fresh = await apiCall(secret, "/agents/rundata", {});
+      tun = (fresh.tunnels || []).find((t) => t.id === tun.id) || tun;
+    }
+    return addrOf(tun);
+  }
+
+  await apiCall(secret, "/tunnels/create", {
+    name,
+    tunnel_type: "minecraft-bedrock",
+    port_type: "udp",
+    port_count: 1,
+    origin: {
+      type: "agent",
+      data: { agent_id: agentId, local_ip: "127.0.0.1", local_port: localPort },
+    },
+    enabled: true,
+    alloc: null,
+    firewall_id: null,
+    proxy_protocol: null,
+  });
+  for (let i = 0; i < 10; i++) {
+    const fresh = await apiCall(secret, "/agents/rundata", {});
+    const t = (fresh.tunnels || []).find(
+      (x) => x.proto === "udp" && x.name === name,
+    );
+    if (t && t.assigned_domain && t.port && t.port.from) return addrOf(t);
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+  throw new Error(
+    "per-server bedrock tunnel created but no address assigned yet",
+  );
 }
 
 // serverId → { code, url, started, exchangeProc }
 const claims = new Map();
 
 function isAvailable() {
-  if (process.env.DISABLE_PLAYIT === '1') return false;
+  if (process.env.DISABLE_PLAYIT === "1") return false;
   try {
-    execFileSync(PLAYIT_CLI, ['version'], { stdio: 'ignore', timeout: 4000 });
-    execFileSync(PLAYIT_AGENT, ['--help'], { stdio: 'ignore', timeout: 4000 });
+    execFileSync(PLAYIT_CLI, ["version"], { stdio: "ignore", timeout: 4000 });
+    execFileSync(PLAYIT_AGENT, ["--help"], { stdio: "ignore", timeout: 4000 });
     return true;
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
 // ── CLAIM PHASE ──────────────────────────────────────────────────────────────
@@ -130,52 +209,87 @@ function claimStart(serverId, agentName) {
   // Wipe any previous in-flight claim
   const prev = claims.get(serverId);
   if (prev?.exchangeProc && !prev.exchangeProc.killed) {
-    try { prev.exchangeProc.kill('SIGTERM'); } catch {}
+    try {
+      prev.exchangeProc.kill("SIGTERM");
+    } catch {}
   }
   // 1) generate
-  const gen = spawnSync(PLAYIT_CLI, ['claim', 'generate'], { timeout: 5000 });
-  if (gen.status !== 0) throw new Error(`claim generate failed: ${String(gen.stderr || gen.stdout).slice(0,200)}`);
+  const gen = spawnSync(PLAYIT_CLI, ["claim", "generate"], { timeout: 5000 });
+  if (gen.status !== 0)
+    throw new Error(
+      `claim generate failed: ${String(gen.stderr || gen.stdout).slice(0, 200)}`,
+    );
   const code = String(gen.stdout).trim();
-  if (!/^[a-z0-9]{6,32}$/i.test(code)) throw new Error(`unexpected claim code: ${code}`);
+  if (!/^[a-z0-9]{6,32}$/i.test(code))
+    throw new Error(`unexpected claim code: ${code}`);
 
   // 2) build URL with a friendly agent name (visible in playit.gg dashboard)
-  const name = (agentName || `CraftHost-${serverId.slice(0,8)}`).replace(/[^a-zA-Z0-9_-]/g, '');
-  const urlR = spawnSync(PLAYIT_CLI, ['claim', 'url', code, '--name', name], { timeout: 5000 });
-  if (urlR.status !== 0) throw new Error(`claim url failed: ${String(urlR.stderr).slice(0,200)}`);
+  const name = (agentName || `CraftHost-${serverId.slice(0, 8)}`).replace(
+    /[^a-zA-Z0-9_-]/g,
+    "",
+  );
+  const urlR = spawnSync(PLAYIT_CLI, ["claim", "url", code, "--name", name], {
+    timeout: 5000,
+  });
+  if (urlR.status !== 0)
+    throw new Error(`claim url failed: ${String(urlR.stderr).slice(0, 200)}`);
   const url = String(urlR.stdout).trim();
 
   // 3) background exchange — waits for user to visit the URL + approve
-  const exchangeProc = spawn(PLAYIT_CLI, ['claim', 'exchange', code, '--wait', '300'], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  const state = { code, url, started: Date.now(), exchangeProc, secret: null, error: null };
+  const exchangeProc = spawn(
+    PLAYIT_CLI,
+    ["claim", "exchange", code, "--wait", "300"],
+    {
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  const state = {
+    code,
+    url,
+    started: Date.now(),
+    exchangeProc,
+    secret: null,
+    error: null,
+  };
   claims.set(serverId, state);
 
-  let buf = '';
-  exchangeProc.stdout.on('data', (b) => { buf += String(b); });
-  exchangeProc.on('exit', (exitCode) => {
+  let buf = "";
+  exchangeProc.stdout.on("data", (b) => {
+    buf += String(b);
+  });
+  exchangeProc.on("exit", (exitCode) => {
     if (exitCode === 0) {
       // Last non-empty line is the secret
-      const lines = buf.split('\n').map(s => s.trim()).filter(Boolean);
+      const lines = buf
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean);
       const secret = lines[lines.length - 1];
       if (secret && secret.length >= 16) {
         state.secret = secret;
         try {
-          db.prepare('UPDATE servers SET playit_secret = ? WHERE id = ?').run(secret, serverId);
-          console.log(`[playit] ${serverId}: claim approved, secret stored (agent="${name}")`);
+          db.prepare("UPDATE servers SET playit_secret = ? WHERE id = ?").run(
+            secret,
+            serverId,
+          );
+          console.log(
+            `[playit] ${serverId}: claim approved, secret stored (agent="${name}")`,
+          );
         } catch (err) {
           console.warn(`[playit] ${serverId}: db update failed:`, err.message);
-          state.error = 'db update failed';
+          state.error = "db update failed";
         }
       } else {
-        state.error = 'exchange returned no secret';
+        state.error = "exchange returned no secret";
       }
     } else {
       state.error = `exchange exited code=${exitCode}`;
-      console.warn(`[playit] ${serverId}: claim exchange failed (${state.error})`);
+      console.warn(
+        `[playit] ${serverId}: claim exchange failed (${state.error})`,
+      );
     }
   });
-  exchangeProc.on('error', (err) => {
+  exchangeProc.on("error", (err) => {
     state.error = err.message;
     console.warn(`[playit] ${serverId}: exchange spawn err:`, err.message);
   });
@@ -187,21 +301,43 @@ function claimStatus(serverId) {
   const state = claims.get(serverId);
   if (!state) {
     // Check DB — maybe the claim completed in an earlier process and we're a fresh container
-    const row = db.prepare('SELECT playit_secret FROM servers WHERE id = ?').get(serverId);
-    if (row?.playit_secret) return { status: 'connected', secret_set: true };
-    return { status: 'none', secret_set: false };
+    const row = db
+      .prepare("SELECT playit_secret FROM servers WHERE id = ?")
+      .get(serverId);
+    if (row?.playit_secret) return { status: "connected", secret_set: true };
+    return { status: "none", secret_set: false };
   }
-  if (state.secret) return { status: 'connected', secret_set: true, claim_url: state.url, code: state.code };
-  if (state.error) return { status: 'failed', error: state.error, claim_url: state.url, code: state.code };
+  if (state.secret)
+    return {
+      status: "connected",
+      secret_set: true,
+      claim_url: state.url,
+      code: state.code,
+    };
+  if (state.error)
+    return {
+      status: "failed",
+      error: state.error,
+      claim_url: state.url,
+      code: state.code,
+    };
   const elapsed = Date.now() - state.started;
-  if (elapsed > 5 * 60 * 1000) return { status: 'expired', claim_url: state.url, code: state.code };
-  return { status: 'pending', claim_url: state.url, code: state.code, elapsed_sec: Math.round(elapsed / 1000) };
+  if (elapsed > 5 * 60 * 1000)
+    return { status: "expired", claim_url: state.url, code: state.code };
+  return {
+    status: "pending",
+    claim_url: state.url,
+    code: state.code,
+    elapsed_sec: Math.round(elapsed / 1000),
+  };
 }
 
 function claimCancel(serverId) {
   const state = claims.get(serverId);
   if (state?.exchangeProc && !state.exchangeProc.killed) {
-    try { state.exchangeProc.kill('SIGTERM'); } catch {}
+    try {
+      state.exchangeProc.kill("SIGTERM");
+    } catch {}
   }
   claims.delete(serverId);
   return true;
@@ -224,22 +360,39 @@ function ensureAgent(secret) {
   agentWanted = true;
   if (agentProc && !agentProc.killed) return agentProc;
 
-  const logDir = '/tmp/playit-agent';
-  try { fs.mkdirSync(logDir, { recursive: true }); } catch {}
-  const logPath = path.join(logDir, 'agent.log');
-  try { fs.writeFileSync(logPath, ''); } catch {}
+  const logDir = "/tmp/playit-agent";
+  try {
+    fs.mkdirSync(logDir, { recursive: true });
+  } catch {}
+  const logPath = path.join(logDir, "agent.log");
+  try {
+    fs.writeFileSync(logPath, "");
+  } catch {}
 
-  const proc = spawn(PLAYIT_AGENT, ['--secret', secret, '--platform-docker', '-l', logPath], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const proc = spawn(
+    PLAYIT_AGENT,
+    ["--secret", secret, "--platform-docker", "-l", logPath],
+    { stdio: ["ignore", "pipe", "pipe"] },
+  );
   agentProc = proc;
-  proc.stdout.on('data', () => {});
-  proc.stderr.on('data', () => {});
-  proc.on('error', (err) => console.warn('[playit agent] spawn err:', err.message));
-  proc.on('exit', (code, sig) => {
+  proc.stdout.on("data", () => {});
+  proc.stderr.on("data", () => {});
+  proc.on("error", (err) =>
+    console.warn("[playit agent] spawn err:", err.message),
+  );
+  proc.on("exit", (code, sig) => {
     console.warn(`[playit agent] exited (code=${code} sig=${sig})`);
     if (agentProc === proc) agentProc = null;
-    if (agentWanted) setTimeout(() => { try { ensureAgent(secret); } catch (e) { console.warn('[playit agent] respawn:', e.message); } }, 4000);
+    if (agentWanted)
+      setTimeout(() => {
+        try {
+          ensureAgent(secret);
+        } catch (e) {
+          console.warn("[playit agent] respawn:", e.message);
+        }
+      }, 4000);
   });
-  console.log('[playit agent] singleton agent started');
+  console.log("[playit agent] singleton agent started");
   return proc;
 }
 
@@ -249,51 +402,95 @@ const agentRunning = () => !!(agentProc && !agentProc.killed);
 // port. Reuses/re-points the tunnel named `chj-<serverId>`. Returns { host, port }.
 async function ensureJavaTunnel(secret, serverId, localPort) {
   const name = `chj-${serverId}`;
-  const data = await apiCall(secret, '/agents/rundata', {});
+  const data = await apiCall(secret, "/agents/rundata", {});
   const agentId = data.agent_id;
-  const addrOf = (t) => ({ host: t.assigned_domain, port: t.port && t.port.from });
-  let tun = (data.tunnels || []).find((t) => t.proto === 'tcp' && t.name === name);
+  const addrOf = (t) => ({
+    host: t.assigned_domain,
+    port: t.port && t.port.from,
+  });
+  let tun = (data.tunnels || []).find(
+    (t) => t.proto === "tcp" && t.name === name,
+  );
 
   if (tun) {
-    const needsFix = tun.local_port !== localPort || String(tun.local_ip) !== '127.0.0.1' || !!tun.disabled;
+    const needsFix =
+      tun.local_port !== localPort ||
+      String(tun.local_ip) !== "127.0.0.1" ||
+      !!tun.disabled;
     if (needsFix) {
-      await apiCall(secret, '/tunnels/update', { tunnel_id: tun.id, local_ip: '127.0.0.1', local_port: localPort, agent_id: agentId, enabled: true });
-      const fresh = await apiCall(secret, '/agents/rundata', {});
+      await apiCall(secret, "/tunnels/update", {
+        tunnel_id: tun.id,
+        local_ip: "127.0.0.1",
+        local_port: localPort,
+        agent_id: agentId,
+        enabled: true,
+      });
+      const fresh = await apiCall(secret, "/agents/rundata", {});
       tun = (fresh.tunnels || []).find((t) => t.id === tun.id) || tun;
     }
     return addrOf(tun);
   }
 
-  await apiCall(secret, '/tunnels/create', {
-    name, tunnel_type: 'minecraft-java', port_type: 'tcp', port_count: 1,
-    origin: { type: 'agent', data: { agent_id: agentId, local_ip: '127.0.0.1', local_port: localPort } },
-    enabled: true, alloc: null, firewall_id: null, proxy_protocol: null,
+  await apiCall(secret, "/tunnels/create", {
+    name,
+    tunnel_type: "minecraft-java",
+    port_type: "tcp",
+    port_count: 1,
+    origin: {
+      type: "agent",
+      data: { agent_id: agentId, local_ip: "127.0.0.1", local_port: localPort },
+    },
+    enabled: true,
+    alloc: null,
+    firewall_id: null,
+    proxy_protocol: null,
   });
   for (let i = 0; i < 10; i++) {
-    const fresh = await apiCall(secret, '/agents/rundata', {});
-    const t = (fresh.tunnels || []).find((x) => x.proto === 'tcp' && x.name === name);
+    const fresh = await apiCall(secret, "/agents/rundata", {});
+    const t = (fresh.tunnels || []).find(
+      (x) => x.proto === "tcp" && x.name === name,
+    );
     if (t && t.assigned_domain && t.port && t.port.from) return addrOf(t);
     await new Promise((r) => setTimeout(r, 1500));
   }
-  throw new Error('java tunnel created but no address assigned yet');
+  throw new Error("java tunnel created but no address assigned yet");
 }
 
 // ── RUN PHASE ────────────────────────────────────────────────────────────────
 
 // Bedrock: ensure the agent + the (single, shared) Bedrock UDP tunnel. Persists
 // the address to servers.playit_host/playit_port. `start` is the historical name.
-async function startBedrock(serverId, _localPort, secret) {
+// When BEDROCK_PER_SERVER=1 and a per-server Geyser UDP port is supplied, each
+// server gets its OWN Bedrock tunnel/address (chb-<serverId>). Otherwise it uses
+// the single shared tunnel on GEYSER_UDP_PORT — unchanged legacy behaviour.
+const PER_SERVER_BEDROCK = process.env.BEDROCK_PER_SERVER === "1";
+async function startBedrock(serverId, geyserPort, secret) {
   if (!isAvailable() || !secret) return null;
   ensureAgent(secret);
+  const perServer =
+    PER_SERVER_BEDROCK && Number.isInteger(geyserPort) && geyserPort > 0;
+  const localPort = perServer ? geyserPort : GEYSER_UDP_PORT;
   try {
-    const addr = await ensureBedrockTunnel(secret, GEYSER_UDP_PORT);
+    const addr = perServer
+      ? await ensureBedrockTunnelForServer(secret, serverId, localPort)
+      : await ensureBedrockTunnel(secret, localPort);
     if (addr && addr.host && addr.port) {
       addrCache.set(serverId, addr);
-      try { db.prepare('UPDATE servers SET playit_host = ?, playit_port = ? WHERE id = ?').run(addr.host, addr.port, serverId); } catch (e) { console.warn('[playit] db update:', e.message); }
-      console.log(`[playit] ${serverId}: Bedrock @ ${addr.host}:${addr.port} → 127.0.0.1:${GEYSER_UDP_PORT}`);
+      try {
+        db.prepare(
+          "UPDATE servers SET playit_host = ?, playit_port = ? WHERE id = ?",
+        ).run(addr.host, addr.port, serverId);
+      } catch (e) {
+        console.warn("[playit] db update:", e.message);
+      }
+      console.log(
+        `[playit] ${serverId}: Bedrock @ ${addr.host}:${addr.port} → 127.0.0.1:${localPort}${perServer ? " (per-server)" : " (shared)"}`,
+      );
       return addr;
     }
-  } catch (err) { console.warn(`[playit] ${serverId}: ensureBedrockTunnel failed:`, err.message); }
+  } catch (err) {
+    console.warn(`[playit] ${serverId}: ensureBedrock failed:`, err.message);
+  }
   return null;
 }
 const start = startBedrock;
@@ -307,10 +504,14 @@ async function startJava(serverId, localPort, secret) {
     const addr = await ensureJavaTunnel(secret, serverId, localPort);
     if (addr && addr.host && addr.port) {
       addrCache.set(`${serverId}:java`, addr);
-      console.log(`[playit] ${serverId}: Java @ ${addr.host}:${addr.port} → 127.0.0.1:${localPort}`);
+      console.log(
+        `[playit] ${serverId}: Java @ ${addr.host}:${addr.port} → 127.0.0.1:${localPort}`,
+      );
       return addr;
     }
-  } catch (err) { console.warn(`[playit] ${serverId}: ensureJavaTunnel failed:`, err.message); }
+  } catch (err) {
+    console.warn(`[playit] ${serverId}: ensureJavaTunnel failed:`, err.message);
+  }
   return null;
 }
 
@@ -318,25 +519,38 @@ async function startJava(serverId, localPort, secret) {
 // serves other servers' Java tunnels); the Bedrock tunnel persists on the account.
 function stop(serverId) {
   addrCache.delete(serverId);
-  try { db.prepare('UPDATE servers SET playit_host = NULL, playit_port = NULL WHERE id = ?').run(serverId); } catch {}
+  try {
+    db.prepare(
+      "UPDATE servers SET playit_host = NULL, playit_port = NULL WHERE id = ?",
+    ).run(serverId);
+  } catch {}
   return true;
 }
 
 // Java stop: forwarding just fails while the JVM is down; we keep the tunnel
 // (stable address, reused on restart) and only drop the cached live address.
-function stopJava(serverId) { addrCache.delete(`${serverId}:java`); return true; }
+function stopJava(serverId) {
+  addrCache.delete(`${serverId}:java`);
+  return true;
+}
 
 // On server DELETE: remove that server's Java tunnel from the account so we don't
 // leak tunnels. The shared Bedrock tunnel is platform-wide — never deleted here.
 async function deleteServerTunnels(secret, serverId) {
   if (!secret) return;
   try {
-    const data = await apiCall(secret, '/agents/rundata', {});
+    const data = await apiCall(secret, "/agents/rundata", {});
     const name = `chj-${serverId}`;
     for (const t of (data.tunnels || []).filter((x) => x.name === name)) {
-      try { await apiCall(secret, '/tunnels/delete', { tunnel_id: t.id }); } catch (e) { console.warn('[playit] delete tunnel:', e.message); }
+      try {
+        await apiCall(secret, "/tunnels/delete", { tunnel_id: t.id });
+      } catch (e) {
+        console.warn("[playit] delete tunnel:", e.message);
+      }
     }
-  } catch (e) { console.warn('[playit] deleteServerTunnels:', e.message); }
+  } catch (e) {
+    console.warn("[playit] deleteServerTunnels:", e.message);
+  }
 }
 
 function info(serverId) {
@@ -346,13 +560,30 @@ function info(serverId) {
 }
 
 function list() {
-  return [...addrCache.entries()].map(([id, a]) => ({ server_id: id, host: a.host, port: a.port, running: agentRunning() }));
+  return [...addrCache.entries()].map(([id, a]) => ({
+    server_id: id,
+    host: a.host,
+    port: a.port,
+    running: agentRunning(),
+  }));
 }
 
 module.exports = {
   isAvailable,
-  start, startBedrock, startJava, stop, stopJava, info, list,
-  ensureAgent, ensureJavaTunnel, deleteServerTunnels,
-  claimStart, claimStatus, claimCancel,
-  ensureBedrockTunnel, apiCall, GEYSER_UDP_PORT,
+  start,
+  startBedrock,
+  startJava,
+  stop,
+  stopJava,
+  info,
+  list,
+  ensureAgent,
+  ensureJavaTunnel,
+  deleteServerTunnels,
+  claimStart,
+  claimStatus,
+  claimCancel,
+  ensureBedrockTunnel,
+  apiCall,
+  GEYSER_UDP_PORT,
 };
