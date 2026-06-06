@@ -408,6 +408,23 @@ async function ensureJavaTunnel(secret, serverId, localPort) {
     host: t.assigned_domain,
     port: t.port && t.port.from,
   });
+  const ready = (t) => !!(t && t.assigned_domain && t.port && t.port.from);
+  // playit allocates the public address asynchronously after the tunnel is
+  // created/enabled; for fresh minecraft-java tunnels this can lag well past
+  // 15s. Poll rundata for up to ~45s before giving up (caller falls back to
+  // bore, and public-tunnel then upgrades to playit in the background).
+  const waitForAddr = async (attempts = 30, delay = 1500) => {
+    for (let i = 0; i < attempts; i++) {
+      const fresh = await apiCall(secret, "/agents/rundata", {});
+      const t = (fresh.tunnels || []).find(
+        (x) => x.proto === "tcp" && x.name === name,
+      );
+      if (ready(t)) return addrOf(t);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+    return null;
+  };
+
   let tun = (data.tunnels || []).find(
     (t) => t.proto === "tcp" && t.name === name,
   );
@@ -428,7 +445,12 @@ async function ensureJavaTunnel(secret, serverId, localPort) {
       const fresh = await apiCall(secret, "/agents/rundata", {});
       tun = (fresh.tunnels || []).find((t) => t.id === tun.id) || tun;
     }
-    return addrOf(tun);
+    if (ready(tun)) return addrOf(tun);
+    // Tunnel exists but its address isn't allocated yet — wait for it instead
+    // of returning a half-empty {host, port} that the caller would reject.
+    const addr = await waitForAddr();
+    if (addr) return addr;
+    throw new Error("java tunnel created but no address assigned yet");
   }
 
   await apiCall(secret, "/tunnels/create", {
@@ -445,14 +467,8 @@ async function ensureJavaTunnel(secret, serverId, localPort) {
     firewall_id: null,
     proxy_protocol: null,
   });
-  for (let i = 0; i < 10; i++) {
-    const fresh = await apiCall(secret, "/agents/rundata", {});
-    const t = (fresh.tunnels || []).find(
-      (x) => x.proto === "tcp" && x.name === name,
-    );
-    if (t && t.assigned_domain && t.port && t.port.from) return addrOf(t);
-    await new Promise((r) => setTimeout(r, 1500));
-  }
+  const addr = await waitForAddr();
+  if (addr) return addr;
   throw new Error("java tunnel created but no address assigned yet");
 }
 
