@@ -1470,6 +1470,9 @@ server.listen(PORT, async () => {
           console.log(`  ↻ ${s.name} (#${s.user_slot}) — resumed`);
           const offset = Math.max(0, parseInt(s.port, 10) - 25565);
           const internal = 26000 + (offset % 1000);
+          // Per-server Geyser UDP port (mirrors jvm-controller.geyserUdpPort);
+          // Bedrock tunnel must point here, NOT the Java port.
+          const bedrockPort = 40000 + (offset % 20000);
           // Java tunnel: playit-preferred with bore fallback (was raw bore).
           if (pubtun.isAvailable()) {
             pubtun
@@ -1483,7 +1486,7 @@ server.listen(PORT, async () => {
           const secret = s.playit_secret || sharedPlayitSecret();
           if (secret && playit.isAvailable()) {
             playit
-              .start(s.id, internal, secret)
+              .start(s.id, bedrockPort, secret)
               .catch((err) =>
                 console.warn(`  ! ${s.name} bedrock:`, err.message),
               );
