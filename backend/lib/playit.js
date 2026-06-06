@@ -616,6 +616,38 @@ async function reconcilePerServerBedrock(secret) {
       }
     }
 
+    // 2b) Sweep orphaned per-server tunnels — chj-/chb-<id> whose server was
+    // deleted. ensure*/reconcile only ever CREATE these, never remove them when a
+    // server is gone, so dead chj-* (Java/TCP) and chb-* (Bedrock/UDP) tunnels
+    // accumulate forever and burn the account's tunnel/port quota. Match the id
+    // out of the name and drop any tunnel with no matching server row.
+    let validIds = null;
+    try {
+      validIds = new Set(
+        db
+          .prepare("SELECT id FROM servers")
+          .all()
+          .map((r) => r.id),
+      );
+    } catch (e) {
+      console.warn("[playit reconcile] db read (orphan sweep):", e.message);
+    }
+    if (validIds) {
+      for (const t of tunnels) {
+        const m = t.name && t.name.match(/^ch[bj]-(.+)$/);
+        if (!m) continue;
+        if (validIds.has(m[1])) continue;
+        try {
+          await apiCall(secret, "/tunnels/delete", { tunnel_id: t.id });
+          console.log(
+            `[playit reconcile] removed orphan tunnel "${t.name}" (no such server)`,
+          );
+        } catch (e) {
+          console.warn("[playit reconcile] orphan delete:", e.message);
+        }
+      }
+    }
+
     // 3) Ensure each cross-play-enabled server has its own Bedrock address.
     let enabled = [];
     try {
