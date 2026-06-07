@@ -34,19 +34,39 @@ const STARTUP_TIMEOUT_MS = 30_000;
 // Auth header is `Agent-Key <secret>`. Response envelope:
 //   { status: 'success', data } | { status: 'fail', data } | { status: 'error', data }
 const PLAYIT_API_BASE = process.env.PLAYIT_API_BASE || "https://api.playit.gg";
+// Hard cap on each playit API request so a stuck socket can't hang a reconcile loop.
+const PLAYIT_API_TIMEOUT_MS = parseInt(
+  process.env.PLAYIT_API_TIMEOUT_MS || "10000",
+  10,
+);
 // Geyser's default Bedrock UDP listen port. CraftHost doesn't override Geyser's
 // config, so it binds 19132 inside the container; the tunnel forwards here.
 const GEYSER_UDP_PORT = parseInt(process.env.GEYSER_PORT || "19132", 10);
 
 async function apiCall(secret, apiPath, body = {}) {
-  const r = await fetch(PLAYIT_API_BASE + apiPath, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Agent-Key ${String(secret).trim()}`,
-    },
-    body: JSON.stringify(body),
-  });
+  let r;
+  try {
+    r = await fetch(PLAYIT_API_BASE + apiPath, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Agent-Key ${String(secret).trim()}`,
+      },
+      body: JSON.stringify(body),
+      // Node's fetch has no default timeout; without this a stuck socket hangs
+      // the caller forever. ensureJava/BedrockTunnel poll this in background
+      // reconcile loops, so a hang would wedge tunnel maintenance.
+      signal: AbortSignal.timeout(PLAYIT_API_TIMEOUT_MS),
+    });
+  } catch (e) {
+    throw new Error(
+      `playit ${apiPath}: ${
+        e.name === "TimeoutError"
+          ? `timed out after ${PLAYIT_API_TIMEOUT_MS}ms`
+          : e.message
+      }`,
+    );
+  }
   let j = null;
   try {
     j = await r.json();
