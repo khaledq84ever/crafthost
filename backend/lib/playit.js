@@ -400,7 +400,12 @@ const agentRunning = () => !!(agentProc && !agentProc.killed);
 
 // Ensure a per-server Minecraft-Java TCP tunnel forwarding to the server's local
 // port. Reuses/re-points the tunnel named `chj-<serverId>`. Returns { host, port }.
-async function ensureJavaTunnel(secret, serverId, localPort) {
+async function ensureJavaTunnel(
+  secret,
+  serverId,
+  localPort,
+  waitAttempts = 30,
+) {
   const name = `chj-${serverId}`;
   const data = await apiCall(secret, "/agents/rundata", {});
   const agentId = data.agent_id;
@@ -411,9 +416,10 @@ async function ensureJavaTunnel(secret, serverId, localPort) {
   const ready = (t) => !!(t && t.assigned_domain && t.port && t.port.from);
   // playit allocates the public address asynchronously after the tunnel is
   // created/enabled; for fresh minecraft-java tunnels this can lag well past
-  // 15s. Poll rundata for up to ~45s before giving up (caller falls back to
-  // bore, and public-tunnel then upgrades to playit in the background).
-  const waitForAddr = async (attempts = 30, delay = 1500) => {
+  // 15s. The inline caller (public-tunnel.start) passes a SMALL waitAttempts so
+  // server start isn't blocked — it falls back to bore immediately and the
+  // background upgrade (schedulePlayitUpgrade) does the patient ~45s wait.
+  const waitForAddr = async (attempts = waitAttempts, delay = 1500) => {
     for (let i = 0; i < attempts; i++) {
       const fresh = await apiCall(secret, "/agents/rundata", {});
       const t = (fresh.tunnels || []).find(
@@ -513,11 +519,16 @@ const start = startBedrock;
 
 // Java: ensure the agent + this server's Java TCP tunnel. Returns { host, port };
 // the caller (public-tunnel) writes it to servers.tunnel_host/tunnel_port.
-async function startJava(serverId, localPort, secret) {
+async function startJava(serverId, localPort, secret, waitAttempts) {
   if (!isAvailable() || !secret) return null;
   ensureAgent(secret);
   try {
-    const addr = await ensureJavaTunnel(secret, serverId, localPort);
+    const addr = await ensureJavaTunnel(
+      secret,
+      serverId,
+      localPort,
+      waitAttempts,
+    );
     if (addr && addr.host && addr.port) {
       addrCache.set(`${serverId}:java`, addr);
       console.log(
@@ -526,7 +537,15 @@ async function startJava(serverId, localPort, secret) {
       return addr;
     }
   } catch (err) {
-    console.warn(`[playit] ${serverId}: ensureJavaTunnel failed:`, err.message);
+    // "no address assigned yet" is the expected transient for a fresh java
+    // tunnel — the caller falls back to bore and the background upgrade keeps
+    // trying, so don't spam it. Only surface genuinely unexpected failures.
+    if (!/no address assigned yet/.test(err.message)) {
+      console.warn(
+        `[playit] ${serverId}: ensureJavaTunnel failed:`,
+        err.message,
+      );
+    }
   }
   return null;
 }

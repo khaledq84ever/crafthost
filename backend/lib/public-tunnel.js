@@ -13,6 +13,11 @@ const db = require("../db");
 
 const PLAYIT_JAVA = () => process.env.PLAYIT_JAVA === "1";
 
+// Inline playit-java attempts before falling back to bore. Kept small so server
+// start isn't blocked waiting on playit's (often slow) java-address allocation —
+// bore comes up immediately and schedulePlayitUpgrade does the patient retry.
+const QUICK_JAVA_ATTEMPTS = 3; // ~4.5s max (3 × 1500ms)
+
 // Resolve the shared playit secret the same way routes/servers.js does:
 // env var first, else the value captured into app_settings.
 function sharedSecret() {
@@ -39,7 +44,12 @@ async function start(serverId, localPort) {
     const secret = sharedSecret();
     if (secret) {
       try {
-        const addr = await playit.startJava(serverId, localPort, secret);
+        const addr = await playit.startJava(
+          serverId,
+          localPort,
+          secret,
+          QUICK_JAVA_ATTEMPTS,
+        );
         if (addr && addr.host && addr.port) {
           try {
             db.prepare(
@@ -50,8 +60,10 @@ async function start(serverId, localPort) {
           }
           return addr;
         }
-        console.warn(
-          "[pubtun] playit-java returned no address — falling back to bore",
+        // Expected: playit's java address usually isn't ready this fast. Use bore
+        // now; the background upgrade swaps to playit once it allocates.
+        console.log(
+          `[pubtun] ${serverId}: playit-java not ready — using bore, will upgrade in background`,
         );
         schedulePlayitUpgrade(serverId, localPort, secret);
       } catch (e) {
