@@ -41,6 +41,11 @@ const INTERNAL_PORT_BASE = 26000;
 // tunnel (per-server Bedrock IP). Off = single shared Bedrock tunnel (legacy).
 const BEDROCK_PER_SERVER = process.env.BEDROCK_PER_SERVER === "1";
 const LOG_RING_SIZE = 1000;
+// Hard cap on a single jar download so a stalled transfer can't wedge a deploy.
+const JAR_DOWNLOAD_TIMEOUT_MS = parseInt(
+  process.env.JAR_DOWNLOAD_TIMEOUT_MS || "180000",
+  10,
+);
 
 const PAPER_API = process.env.PAPER_API || "https://api.papermc.io/v2";
 const MOJANG_MANIFEST =
@@ -105,7 +110,24 @@ function geyserUdpPort(server) {
 }
 
 async function downloadFile(url, dest, label) {
-  const res = await fetch(url, { headers: { "User-Agent": "CraftHost/1.0" } });
+  let res;
+  try {
+    res = await fetch(url, {
+      headers: { "User-Agent": "CraftHost/1.0" },
+      // Node's fetch never times out on its own; without this a stalled jar
+      // download hangs the deploy forever (server stuck "downloading"). Cap the
+      // whole transfer — generous so real jars finish, configurable for slow links.
+      signal: AbortSignal.timeout(JAR_DOWNLOAD_TIMEOUT_MS),
+    });
+  } catch (e) {
+    throw new Error(
+      `${label} download failed: ${
+        e.name === "TimeoutError"
+          ? `timed out after ${JAR_DOWNLOAD_TIMEOUT_MS}ms`
+          : e.message
+      }`,
+    );
+  }
   if (!res.ok) throw new Error(`${label} download failed: HTTP ${res.status}`);
   const buf = Buffer.from(await res.arrayBuffer());
   await fsp.writeFile(dest, buf);
