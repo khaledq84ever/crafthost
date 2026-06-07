@@ -73,8 +73,13 @@ function extractRefs(html) {
     const attrs = m[1];
     const body = m[2];
     const srcM = /\bsrc\s*=\s*["']([^"']+)["']/i.exec(attrs);
+    const type = (/\btype\s*=\s*["']([^"']+)["']/i.exec(attrs)?.[1] || '').toLowerCase();
+    // Only executable JS gets the new Function() syntax check. Data blocks like
+    // application/ld+json (JSON-LD), importmap, and speculationrules are NOT
+    // JavaScript and would false-positive on tokens like ':'.
+    const isJs = !type || /^(text|application)\/(java|ecma)script$/.test(type) || type === 'module';
     if (srcM) out.scripts.push(srcM[1]);
-    else if (body.trim()) out.inlineScripts.push(body);
+    else if (body.trim() && isJs) out.inlineScripts.push(body);
   }
   // <link rel=stylesheet href=…>  (only stylesheets — skip preconnect/preload/icon)
   const linkRe = /<link\b([^>]*)>/gi;
