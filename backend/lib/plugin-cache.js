@@ -9,52 +9,65 @@
 //   /data/.plugin-cache/<project_id>__<mc_version>.jar   (e.g. Vebnzrzj__1.20.1.jar)
 //   /data/.plugin-cache/<project_id>__any.jar            (fallback / universal builds)
 //   /data/.plugin-cache/_index.json                      ({ "<pid>__<mcVer>": meta })
-const fs = require('fs');
-const fsp = require('fs/promises');
-const path = require('path');
+const fs = require("fs");
+const fsp = require("fs/promises");
+const path = require("path");
 
-const DATA_DIR = process.env.DATA_DIR || path.resolve(__dirname, '../../data/servers');
-const CACHE_DIR = path.join(path.dirname(DATA_DIR), '.plugin-cache');
-const INDEX_FILE = path.join(CACHE_DIR, '_index.json');
-const MODRINTH = process.env.MODRINTH_API || 'https://api.modrinth.com/v2';
-const UA = 'CraftHost/1.0 (crafthost.up.railway.app)';
+const DATA_DIR =
+  process.env.DATA_DIR || path.resolve(__dirname, "../../data/servers");
+const CACHE_DIR = path.join(path.dirname(DATA_DIR), ".plugin-cache");
+const INDEX_FILE = path.join(CACHE_DIR, "_index.json");
+const MODRINTH = process.env.MODRINTH_API || "https://api.modrinth.com/v2";
+const UA = "CraftHost/1.0 (crafthost.up.railway.app)";
+// Cap every Modrinth/Geyser request so a stalled fetch can't hang prewarm/deploy.
+const FETCH_TIMEOUT_MS = parseInt(
+  process.env.PLUGIN_FETCH_TIMEOUT_MS || "120000",
+  10,
+);
 
 // Must mirror STARTER_PLUGINS in frontend/js/wizard.js. Adding a plugin here
 // pre-caches it so the FIRST user to enable it gets an instant copy.
 const STARTER_PLUGIN_IDS = [
-  'Vebnzrzj', // LuckPerms
-  'hXiIvTyT', // EssentialsX
-  '1u6JkXh5', // WorldEdit
-  'P1OZGk5p', // ViaVersion
-  'Lu3KuzdV', // CoreProtect
-  'squaremap',
-  'wKkoqHrH', // GeyserMC — Bedrock cross-play bridge
-  'bWrNNfkb', // Floodgate — companion to Geyser
+  "Vebnzrzj", // LuckPerms
+  "hXiIvTyT", // EssentialsX
+  "1u6JkXh5", // WorldEdit
+  "P1OZGk5p", // ViaVersion
+  "Lu3KuzdV", // CoreProtect
+  "squaremap",
+  "wKkoqHrH", // GeyserMC — Bedrock cross-play bridge
+  "bWrNNfkb", // Floodgate — companion to Geyser
 ];
 
 // MC versions worth prewarming (one cache slot per plugin × version). Mirrors
 // the most popular wizard picks. Cache cost: 8 plugins × 3 versions ≈ 150 MB.
-const PREWARM_MC_VERSIONS = ['1.20.1', '1.21.1', '26.1.2'];
+const PREWARM_MC_VERSIONS = ["1.20.1", "1.21.1", "26.1.2"];
 
-function safeKey(s) { return String(s).replace(/[^a-zA-Z0-9._-]/g, '_'); }
+function safeKey(s) {
+  return String(s).replace(/[^a-zA-Z0-9._-]/g, "_");
+}
 
 function cachePath(projectId, mcVersion) {
-  const pid = String(projectId).replace(/[^a-zA-Z0-9_-]/g, '');
-  const ver = mcVersion ? safeKey(mcVersion) : 'any';
+  const pid = String(projectId).replace(/[^a-zA-Z0-9_-]/g, "");
+  const ver = mcVersion ? safeKey(mcVersion) : "any";
   return path.join(CACHE_DIR, `${pid}__${ver}.jar`);
 }
 
 function indexKey(projectId, mcVersion) {
-  return `${projectId}__${mcVersion ? safeKey(mcVersion) : 'any'}`;
+  return `${projectId}__${mcVersion ? safeKey(mcVersion) : "any"}`;
 }
 
 function loadIndex() {
-  try { return JSON.parse(fs.readFileSync(INDEX_FILE, 'utf8')); }
-  catch { return {}; }
+  try {
+    return JSON.parse(fs.readFileSync(INDEX_FILE, "utf8"));
+  } catch {
+    return {};
+  }
 }
 
 function saveIndex(idx) {
-  try { fs.writeFileSync(INDEX_FILE, JSON.stringify(idx, null, 2)); } catch {}
+  try {
+    fs.writeFileSync(INDEX_FILE, JSON.stringify(idx, null, 2));
+  } catch {}
 }
 
 // One-time migration: rename legacy single-version cache files
@@ -66,19 +79,29 @@ function migrateLegacyCache() {
     const idx = loadIndex();
     let migrated = 0;
     for (const f of fs.readdirSync(CACHE_DIR)) {
-      if (!f.endsWith('.jar')) continue;
-      if (f.includes('__')) continue; // already new-shape
-      const pid = f.replace(/\.jar$/, '');
+      if (!f.endsWith(".jar")) continue;
+      if (f.includes("__")) continue; // already new-shape
+      const pid = f.replace(/\.jar$/, "");
       const oldPath = path.join(CACHE_DIR, f);
       const newPath = path.join(CACHE_DIR, `${pid}__any.jar`);
       try {
         fs.renameSync(oldPath, newPath);
-        if (idx[pid]) { idx[indexKey(pid, null)] = idx[pid]; delete idx[pid]; }
+        if (idx[pid]) {
+          idx[indexKey(pid, null)] = idx[pid];
+          delete idx[pid];
+        }
         migrated++;
       } catch {}
     }
-    if (migrated > 0) { saveIndex(idx); console.log(`[plugin-cache] migrated ${migrated} legacy cache entries → __any.jar`); }
-  } catch (err) { console.warn('[plugin-cache] migration failed:', err.message); }
+    if (migrated > 0) {
+      saveIndex(idx);
+      console.log(
+        `[plugin-cache] migrated ${migrated} legacy cache entries → __any.jar`,
+      );
+    }
+  } catch (err) {
+    console.warn("[plugin-cache] migration failed:", err.message);
+  }
 }
 
 // Some plugins don't publish Paper/Spigot/Bukkit builds to Modrinth — they're
@@ -87,14 +110,21 @@ function migrateLegacyCache() {
 // CUSTOM_RESOLVERS receive mcVersion but most return a universal JAR (Floodgate
 // ships one Spigot JAR per Geyser release that covers all supported MC versions).
 const CUSTOM_RESOLVERS = {
-  'bWrNNfkb': async (_mcVersion) => {
-    const GEYSER = 'https://download.geysermc.org/v2/projects/floodgate';
-    const pr = await fetch(GEYSER, { headers: { 'User-Agent': UA } });
+  bWrNNfkb: async (_mcVersion) => {
+    const GEYSER = "https://download.geysermc.org/v2/projects/floodgate";
+    const pr = await fetch(GEYSER, {
+      headers: { "User-Agent": UA },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
     if (!pr.ok) throw new Error(`geysermc project: HTTP ${pr.status}`);
     const proj = await pr.json();
     const latestVer = proj.versions[proj.versions.length - 1];
-    const br = await fetch(`${GEYSER}/versions/${latestVer}`, { headers: { 'User-Agent': UA } });
-    if (!br.ok) throw new Error(`geysermc version ${latestVer}: HTTP ${br.status}`);
+    const br = await fetch(`${GEYSER}/versions/${latestVer}`, {
+      headers: { "User-Agent": UA },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!br.ok)
+      throw new Error(`geysermc version ${latestVer}: HTTP ${br.status}`);
     const ver = await br.json();
     const latestBuild = ver.builds[ver.builds.length - 1];
     return {
@@ -113,11 +143,15 @@ const CUSTOM_RESOLVERS = {
 // MC-specific match exists (e.g. for forward-compat plugins like LuckPerms
 // where one JAR works across many MC versions).
 async function resolveLatestVersion(projectId, mcVersion) {
-  if (CUSTOM_RESOLVERS[projectId]) return CUSTOM_RESOLVERS[projectId](mcVersion);
+  if (CUSTOM_RESOLVERS[projectId])
+    return CUSTOM_RESOLVERS[projectId](mcVersion);
   const loaders = encodeURIComponent('["paper","spigot","bukkit"]');
   // Step 1: try filtered by (loaders, game_version) — strictest match
   const tryFetch = async (url) => {
-    const r = await fetch(url, { headers: { 'User-Agent': UA } });
+    const r = await fetch(url, {
+      headers: { "User-Agent": UA },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
     if (!r.ok) return [];
     const j = await r.json();
     return Array.isArray(j) ? j : [];
@@ -125,37 +159,58 @@ async function resolveLatestVersion(projectId, mcVersion) {
   let versions = [];
   if (mcVersion) {
     const gv = encodeURIComponent(JSON.stringify([mcVersion]));
-    versions = await tryFetch(`${MODRINTH}/project/${encodeURIComponent(projectId)}/version?loaders=${loaders}&game_versions=${gv}`);
+    versions = await tryFetch(
+      `${MODRINTH}/project/${encodeURIComponent(projectId)}/version?loaders=${loaders}&game_versions=${gv}`,
+    );
   }
   // Step 2: loaders only (covers forward-compat plugins that don't list every minor MC ver)
   if (!versions.length) {
-    versions = await tryFetch(`${MODRINTH}/project/${encodeURIComponent(projectId)}/version?loaders=${loaders}`);
+    versions = await tryFetch(
+      `${MODRINTH}/project/${encodeURIComponent(projectId)}/version?loaders=${loaders}`,
+    );
     // If we have a mcVersion, prefer entries that LIST it in game_versions
     if (mcVersion && versions.length) {
-      const match = versions.find(v => Array.isArray(v.game_versions) && v.game_versions.includes(mcVersion));
-      if (match) versions = [match, ...versions.filter(v => v !== match)];
+      const match = versions.find(
+        (v) =>
+          Array.isArray(v.game_versions) && v.game_versions.includes(mcVersion),
+      );
+      if (match) versions = [match, ...versions.filter((v) => v !== match)];
     }
   }
   // Step 3: unfiltered fallback
   if (!versions.length) {
-    versions = await tryFetch(`${MODRINTH}/project/${encodeURIComponent(projectId)}/version`);
+    versions = await tryFetch(
+      `${MODRINTH}/project/${encodeURIComponent(projectId)}/version`,
+    );
   }
   const v = versions[0];
-  const file = v?.files?.find(f => f.primary) || v?.files?.[0];
-  if (!file?.url) throw new Error(`no compatible file for ${projectId} mc=${mcVersion || 'any'}`);
-  return { version_id: v.id, version_number: v.version_number, filename: file.filename, url: file.url, sha512: file.hashes?.sha512 };
+  const file = v?.files?.find((f) => f.primary) || v?.files?.[0];
+  if (!file?.url)
+    throw new Error(
+      `no compatible file for ${projectId} mc=${mcVersion || "any"}`,
+    );
+  return {
+    version_id: v.id,
+    version_number: v.version_number,
+    filename: file.filename,
+    url: file.url,
+    sha512: file.hashes?.sha512,
+  };
 }
 
 async function downloadOne(projectId, mcVersion, idx) {
   const meta = await resolveLatestVersion(projectId, mcVersion);
-  const dl = await fetch(meta.url, { headers: { 'User-Agent': UA } });
+  const dl = await fetch(meta.url, {
+    headers: { "User-Agent": UA },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
   if (!dl.ok) throw new Error(`HTTP ${dl.status}`);
   const buf = Buffer.from(await dl.arrayBuffer());
   await fsp.mkdir(CACHE_DIR, { recursive: true });
   await fsp.writeFile(cachePath(projectId, mcVersion), buf);
   idx[indexKey(projectId, mcVersion)] = {
     project_id: projectId,
-    mc_version: mcVersion || 'any',
+    mc_version: mcVersion || "any",
     filename: meta.filename,
     version_id: meta.version_id,
     version_number: meta.version_number,
@@ -170,10 +225,16 @@ async function downloadOne(projectId, mcVersion, idx) {
 // resolvers (Floodgate) only cache one universal entry under 'any' since they
 // ship a single Spigot JAR per release.
 async function prewarmPluginCache() {
-  try { await fsp.mkdir(CACHE_DIR, { recursive: true }); } catch {}
+  try {
+    await fsp.mkdir(CACHE_DIR, { recursive: true });
+  } catch {}
   migrateLegacyCache();
   const idx = loadIndex();
-  let hits = 0, misses = 0, refreshed = 0, errors = 0, mb = 0;
+  let hits = 0,
+    misses = 0,
+    refreshed = 0,
+    errors = 0,
+    mb = 0;
 
   // Build target list: (plugin × MC version) for Modrinth, plus 'any' for custom resolvers
   const targets = [];
@@ -193,14 +254,25 @@ async function prewarmPluginCache() {
       const cp = cachePath(pid, mc);
       const key = indexKey(pid, mc);
       const cached = idx[key];
-      const wrongLoader = cached && /\b(neoforge|fabric|forge)\b/i.test(cached.filename || '');
-      if (!wrongLoader && cached && fs.existsSync(cp) && fs.statSync(cp).size > 1000 && (Date.now() - cached.mtime) < 24 * 3600 * 1000) {
+      const wrongLoader =
+        cached && /\b(neoforge|fabric|forge)\b/i.test(cached.filename || "");
+      if (
+        !wrongLoader &&
+        cached &&
+        fs.existsSync(cp) &&
+        fs.statSync(cp).size > 1000 &&
+        Date.now() - cached.mtime < 24 * 3600 * 1000
+      ) {
         hits++;
         continue;
       }
       if (wrongLoader) {
-        console.log(`[plugin-cache/prewarm] ${key} cached as wrong loader (${cached.filename}) — re-resolving`);
-        try { fs.unlinkSync(cp); } catch {}
+        console.log(
+          `[plugin-cache/prewarm] ${key} cached as wrong loader (${cached.filename}) — re-resolving`,
+        );
+        try {
+          fs.unlinkSync(cp);
+        } catch {}
       }
       if (cached && fs.existsSync(cp)) {
         try {
@@ -210,7 +282,9 @@ async function prewarmPluginCache() {
             hits++;
             continue;
           }
-          console.log(`[plugin-cache/prewarm] ${key} → newer version ${latest.version_number} (was ${cached.version_number})`);
+          console.log(
+            `[plugin-cache/prewarm] ${key} → newer version ${latest.version_number} (was ${cached.version_number})`,
+          );
           refreshed++;
         } catch {
           hits++;
@@ -224,11 +298,15 @@ async function prewarmPluginCache() {
       mb += size / 1024 / 1024;
     } catch (err) {
       errors++;
-      console.warn(`[plugin-cache/prewarm] ${pid}__${mc || 'any'} failed: ${err.message.slice(0, 120)}`);
+      console.warn(
+        `[plugin-cache/prewarm] ${pid}__${mc || "any"} failed: ${err.message.slice(0, 120)}`,
+      );
     }
   }
   saveIndex(idx);
-  console.log(`🧩 Plugin cache prewarmed: ${hits} hit · ${misses} downloaded · ${refreshed} refreshed (${mb.toFixed(1)}MB) · ${errors} errors`);
+  console.log(
+    `🧩 Plugin cache prewarmed: ${hits} hit · ${misses} downloaded · ${refreshed} refreshed (${mb.toFixed(1)}MB) · ${errors} errors`,
+  );
 }
 
 // Copy a cached plugin JAR into a server's plugins/ dir. Looks up cache by
@@ -240,21 +318,21 @@ async function copyFromCache(projectId, destPluginsDir, mcVersion) {
     cachePath(projectId, mcVersion),
     cachePath(projectId, null), // 'any' fallback
   ];
-  const keys = [
-    indexKey(projectId, mcVersion),
-    indexKey(projectId, null),
-  ];
+  const keys = [indexKey(projectId, mcVersion), indexKey(projectId, null)];
   for (let i = 0; i < candidates.length; i++) {
     const cp = candidates[i];
     const meta = idx[keys[i]];
     if (!fs.existsSync(cp) || fs.statSync(cp).size < 1000 || !meta) continue;
     await fsp.mkdir(destPluginsDir, { recursive: true });
-    const safe = String(meta.filename).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const safe = String(meta.filename).replace(/[^a-zA-Z0-9._-]/g, "_");
     const destPath = path.join(destPluginsDir, safe);
-    try { await fsp.link(cp, destPath); }
-    catch (err) {
-      if (err.code === 'EEXIST') return { filename: safe, fromCache: true, mc: meta.mc_version };
-      if (err.code === 'EXDEV' || err.code === 'EPERM') await fsp.copyFile(cp, destPath);
+    try {
+      await fsp.link(cp, destPath);
+    } catch (err) {
+      if (err.code === "EEXIST")
+        return { filename: safe, fromCache: true, mc: meta.mc_version };
+      if (err.code === "EXDEV" || err.code === "EPERM")
+        await fsp.copyFile(cp, destPath);
       else throw err;
     }
     return { filename: safe, fromCache: true, mc: meta.mc_version };
@@ -263,13 +341,21 @@ async function copyFromCache(projectId, destPluginsDir, mcVersion) {
 }
 
 // Persist a freshly-downloaded JAR into the cache so future installs hit.
-async function writeIntoCache(projectId, filename, buf, versionMeta = {}, mcVersion) {
-  try { await fsp.mkdir(CACHE_DIR, { recursive: true }); } catch {}
+async function writeIntoCache(
+  projectId,
+  filename,
+  buf,
+  versionMeta = {},
+  mcVersion,
+) {
+  try {
+    await fsp.mkdir(CACHE_DIR, { recursive: true });
+  } catch {}
   await fsp.writeFile(cachePath(projectId, mcVersion), buf);
   const idx = loadIndex();
   idx[indexKey(projectId, mcVersion)] = {
     project_id: projectId,
-    mc_version: mcVersion || 'any',
+    mc_version: mcVersion || "any",
     filename,
     version_id: versionMeta.version_id || null,
     version_number: versionMeta.version_number || null,
@@ -284,11 +370,14 @@ function listCache() {
   try {
     if (!fs.existsSync(CACHE_DIR)) return [];
     const idx = loadIndex();
-    return fs.readdirSync(CACHE_DIR)
-      .filter(n => n.endsWith('.jar'))
-      .map(n => {
-        const base = n.replace(/\.jar$/, '');
-        const [pid, mc] = base.includes('__') ? base.split('__', 2) : [base, 'any'];
+    return fs
+      .readdirSync(CACHE_DIR)
+      .filter((n) => n.endsWith(".jar"))
+      .map((n) => {
+        const base = n.replace(/\.jar$/, "");
+        const [pid, mc] = base.includes("__")
+          ? base.split("__", 2)
+          : [base, "any"];
         const key = `${pid}__${mc}`;
         const meta = idx[key] || idx[pid] || {};
         const st = fs.statSync(path.join(CACHE_DIR, n));
@@ -300,8 +389,14 @@ function listCache() {
           mb: +(st.size / 1024 / 1024).toFixed(1),
         };
       })
-      .sort((a, b) => a.project_id.localeCompare(b.project_id) || a.mc_version.localeCompare(b.mc_version));
-  } catch { return []; }
+      .sort(
+        (a, b) =>
+          a.project_id.localeCompare(b.project_id) ||
+          a.mc_version.localeCompare(b.mc_version),
+      );
+  } catch {
+    return [];
+  }
 }
 
 module.exports = {
