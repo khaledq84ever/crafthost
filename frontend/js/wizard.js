@@ -178,7 +178,10 @@ async function openWizard() {
     return;
   }
   wizState.step = 1;
-  wizState.type = null;
+  // Default to Paper (most common) so Next works immediately — a null type
+  // left the Next button disabled with no visible reason, which users read
+  // as "the create page is broken".
+  wizState.type = "paper";
   renderWizard();
   document.getElementById("wizardModal").classList.add("show");
 }
@@ -210,6 +213,17 @@ function renderWizard() {
 
     <div class="modal-foot">
       ${wizState.step > 1 ? '<button class="btn btn-ghost" onclick="wizPrev()">← Back</button>' : ""}
+      ${
+        wizState.step < 4 && !canAdvance()
+          ? `<span class="wiz-foot-hint" style="color:var(--text-disabled);font-size:13px;margin-right:auto;align-self:center;">${
+              wizState.step === 1
+                ? "Pick an engine to continue"
+                : wizState.step === 2
+                  ? "Pick a version to continue"
+                  : "Enter a server name to continue"
+            }</span>`
+          : ""
+      }
       ${
         wizState.step < 4
           ? `<button class="btn btn-primary" id="nextBtn" onclick="wizNext()" ${!canAdvance() ? "disabled" : ""}>Next →</button>`

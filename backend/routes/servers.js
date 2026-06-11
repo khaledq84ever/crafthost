@@ -412,7 +412,7 @@ async function createServerForUser(user, opts, ip) {
       container_id: r.containerId,
       status: "created",
     };
-    const quotaErr = checkRunningQuota(enrichedForStart);
+    const quotaErr = checkRunningQuota(enrichedForStart, req.user);
     if (skipAutoStart) {
       startSkippedReason = "skipped by caller";
     } else if (quotaErr) {
@@ -635,7 +635,7 @@ router.post("/clone", async (req, res) => {
         "SELECT s.*, p.ram_mb, p.cpu_cores FROM servers s JOIN plans p ON s.plan_id = p.id WHERE s.id = ?",
       )
       .get(out.id);
-    const quotaErr = checkRunningQuota(dst);
+    const quotaErr = checkRunningQuota(dst, req.user);
     if (quotaErr) {
       startSkippedReason = quotaErr;
     } else {
@@ -976,8 +976,9 @@ function getOwnedServer(req, res) {
 // Running-server quota. On Railway Pro (1 TB RAM) we can run many concurrent
 // servers. Cap at 3 per user as a safety bound — way more than the prior 1 —
 // without being effectively unlimited. Override via MAX_RUNNING_PER_USER env.
-function checkRunningQuota(s) {
-  const MAX = parseInt(process.env.MAX_RUNNING_PER_USER || "3", 10);
+function checkRunningQuota(s, user) {
+  if (user && isUnlimitedUser(user)) return null; // owner/admin: no running cap
+  const MAX = parseInt(process.env.MAX_RUNNING_PER_USER || "1", 10);
   const running = db
     .prepare(
       `
@@ -996,7 +997,7 @@ function checkRunningQuota(s) {
 router.post("/:id/start", async (req, res) => {
   const s = getOwnedServer(req, res);
   if (!s) return;
-  const quotaErr = checkRunningQuota(s);
+  const quotaErr = checkRunningQuota(s, req.user);
   if (quotaErr) return res.status(409).json({ error: quotaErr });
   try {
     const r = await dc.startServer(s);

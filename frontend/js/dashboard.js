@@ -101,6 +101,13 @@ function ipFor(s) {
     return `${s.tunnel_host}:${s.tunnel_port}`;
   if (s.proxy_host && s.proxy_port) return `${s.proxy_host}:${s.proxy_port}`;
   if (s.is_public) return `${publicHost}:${publicMcPort}`;
+  // No tunnel yet. While starting it's genuinely "waiting"; when the server
+  // is offline there IS no joinable address — returning the proxy host +
+  // internal port here showed users a dead address with a Copy button.
+  const running = ["online", "running", "starting"].includes(
+    String(s.status || "").toLowerCase(),
+  );
+  if (!running) return null;
   return `${publicHost}:${s.port} (waiting for tunnel…)`;
 }
 
@@ -253,11 +260,19 @@ function renderServer(s) {
       </div>
     </div>
 
+    ${
+      ip
+        ? `
     <div class="sc-ip" title="Java Edition · click to copy" onclick="copyText('${escapeHtml(ip)}')" style="cursor:pointer;">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
       <span style="flex:1;">🖥️ <span style="font-weight:600;">Java:</span> ${escapeHtml(ip)}</span>
       <span class="sc-copy">📋 Copy</span>
-    </div>
+    </div>`
+        : `
+    <div class="sc-ip" title="Start the server to get its join address" style="opacity:0.7;">
+      <span style="flex:1;">🖥️ <span style="font-weight:600;">Java:</span> address appears after you press ▶ Start</span>
+    </div>`
+    }
     ${
       s.playit_host && s.playit_port
         ? `

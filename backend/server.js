@@ -538,14 +538,14 @@ server.listen(PORT, async () => {
     console.warn("[janitor] startup sweep failed:", err.message);
   }
 
-  // Idle-stop loop: stop free-tier servers with 0 players for IDLE_STOP_MINUTES (default 30).
-  // Paid plans keep running 24/7. Saves Railway resources without forcing inactive accounts to upgrade.
+  // Idle-stop loop: stop ANY server with 0 players for IDLE_STOP_MINUTES (default 10).
+  // Only the pinned is_public showcase server is exempt (always-on by design).
   // Before stopping, sends `save-all flush` over the JVM's stdin to guarantee the
   // world + player data is flushed to disk so the next /start resumes exactly
   // where players left off. The MC `stop` command also saves, but explicit
   // save-first is belt-and-suspenders against the 20s SIGTERM fallback in stopServer.
   if (backend === "jvm" && process.env.IDLE_STOP !== "0") {
-    const idleMin = parseInt(process.env.IDLE_STOP_MINUTES || "30", 10);
+    const idleMin = parseInt(process.env.IDLE_STOP_MINUTES || "10", 10);
     const lastSeenPlayers = new Map(); // serverId → ts when last had >0 players
     const jvm = require("./lib/jvm-controller");
     setInterval(async () => {
@@ -556,7 +556,7 @@ server.listen(PORT, async () => {
           SELECT s.*, p.ram_mb FROM servers s
           JOIN plans p ON s.plan_id = p.id
           WHERE s.status IN ('online','running')
-            AND s.plan_id = 'free'
+            AND s.is_public != 1
             AND s.container_id LIKE 'jvm-%'
         `,
           )
@@ -602,6 +602,12 @@ server.listen(PORT, async () => {
               //    normal stop sequence). 20s SIGTERM fallback if it hangs.
               const tunnel = require("./lib/tunnel");
               tunnel.stop(s.id);
+              try {
+                require("./lib/public-tunnel").stop(s.id);
+              } catch {}
+              try {
+                require("./lib/playit").stop(s.id);
+              } catch {}
               await dc.stopServer(s);
               db.prepare(
                 "UPDATE servers SET status = ?, last_idle_stop_at = ? WHERE id = ?",
@@ -620,7 +626,7 @@ server.listen(PORT, async () => {
       }
     }, 60_000);
     console.log(
-      `💤 Idle-stop loop enabled (${idleMin}min idle → save-all flush → stop, free tier only)`,
+      `💤 Idle-stop loop enabled (${idleMin}min idle → save-all flush → stop, all plans, is_public exempt)`,
     );
   }
 
