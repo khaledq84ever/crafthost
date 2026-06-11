@@ -9,3 +9,4 @@ uploads/
 jars/*.jar
 *.log
 .DS_Store
+data/.jar-cache/
