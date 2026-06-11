@@ -157,6 +157,65 @@ async function ensureBedrockTunnel(secret, localPort = GEYSER_UDP_PORT) {
 // named chb-<serverId> and REUSED by name (never creates a duplicate), pointing
 // at THIS server's unique Geyser UDP port. Gives each server its own Bedrock
 // address — requires a playit plan that allows multiple UDP allocations.
+// The playit account has a hard cap on allocated tunnels (hit at 31 on the
+// current plan): past it, new tunnels sit in `pending` FOREVER — they never
+// allocate, even after slots free up later. Bedrock (UDP) has no fallback
+// transport, but Java does (bore + the Railway TCP proxy). So when Bedrock
+// can't allocate, free slots by deleting Java tunnels of servers that aren't
+// running — their Java address re-tunnels (or bore-covers) on next start.
+async function reclaimSlotsForBedrock(secret, count = 1) {
+  try {
+    const data = await apiCall(secret, "/agents/rundata", {});
+    const running = new Set();
+    try {
+      db.prepare("SELECT id FROM servers WHERE status IN ('online','starting')")
+        .all()
+        .forEach((r) => running.add(r.id));
+    } catch {}
+    // Purge stuck pending java tunnels first so none of them can grab the
+    // slot we're about to free (java keeps working via bore regardless).
+    for (const t of data.pending || []) {
+      if (/^chj-/.test(t.name || "")) {
+        try {
+          await apiCall(secret, "/tunnels/delete", { tunnel_id: t.id });
+        } catch {}
+      }
+    }
+    let freed = 0;
+    for (const t of data.tunnels || []) {
+      if (freed >= count) break;
+      const m = t.name && t.name.match(/^chj-(.+)$/);
+      if (!m || running.has(m[1])) continue;
+      await apiCall(secret, "/tunnels/delete", { tunnel_id: t.id });
+      console.log(
+        `[playit] reclaimed slot: removed java tunnel "${t.name}" (server not running; bore covers java)`,
+      );
+      freed++;
+    }
+    return freed;
+  } catch (e) {
+    console.warn("[playit] reclaim:", e.message);
+    return 0;
+  }
+}
+
+function bedrockCreatePayload(agentId, name, localPort) {
+  return {
+    name,
+    tunnel_type: "minecraft-bedrock",
+    port_type: "udp",
+    port_count: 1,
+    origin: {
+      type: "agent",
+      data: { agent_id: agentId, local_ip: "127.0.0.1", local_port: localPort },
+    },
+    enabled: true,
+    alloc: null,
+    firewall_id: null,
+    proxy_protocol: null,
+  };
+}
+
 async function ensureBedrockTunnelForServer(secret, serverId, localPort) {
   const name = `chb-${serverId}`;
   const data = await apiCall(secret, "/agents/rundata", {});
@@ -196,32 +255,46 @@ async function ensureBedrockTunnelForServer(secret, serverId, localPort) {
     (t) => t.proto === "udp" && t.name === name,
   );
   if (!pendingTun) {
-    await apiCall(secret, "/tunnels/create", {
-      name,
-      tunnel_type: "minecraft-bedrock",
-      port_type: "udp",
-      port_count: 1,
-      origin: {
-        type: "agent",
-        data: {
-          agent_id: agentId,
-          local_ip: "127.0.0.1",
-          local_port: localPort,
-        },
-      },
-      enabled: true,
-      alloc: null,
-      firewall_id: null,
-      proxy_protocol: null,
-    });
-  }
-  for (let i = 0; i < 10; i++) {
-    const fresh = await apiCall(secret, "/agents/rundata", {});
-    const t = (fresh.tunnels || []).find(
-      (x) => x.proto === "udp" && x.name === name,
+    await apiCall(
+      secret,
+      "/tunnels/create",
+      bedrockCreatePayload(agentId, name, localPort),
     );
-    if (t && t.assigned_domain && t.port && t.port.from) return addrOf(t);
-    await new Promise((r) => setTimeout(r, 1500));
+  }
+  const waitForAlloc = async (attempts = 10) => {
+    for (let i = 0; i < attempts; i++) {
+      const fresh = await apiCall(secret, "/agents/rundata", {});
+      const t = (fresh.tunnels || []).find(
+        (x) => x.proto === "udp" && x.name === name,
+      );
+      if (t && t.assigned_domain && t.port && t.port.from) return addrOf(t);
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+    return null;
+  };
+  let addr = await waitForAlloc();
+  if (addr) return addr;
+
+  // Still unallocated — almost certainly the account's tunnel cap. Free one
+  // slot from a non-running server's java tunnel, drop the stuck pending
+  // tunnel (stuck ones never allocate even after a slot frees), create fresh
+  // once, and wait again.
+  if ((await reclaimSlotsForBedrock(secret, 1)) > 0) {
+    const cur = await apiCall(secret, "/agents/rundata", {});
+    for (const t of cur.pending || []) {
+      if (t.name === name) {
+        try {
+          await apiCall(secret, "/tunnels/delete", { tunnel_id: t.id });
+        } catch {}
+      }
+    }
+    await apiCall(
+      secret,
+      "/tunnels/create",
+      bedrockCreatePayload(agentId, name, localPort),
+    );
+    addr = await waitForAlloc();
+    if (addr) return addr;
   }
   throw new Error(
     "per-server bedrock tunnel created but no address assigned yet",
