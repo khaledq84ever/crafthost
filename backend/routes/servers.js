@@ -5,6 +5,7 @@ const os = require("os");
 const db = require("../db");
 const { authMiddleware } = require("../lib/auth");
 const dc = require("../lib/controller");
+const jvm = require("../lib/jvm-controller");
 const railway = require("../lib/railway-api");
 const tunnel = require("../lib/tunnel");
 const pubtun = require("../lib/public-tunnel");
@@ -114,7 +115,16 @@ function allocPort() {
       .map((r) => parseInt(r.port, 10))
       .filter((p) => Number.isInteger(p)),
   );
-  for (let p = PORT_START; p <= PORT_END; p++) if (!used.has(p)) return p;
+  // Internal host ports currently bound by live JVMs. A JVM whose DB port was
+  // reassigned mid-run still holds its OLD internal port, which DB ports alone
+  // won't reveal — handing out a port that derives to it guarantees a bind
+  // collision for the new server.
+  const liveInternal = new Set(jvm.listRunning().map((r) => r.hostPort));
+  for (let p = PORT_START; p <= PORT_END; p++) {
+    if (used.has(p)) continue;
+    if (liveInternal.has(internalListenPort({ port: p }))) continue;
+    return p;
+  }
   throw new Error(
     `No free ports available (pool ${PORT_START}-${PORT_END}, ${used.size} in use)`,
   );
