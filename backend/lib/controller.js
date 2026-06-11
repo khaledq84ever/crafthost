@@ -5,9 +5,9 @@
 //
 // All routes go through this; legacy callers can still `require('./docker-controller')`.
 
-const docker = require('./docker-controller');
-const jvm = require('./jvm-controller');
-const crypto = require('crypto');
+const docker = require("./docker-controller");
+const jvm = require("./jvm-controller");
+const crypto = require("crypto");
 
 let _backendCache = null;
 let _cacheTs = 0;
@@ -15,64 +15,73 @@ const CACHE_TTL = 30_000;
 
 async function pickBackend() {
   if (_backendCache && Date.now() - _cacheTs < CACHE_TTL) return _backendCache;
-  let pick = 'stub';
-  if (await docker.isDockerAvailable()) pick = 'docker';
-  else if (jvm.isAvailable()) pick = 'jvm';
+  let pick = "stub";
+  if (await docker.isDockerAvailable()) pick = "docker";
+  else if (jvm.isAvailable()) pick = "jvm";
   _backendCache = pick;
   _cacheTs = Date.now();
   return pick;
 }
 
 function isJvmId(containerId) {
-  return String(containerId || '').startsWith('jvm-');
+  return String(containerId || "").startsWith("jvm-");
 }
 function isStubId(containerId) {
-  return String(containerId || '').startsWith('stub-');
+  return String(containerId || "").startsWith("stub-");
 }
 
 function makeRconPassword() {
-  return crypto.randomBytes(16).toString('hex');
+  return crypto.randomBytes(16).toString("hex");
 }
 
 async function createServer(server) {
   const backend = await pickBackend();
-  if (backend === 'docker') return docker.createServer(server);
-  if (backend === 'jvm') return jvm.createServer(server);
-  return { containerId: 'stub-' + server.id, status: 'created' };
+  if (backend === "docker") return docker.createServer(server);
+  if (backend === "jvm") return jvm.createServer(server);
+  return { containerId: "stub-" + server.id, status: "created" };
 }
 
 async function startServer(server) {
   const cid = server.container_id;
   if (isJvmId(cid)) return jvm.startServer(cid, server);
-  if (isStubId(cid)) return { status: 'starting' };
+  if (isStubId(cid)) {
+    // Stub ids are born when no real backend answered at create time (e.g. a
+    // slow `java -version` probe). If the JVM backend works now, upgrade in
+    // place — the start route persists the returned containerId.
+    if (jvm.isAvailable()) {
+      const r = await jvm.createServer(server);
+      await jvm.startServer(r.containerId, server);
+      return { containerId: r.containerId, status: "starting" };
+    }
+    return { status: "starting" };
+  }
   if (await docker.isDockerAvailable()) return docker.startServer(cid);
-  // Fallback: container was created in stub mode but JVM is now available — upgrade it
-  if (jvm.isAvailable()) return jvm.startServer('jvm-' + server.id, server);
-  return { status: 'starting' };
+  if (jvm.isAvailable()) return jvm.startServer("jvm-" + server.id, server);
+  return { status: "starting" };
 }
 
 async function stopServer(server) {
   const cid = server.container_id;
   if (isJvmId(cid)) return jvm.stopServer(cid, server);
-  if (isStubId(cid)) return { status: 'offline' };
+  if (isStubId(cid)) return { status: "offline" };
   if (await docker.isDockerAvailable()) return docker.stopServer(cid);
-  return { status: 'offline' };
+  return { status: "offline" };
 }
 
 async function restartServer(server) {
   const cid = server.container_id;
   if (isJvmId(cid)) return jvm.restartServer(cid, server);
-  if (isStubId(cid)) return { status: 'starting' };
+  if (isStubId(cid)) return startServer(server); // upgrades stub → real backend
   if (await docker.isDockerAvailable()) return docker.restartServer(cid);
-  return { status: 'starting' };
+  return { status: "starting" };
 }
 
 async function removeServer(server) {
   const cid = server.container_id;
   if (isJvmId(cid)) return jvm.removeServer(cid, server);
-  if (isStubId(cid)) return { status: 'removed' };
+  if (isStubId(cid)) return { status: "removed" };
   if (await docker.isDockerAvailable()) return docker.removeServer(cid);
-  return { status: 'removed' };
+  return { status: "removed" };
 }
 
 async function getStats(server) {
@@ -91,17 +100,29 @@ async function getStats(server) {
     };
   }
   if (await docker.isDockerAvailable()) return docker.getStats(cid);
-  return { cpu: 0, ram_used: 0, ram_max: server.ram_mb || 0, tps: 0, uptime: 0, players: 0, online: false };
+  return {
+    cpu: 0,
+    ram_used: 0,
+    ram_max: server.ram_mb || 0,
+    tps: 0,
+    uptime: 0,
+    players: 0,
+    online: false,
+  };
 }
 
 async function attachLogStream(server, onLine) {
   const cid = server.container_id;
   if (isJvmId(cid)) return jvm.attachLogStream(cid, onLine);
   if (isStubId(cid)) {
-    const t = setInterval(() => onLine(`[stub] ${new Date().toISOString()} Server tick`), 4000);
+    const t = setInterval(
+      () => onLine(`[stub] ${new Date().toISOString()} Server tick`),
+      4000,
+    );
     return { stop: () => clearInterval(t) };
   }
-  if (await docker.isDockerAvailable()) return docker.attachLogStream(cid, onLine);
+  if (await docker.isDockerAvailable())
+    return docker.attachLogStream(cid, onLine);
   return { stop: () => {} };
 }
 
@@ -113,11 +134,17 @@ async function sendRcon(server, command) {
   return `[stub] executed: ${command}`;
 }
 
-async function backendName() { return pickBackend(); }
+async function backendName() {
+  return pickBackend();
+}
 
 // Pass-throughs for the auto-restart loop — only meaningful in JVM backend.
-function getCrashes() { return jvm.getCrashes ? jvm.getCrashes() : []; }
-function clearCrash(id) { return jvm.clearCrash && jvm.clearCrash(id); }
+function getCrashes() {
+  return jvm.getCrashes ? jvm.getCrashes() : [];
+}
+function clearCrash(id) {
+  return jvm.clearCrash && jvm.clearCrash(id);
+}
 
 module.exports = {
   pickBackend,

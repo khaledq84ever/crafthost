@@ -1039,6 +1039,12 @@ router.post("/:id/restart", async (req, res) => {
     pubtun.stop(s.id);
     playit.stop(s.id);
     const r = await dc.restartServer(s);
+    if (r && r.containerId && r.containerId !== s.container_id) {
+      db.prepare("UPDATE servers SET container_id = ? WHERE id = ?").run(
+        r.containerId,
+        s.id,
+      );
+    }
     db.prepare("UPDATE servers SET status = ? WHERE id = ?").run(
       "starting",
       s.id,
