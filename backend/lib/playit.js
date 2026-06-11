@@ -794,6 +794,22 @@ async function reconcilePerServerBedrock(secret) {
       }
     }
 
+    // 2a) Purge ALL stuck pending tunnels. A pending tunnel never allocates
+    // (verified live — even with free slots), so every one of them is dead
+    // weight; ensure* recreates fresh on demand when a server actually needs
+    // its tunnel.
+    for (const t of data.pending || []) {
+      if (!/^ch[bj]-/.test(t.name || "")) continue;
+      try {
+        await apiCall(secret, "/tunnels/delete", { tunnel_id: t.id });
+        console.log(
+          `[playit reconcile] purged stuck pending tunnel "${t.name}"`,
+        );
+      } catch (e) {
+        console.warn("[playit reconcile] purge pending:", e.message);
+      }
+    }
+
     // 2b) Sweep orphaned per-server tunnels — chj-/chb-<id> whose server was
     // deleted. ensure*/reconcile only ever CREATE these, never remove them when a
     // server is gone, so dead chj-* (Java/TCP) and chb-* (Bedrock/UDP) tunnels
