@@ -412,7 +412,7 @@ async function createServerForUser(user, opts, ip) {
       container_id: r.containerId,
       status: "created",
     };
-    const quotaErr = checkRunningQuota(enrichedForStart, req.user);
+    const quotaErr = checkRunningQuota(enrichedForStart, user);
     if (skipAutoStart) {
       startSkippedReason = "skipped by caller";
     } else if (quotaErr) {
