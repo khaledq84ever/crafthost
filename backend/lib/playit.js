@@ -118,21 +118,30 @@ async function ensureBedrockTunnel(secret, localPort = GEYSER_UDP_PORT) {
     return addrOf(tun);
   }
 
-  // None yet — create it. alloc:null = the free shared/global allocation.
-  await apiCall(secret, "/tunnels/create", {
-    name: "CraftHost Bedrock",
-    tunnel_type: "minecraft-bedrock",
-    port_type: "udp",
-    port_count: 1,
-    origin: {
-      type: "agent",
-      data: { agent_id: agentId, local_ip: "127.0.0.1", local_port: localPort },
-    },
-    enabled: true,
-    alloc: null,
-    firewall_id: null,
-    proxy_protocol: null,
-  });
+  // None active — but one may be sitting in `pending` awaiting allocation;
+  // creating again would stack a duplicate pending tunnel on every retry.
+  const pendingTun = (data.pending || []).find((t) => t.proto === "udp");
+  if (!pendingTun) {
+    // None yet — create it. alloc:null = the free shared/global allocation.
+    await apiCall(secret, "/tunnels/create", {
+      name: "CraftHost Bedrock",
+      tunnel_type: "minecraft-bedrock",
+      port_type: "udp",
+      port_count: 1,
+      origin: {
+        type: "agent",
+        data: {
+          agent_id: agentId,
+          local_ip: "127.0.0.1",
+          local_port: localPort,
+        },
+      },
+      enabled: true,
+      alloc: null,
+      firewall_id: null,
+      proxy_protocol: null,
+    });
+  }
 
   // Allocation is usually instant, but poll a few times to be safe.
   for (let i = 0; i < 10; i++) {
@@ -179,20 +188,33 @@ async function ensureBedrockTunnelForServer(secret, serverId, localPort) {
     return addrOf(tun);
   }
 
-  await apiCall(secret, "/tunnels/create", {
-    name,
-    tunnel_type: "minecraft-bedrock",
-    port_type: "udp",
-    port_count: 1,
-    origin: {
-      type: "agent",
-      data: { agent_id: agentId, local_ip: "127.0.0.1", local_port: localPort },
-    },
-    enabled: true,
-    alloc: null,
-    firewall_id: null,
-    proxy_protocol: null,
-  });
+  // A tunnel awaiting allocation lives in `pending`, NOT `tunnels` — creating
+  // again here would stack a duplicate pending tunnel on every retry (which is
+  // exactly what exhausted the account's allocation once). Reuse it: skip the
+  // create and just poll for the address.
+  const pendingTun = (data.pending || []).find(
+    (t) => t.proto === "udp" && t.name === name,
+  );
+  if (!pendingTun) {
+    await apiCall(secret, "/tunnels/create", {
+      name,
+      tunnel_type: "minecraft-bedrock",
+      port_type: "udp",
+      port_count: 1,
+      origin: {
+        type: "agent",
+        data: {
+          agent_id: agentId,
+          local_ip: "127.0.0.1",
+          local_port: localPort,
+        },
+      },
+      enabled: true,
+      alloc: null,
+      firewall_id: null,
+      proxy_protocol: null,
+    });
+  }
   for (let i = 0; i < 10; i++) {
     const fresh = await apiCall(secret, "/agents/rundata", {});
     const t = (fresh.tunnels || []).find(
@@ -479,20 +501,32 @@ async function ensureJavaTunnel(
     throw new Error("java tunnel created but no address assigned yet");
   }
 
-  await apiCall(secret, "/tunnels/create", {
-    name,
-    tunnel_type: "minecraft-java",
-    port_type: "tcp",
-    port_count: 1,
-    origin: {
-      type: "agent",
-      data: { agent_id: agentId, local_ip: "127.0.0.1", local_port: localPort },
-    },
-    enabled: true,
-    alloc: null,
-    firewall_id: null,
-    proxy_protocol: null,
-  });
+  // Same-name tunnel still awaiting allocation sits in `pending` — creating
+  // again would stack duplicate pending tunnels on every retry until the
+  // account's allocation is exhausted. Reuse it: just wait for its address.
+  const pendingTun = (data.pending || []).find(
+    (t) => t.proto === "tcp" && t.name === name,
+  );
+  if (!pendingTun) {
+    await apiCall(secret, "/tunnels/create", {
+      name,
+      tunnel_type: "minecraft-java",
+      port_type: "tcp",
+      port_count: 1,
+      origin: {
+        type: "agent",
+        data: {
+          agent_id: agentId,
+          local_ip: "127.0.0.1",
+          local_port: localPort,
+        },
+      },
+      enabled: true,
+      alloc: null,
+      firewall_id: null,
+      proxy_protocol: null,
+    });
+  }
   const addr = await waitForAddr();
   if (addr) return addr;
   throw new Error("java tunnel created but no address assigned yet");
@@ -638,6 +672,11 @@ async function reconcilePerServerBedrock(secret) {
     ensureAgent(secret);
     let data = await apiCall(secret, "/agents/rundata", {});
     const tunnels = data.tunnels || [];
+    // Pending tunnels (created but never allocated an address) count against
+    // the account's allocation just like active ones — duplicates and orphans
+    // there must be swept too, or they pile up and block ALL new allocations.
+    // Active tunnels come first so dedup always keeps an allocated one.
+    const allTunnels = tunnels.concat(data.pending || []);
 
     // 1) Delete dead legacy shared UDP tunnels (forward to unused 19132).
     for (const t of tunnels) {
@@ -655,7 +694,7 @@ async function reconcilePerServerBedrock(secret) {
 
     // 2) Prune duplicate per-server tunnels (same name → keep first, drop rest).
     const seen = new Set();
-    for (const t of tunnels) {
+    for (const t of allTunnels) {
       if (!t.name || !/^ch[bj]-/.test(t.name)) continue;
       if (seen.has(t.name)) {
         try {
@@ -688,7 +727,7 @@ async function reconcilePerServerBedrock(secret) {
       console.warn("[playit reconcile] db read (orphan sweep):", e.message);
     }
     if (validIds) {
-      for (const t of tunnels) {
+      for (const t of allTunnels) {
         const m = t.name && t.name.match(/^ch[bj]-(.+)$/);
         if (!m) continue;
         if (validIds.has(m[1])) continue;
