@@ -112,6 +112,13 @@
         background: color-mix(in srgb, var(--c) 20%, var(--slate-700));
         font-size: 15px;
         flex-shrink: 0;
+        overflow: hidden;
+      }
+      .mp-pick-icon img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 7px;
       }
       .mp-pick-text {
         flex: 1;
@@ -579,98 +586,98 @@
         {
           slug: "luckperms",
           name: "LuckPerms",
-          icon: "lock",
+          img: "/img/plugins/luckperms.webp",
           c: "#10B981",
           desc: "Permissions & ranks",
         },
         {
           slug: "essentialsx",
           name: "EssentialsX",
-          icon: "settings",
+          img: "/img/plugins/essentialsx.webp",
           c: "#F59E0B",
           desc: "Server essentials",
         },
         {
           slug: "worldedit",
           name: "WorldEdit",
-          icon: "public",
+          img: "/img/plugins/worldedit.webp",
           c: "#3B82F6",
           desc: "Terrain editor",
         },
         {
           slug: "worldguard",
           name: "WorldGuard",
-          icon: "shield",
+          img: "/img/plugins/worldguard.webp",
           c: "#A855F7",
           desc: "Region protection",
         },
         {
           slug: "viaversion",
           name: "ViaVersion",
-          icon: "sync",
+          img: "/img/plugins/viaversion.webp",
           c: "#06B6D4",
           desc: "Cross-version compat",
         },
         {
           slug: "coreprotect",
           name: "CoreProtect",
-          icon: "history",
+          img: "/img/plugins/coreprotect.png",
           c: "#EF4444",
           desc: "Block logging",
         },
         {
           slug: "squaremap",
           name: "squaremap",
-          icon: "map",
+          img: "/img/plugins/squaremap.webp",
           c: "#FBBF24",
           desc: "Lightweight web map",
         },
         {
           slug: "placeholderapi",
           name: "PlaceholderAPI",
-          icon: "build",
+          img: "/img/plugins/placeholderapi.webp",
           c: "#8B5CF6",
           desc: "Dynamic placeholders",
         },
         {
           slug: "geyser",
           name: "Geyser",
-          icon: "smartphone",
+          img: "/img/plugins/geyser.webp",
           c: "#10B981",
           desc: "Bedrock players → Java",
         },
         {
           slug: "skinsrestorer",
           name: "SkinsRestorer",
-          icon: "person",
+          img: "/img/plugins/skinsrestorer.webp",
           c: "#0284C7",
           desc: "Keep skins on offline mode",
         },
         {
           slug: "multiverse-core",
           name: "Multiverse",
-          icon: "travel_explore",
+          img: "/img/plugins/multiverse-core.webp",
           c: "#6366F1",
           desc: "Multiple worlds",
         },
         {
           slug: "discordsrv",
           name: "DiscordSRV",
-          icon: "forum",
+          img: "/img/plugins/discordsrv.png",
           c: "#5865F2",
           desc: "Discord bridge",
         },
         {
           slug: "bluemap",
           name: "BlueMap",
-          icon: "language",
+          img: "/img/plugins/bluemap.webp",
           c: "#0EA5E9",
           desc: "3D web map",
         },
         {
           slug: "chunky",
           name: "Chunky",
-          icon: "terrain",
+          img: "/img/plugins/chunky.webp",
           c: "#92400E",
           desc: "Pre-generate chunks",
         },
@@ -681,7 +688,7 @@
         row.innerHTML = TOP_PICKS.map(
           (p) => `
     <div class="mp-pick" style="--c:${p.c};" data-slug="${p.slug}" data-name="${escapeHtml(p.name)}">
-      <div class="mp-pick-icon"><span class="msr">${p.icon}</span></div>
+      <div class="mp-pick-icon"><img src="${p.img}" alt="" loading="lazy" /></div>
       <div class="mp-pick-text">
         <div class="mp-pick-name">${p.name}</div>
         <div class="mp-pick-desc">${escapeHtml(p.desc)}</div>
