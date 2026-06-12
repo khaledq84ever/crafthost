@@ -93,6 +93,7 @@
 }
 .type-pick .tp-logo-svg { padding: 4px; }
 .type-pick .tp-logo svg { width: 100%; height: 100%; display: block; }
+.type-pick .tp-logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
 
 /* Live deploy progress (wizard final screen). Vertical list of phases — each
  * row is a check / spinner / hollow circle plus a label. */
@@ -187,6 +188,7 @@
   background: var(--slate-700);
 }
 .pl-chip.on .pl-chip-icon { background: rgba(16, 185, 129, 0.25); }
+.pl-chip-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
 .pl-chip-text { flex: 1; min-width: 0; overflow: hidden; }
 .pl-chip-name { display: block; font-weight: 700; font-size: 13.5px; color: var(--text-strong); }
 .pl-chip-desc {

@@ -265,12 +265,13 @@ function renderServer(s) {
         ? `
     <div class="sc-ip" title="Java Edition · click to copy" onclick="copyText('${escapeHtml(ip)}')" style="cursor:pointer;">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
-      <span style="flex:1;">🖥️ <span style="font-weight:600;">Java:</span> ${escapeHtml(ip)}</span>
-      <span class="sc-copy">📋 Copy</span>
+      <span style="flex:1;"><span style="font-weight:600;">Java:</span> ${escapeHtml(ip)}</span>
+      <span class="sc-copy">Copy</span>
     </div>`
         : `
     <div class="sc-ip" title="Start the server to get its join address" style="opacity:0.7;">
-      <span style="flex:1;">🖥️ <span style="font-weight:600;">Java:</span> address appears after you press ▶ Start</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      <span style="flex:1;"><span style="font-weight:600;">Java:</span> address appears after you press ▶ Start</span>
     </div>`
     }
     ${
@@ -278,13 +279,14 @@ function renderServer(s) {
         ? `
     <div class="sc-ip" title="Bedrock Edition (mobile / console) · click to copy" onclick="copyText('${escapeHtml(s.playit_host + ":" + s.playit_port)}')" style="cursor:pointer;border-color:rgba(255,107,53,0.35);background:rgba(255,107,53,0.05);">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ff6b35" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
-      <span style="flex:1;">📱 <span style="font-weight:600;">Bedrock:</span> ${escapeHtml(s.playit_host + ":" + s.playit_port)}</span>
-      <span class="sc-copy">📋 Copy</span>
+      <span style="flex:1;"><span style="font-weight:600;">Bedrock:</span> ${escapeHtml(s.playit_host + ":" + s.playit_port)}</span>
+      <span class="sc-copy">Copy</span>
     </div>`
         : s.playit_enabled
           ? `
     <div class="sc-ip" title="Bedrock cross-play is on — waiting for tunnel address" onclick="openBedrockModal('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')" style="cursor:pointer;border-color:rgba(255,107,53,0.35);background:rgba(255,107,53,0.05);">
-      <span style="flex:1;">📱 <span style="font-weight:600;">Bedrock:</span> on — connecting…</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ff6b35" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
+      <span style="flex:1;"><span style="font-weight:600;">Bedrock:</span> on — connecting…</span>
       <span class="sc-copy">Details</span>
     </div>`
           : [
@@ -298,7 +300,7 @@ function renderServer(s) {
             ? `
     <div class="sc-ip sc-bedrock-enable" title="Enable Bedrock cross-play — mobile / Xbox / Switch / PS players" onclick="openBedrockModal('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')" style="cursor:pointer;border-style:dashed;border-color:rgba(255,107,53,0.5);background:rgba(255,107,53,0.04);">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ff6b35" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
-      <span style="flex:1;">📱 <span style="font-weight:600;">Enable Bedrock cross-play</span> <span style="opacity:.65;font-size:11px;">mobile / console</span></span>
+      <span style="flex:1;"><span style="font-weight:600;">Enable Bedrock cross-play</span> <span style="opacity:.65;font-size:11px;">mobile / console</span></span>
       <span class="sc-copy" style="background:rgba(255,107,53,0.18);color:#ff6b35;">Enable →</span>
     </div>`
             : ""
@@ -1130,9 +1132,15 @@ async function openSettings(sid, name) {
 }
 window.openSettings = openSettings;
 
+// Last rendered HTML per card id — lets renderServers skip cards whose
+// content didn't change. Rebuilding the whole grid every poll tick made
+// cards flicker/jump (and closed open menus) right after pressing Start.
+const lastCardHtml = new Map();
+
 function renderServers() {
   const grid = document.getElementById("serversGrid");
   if (!servers.length) {
+    lastCardHtml.clear();
     grid.innerHTML = `
       <div class="empty" style="grid-column:1/-1;padding:60px 20px;text-align:center;">
         <div style="font-size:48px;margin-bottom:8px;">🎮</div>
@@ -1140,9 +1148,29 @@ function renderServers() {
         <p class="text-muted" style="margin:8px 0 18px;">Spin up your first Minecraft server in under 60 seconds.</p>
         <button class="btn btn-primary" onclick="openWizard()">+ Create your first server</button>
       </div>`;
-  } else {
-    grid.innerHTML = servers.map(renderServer).join("");
+    updateSummary();
+    return;
   }
+  const emptyEl = grid.querySelector(".empty");
+  if (emptyEl) emptyEl.remove();
+  const ids = new Set(servers.map((s) => String(s.id)));
+  grid.querySelectorAll(".server-card[data-id]").forEach((el) => {
+    if (!ids.has(el.dataset.id)) {
+      lastCardHtml.delete(el.dataset.id);
+      el.remove();
+    }
+  });
+  servers.forEach((s) => {
+    const id = String(s.id);
+    const html = renderServer(s);
+    if (lastCardHtml.get(id) === html) return;
+    lastCardHtml.set(id, html);
+    const existing = grid.querySelector(
+      `.server-card[data-id="${CSS.escape(id)}"]`,
+    );
+    if (existing) existing.outerHTML = html;
+    else grid.insertAdjacentHTML("beforeend", html);
+  });
   updateSummary();
 }
 
@@ -1926,7 +1954,7 @@ async function renderBedrockStatus(sid, sname) {
         </div>
         <div class="sc-ip" onclick="copyText('${escapeHtml(srv.playit_host + ":" + srv.playit_port)}')" style="cursor:pointer;margin-bottom:14px;border-color:rgba(255,107,53,0.4);">
           <span style="flex:1;font-family:monospace;font-size:14px;">📱 ${escapeHtml(srv.playit_host)}:${escapeHtml(String(srv.playit_port))}</span>
-          <span class="sc-copy">📋 Copy</span>
+          <span class="sc-copy">Copy</span>
         </div>
         ${pluginsRow}
         ${restartHint}

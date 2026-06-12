@@ -53,22 +53,27 @@
         margin-top: 4px;
       }
       .mp-section-label {
-        font-size: 11px;
+        font-size: 12.5px;
         font-weight: 700;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.07em;
         text-transform: uppercase;
         color: var(--text-strong);
         display: inline-flex;
         align-items: center;
-        gap: 6px;
+        gap: 7px;
+        font-family: "Inter Tight", Inter, sans-serif;
       }
-      .mp-section-label .ico {
-        font-size: 13px;
+      .mp-section-label .msr {
+        font-size: 16px;
+        color: #d4a843;
       }
       .mp-section-sub {
-        font-size: 11px;
-        color: var(--slate-500);
+        font-size: 11.5px;
+        color: var(--slate-400);
         letter-spacing: 0.01em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       /* Page-lead summary line under the topbar. */
@@ -217,160 +222,12 @@
         align-items: center;
       }
 
-      /* Search bar + result grid */
-      .mp-search-bar {
-        display: flex;
-        gap: 8px;
-        align-items: stretch;
-        margin: 6px 0 12px;
-      }
-      .mp-search-input {
-        flex: 1;
-        background: var(--slate-800);
-        color: var(--text-strong);
-        border: 1px solid var(--glass-border);
-        border-radius: 9px;
-        padding: 9px 12px;
-        font-size: 13px;
-        font-family: inherit;
-        transition:
-          border-color 0.15s,
-          background 0.15s;
-      }
-      .mp-search-input::placeholder {
-        color: var(--slate-500);
-      }
-      .mp-search-input:focus {
-        outline: none;
-        border-color: var(--emerald);
-        background: var(--slate-700);
-      }
-      .mp-search-sel {
-        flex: 0 0 auto;
-        min-width: 130px;
-        background: var(--slate-800);
-        border: 1px solid var(--glass-border);
-        border-radius: 9px;
-        font-size: 12px;
-        padding: 4px 8px;
-      }
-      .mp-results {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-        gap: 8px;
-        min-height: 1px;
-      }
-      .mp-result {
-        display: flex;
-        align-items: center;
-        gap: 9px;
-        padding: 9px 10px;
-        background: var(--slate-800);
-        border: 1px solid var(--glass-border);
-        border-radius: 9px;
-        transition:
-          transform 0.15s,
-          border-color 0.15s,
-          background 0.15s;
-      }
-      .mp-result:hover {
-        transform: translateY(-1px);
-        background: var(--slate-700);
-        border-color: var(--emerald);
-      }
-      .mp-result-icon {
-        width: 38px;
-        height: 38px;
-        border-radius: 8px;
-        background: var(--slate-700);
-        object-fit: cover;
-        flex-shrink: 0;
-      }
-      .mp-result-text {
-        flex: 1;
-        min-width: 0;
-        line-height: 1.3;
-      }
-      .mp-result-name {
-        font-weight: 700;
-        font-size: 12.5px;
-        color: var(--text-strong);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .mp-result-desc {
-        font-size: 10.5px;
-        color: var(--slate-400);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        white-space: normal;
-      }
-      .mp-result-meta {
-        font-size: 10px;
-        color: var(--slate-500);
-        display: flex;
-        gap: 8px;
-        margin-top: 2px;
-      }
-      .mp-result-btn {
-        flex-shrink: 0;
-        font-size: 11px;
-        font-weight: 600;
-        padding: 4px 10px;
-        min-height: 26px;
-      }
-      .mp-result-tag {
-        display: inline-block;
-        font-size: 9px;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        padding: 1px 6px;
-        border-radius: 4px;
-        text-transform: uppercase;
-        background: color-mix(in srgb, var(--emerald) 18%, transparent);
-        color: var(--emerald);
-        margin-right: 4px;
-      }
-      .mp-search-foot {
-        display: flex;
-        justify-content: center;
-        margin: 12px 0 4px;
-      }
-      .mp-results-empty,
-      .mp-results-loading,
-      .mp-results-error {
-        grid-column: 1 / -1;
-        text-align: center;
-        color: var(--slate-500);
-        font-size: 11.5px;
-        padding: 18px 0;
-      }
-      .mp-results-error {
-        color: var(--rose, #f87171);
-      }
-
       /* Mobile — single col, even tighter. */
       @media (max-width: 600px) {
         .mp-top-picks,
-        .mp-feed,
-        .mp-results {
+        .mp-feed {
           grid-template-columns: 1fr;
           gap: 6px;
-        }
-        .mp-search-bar {
-          flex-wrap: wrap;
-        }
-        .mp-search-input {
-          width: 100%;
-          flex: 1 1 100%;
-        }
-        .mp-search-sel {
-          flex: 1 1 calc(50% - 4px);
-          min-width: 0;
         }
         .mp-section {
           margin: 20px 0 8px;
@@ -379,8 +236,7 @@
           font-size: 10.5px;
         }
         .mp-pick,
-        .mp-feed-card,
-        .mp-result {
+        .mp-feed-card {
           padding: 8px 9px;
           gap: 8px;
         }
@@ -388,13 +244,6 @@
         .mp-feed-icon {
           width: 28px;
           height: 28px;
-        }
-        .mp-result-icon {
-          width: 34px;
-          height: 34px;
-        }
-        .mp-result-desc {
-          -webkit-line-clamp: 1;
         }
         .mp-pick-name,
         .mp-feed-name {
@@ -472,43 +321,6 @@
             200,000+ from Modrinth & CurseForge. One-click install on your
             server.
           </p>
-
-          <div class="mp-section">
-            <span class="mp-section-label"
-              ><span class="msr">search</span> Search Modrinth</span
-            >
-            <span class="mp-section-sub" id="searchHint"
-              >Browse · install · auto-cached per MC version</span
-            >
-          </div>
-          <div class="mp-search-bar">
-            <input
-              type="text"
-              class="mp-search-input"
-              id="searchInput"
-              placeholder="Search plugins, mods, modpacks…"
-              autocomplete="off"
-            />
-            <select class="select mp-search-sel" id="searchSort">
-              <option value="relevance">Relevance</option>
-              <option value="downloads">Most downloads</option>
-              <option value="updated">Recently updated</option>
-              <option value="newest">Newest</option>
-              <option value="follows">Most followed</option>
-            </select>
-            <select class="select mp-search-sel" id="searchType">
-              <option value="">Plugins + Mods</option>
-              <option value="plugin">Plugins only</option>
-              <option value="mod">Mods only</option>
-              <option value="modpack">Modpacks</option>
-            </select>
-          </div>
-          <div class="mp-results" id="searchResults"></div>
-          <div class="mp-search-foot" id="searchFoot" style="display: none">
-            <button class="btn btn-secondary btn-sm" id="loadMoreBtn">
-              Load 24 more
-            </button>
-          </div>
 
           <div class="mp-section">
             <span class="mp-section-label"
@@ -804,151 +616,13 @@
         }
       }
 
-      // ── Search: live Modrinth search with sort + type filters + pagination ────
-      let searchState = {
-        q: "",
-        sort: "relevance",
-        type: "",
-        offset: 0,
-        hits: [],
-        hasMore: false,
-        busy: false,
-      };
-      let searchTimer = null;
-
-      async function runSearch(append = false) {
-        const grid = document.getElementById("searchResults");
-        const foot = document.getElementById("searchFoot");
-        if (!grid) return;
-        if (searchState.busy) return;
-        searchState.busy = true;
-
-        if (!append) {
-          searchState.offset = 0;
-          searchState.hits = [];
-          grid.innerHTML = '<div class="mp-results-loading">Searching…</div>';
-        }
-        const LIMIT = 24;
-        try {
-          const params = new URLSearchParams({
-            q: searchState.q,
-            sort: searchState.sort,
-            limit: String(LIMIT),
-            offset: String(searchState.offset),
-          });
-          if (searchState.type) params.set("type", searchState.type);
-          // Pin loader + game_version to currently-selected server so results match
-          if (
-            picker?.current &&
-            !picker.demo &&
-            !picker.current.id?.startsWith?.("demo-")
-          ) {
-            if (picker.current.type)
-              params.set("loader", String(picker.current.type).toLowerCase());
-            if (picker.current.version)
-              params.set("version", picker.current.version);
-          }
-          const r = await fetch(`/api/modrinth/search?${params}`, {
-            credentials: "include",
-          });
-          const data = await r.json();
-          const hits = data.hits || [];
-          searchState.hits = append ? [...searchState.hits, ...hits] : hits;
-          const total = data.total_hits || searchState.hits.length;
-          searchState.hasMore =
-            searchState.hits.length < total && hits.length === LIMIT;
-
-          if (!searchState.hits.length) {
-            grid.innerHTML =
-              '<div class="mp-results-empty">No results. Try a different query or filter.</div>';
-            foot.style.display = "none";
-          } else {
-            renderResultsGrid(grid, searchState.hits);
-            foot.style.display = searchState.hasMore ? "flex" : "none";
-          }
-          document.getElementById("searchHint").textContent =
-            `${searchState.hits.length}${searchState.hasMore ? "+" : ""} result${searchState.hits.length === 1 ? "" : "s"} · install auto-caches per MC version`;
-        } catch (err) {
-          grid.innerHTML = `<div class="mp-results-error">Search failed: ${escapeHtml(err.message)}</div>`;
-          foot.style.display = "none";
-        } finally {
-          searchState.busy = false;
-        }
-      }
-
-      function renderResultsGrid(grid, hits) {
-        grid.innerHTML = hits
-          .map((m) => {
-            const icon = m.icon_url
-              ? `<img class="mp-result-icon" src="${escapeHtml(m.icon_url)}" loading="lazy" alt="" />`
-              : `<div class="mp-result-icon"></div>`;
-            const type = m.project_type || "plugin";
-            const tag =
-              type === "modpack"
-                ? '<span class="mp-result-tag">Modpack</span>'
-                : "";
-            return `
-      <div class="mp-result">
-        ${icon}
-        <div class="mp-result-text">
-          <div class="mp-result-name">${tag}${escapeHtml(m.title || "?")}</div>
-          <div class="mp-result-desc">${escapeHtml(m.description || "")}</div>
-          <div class="mp-result-meta">⬇ ${fmtDownloads(m.downloads)} · ★ ${fmtDownloads(m.follows)}</div>
-        </div>
-        <button class="btn btn-secondary btn-sm mp-result-btn"
-                data-slug="${escapeHtml(m.slug || m.project_id)}"
-                data-name="${escapeHtml(m.title || "?")}"
-                data-type="${escapeHtml(type)}">Install</button>
-      </div>
-    `;
-          })
-          .join("");
-        grid.querySelectorAll(".mp-result-btn").forEach((btn) => {
-          btn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            installPlugin(
-              btn.dataset.slug,
-              btn.dataset.name,
-              btn,
-              btn.dataset.type,
-            );
-          });
-        });
-      }
-
       (async function init() {
         picker = await useServerPicker(document.getElementById("serverPicker"));
-        picker.onChange(() => {
-          if (searchState.hits.length || searchState.q) runSearch(false);
-        });
         if (picker.demo)
           toast(
             "Sign in and create a server to install plugins for real.",
             "warn",
           );
-
-        // Search wiring — 250ms debounce on input, instant on select change
-        const input = document.getElementById("searchInput");
-        const sortSel = document.getElementById("searchSort");
-        const typeSel = document.getElementById("searchType");
-        const moreBtn = document.getElementById("loadMoreBtn");
-        input.addEventListener("input", () => {
-          searchState.q = input.value.trim();
-          clearTimeout(searchTimer);
-          searchTimer = setTimeout(() => runSearch(false), 250);
-        });
-        sortSel.addEventListener("change", () => {
-          searchState.sort = sortSel.value;
-          runSearch(false);
-        });
-        typeSel.addEventListener("change", () => {
-          searchState.type = typeSel.value;
-          runSearch(false);
-        });
-        moreBtn.addEventListener("click", () => {
-          searchState.offset += 24;
-          runSearch(true);
-        });
 
         renderTopPicks();
         loadFeed("trendingRow", "downloads");

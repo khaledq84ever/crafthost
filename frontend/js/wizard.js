@@ -3,30 +3,35 @@
 const SERVER_TYPES = [
   {
     id: "paper",
+    img: "/img/engines/paper.svg",
     name: "Paper",
     c: "#F57C00",
     desc: "High-performance fork. Plugins supported.",
   },
   {
     id: "vanilla",
+    img: "/img/engines/vanilla.svg",
     name: "Vanilla",
     c: "#7CB342",
     desc: "Pure Mojang. No mods, no plugins.",
   },
   {
     id: "purpur",
+    img: "/img/engines/purpur.svg",
     name: "Purpur",
     c: "#283593",
     desc: "Highly configurable Paper fork.",
   },
   {
     id: "fabric",
+    img: "/img/engines/fabric.png",
     name: "Fabric",
     c: "#01579B",
     desc: "Lightweight modding API for mods.",
   },
   {
     id: "neoforge",
+    img: "/img/engines/neoforge.png",
     name: "NeoForge",
     c: "#FF6F00",
     desc: "Modern Forge fork — for heavy modpacks.",
@@ -111,37 +116,37 @@ const STARTER_PLUGINS = [
   {
     id: "Vebnzrzj",
     name: "LuckPerms",
-    icon: "🔒",
+    icon: '<img src="/img/plugins/luckperms.webp" alt="" loading="lazy" />',
     desc: "Permissions manager — set roles + privileges.",
   },
   {
     id: "hXiIvTyT",
     name: "EssentialsX",
-    icon: "⚙",
+    icon: '<img src="/img/plugins/essentialsx.webp" alt="" loading="lazy" />',
     desc: "Server essentials — /home /tpa /kit /spawn.",
   },
   {
     id: "1u6JkXh5",
     name: "WorldEdit",
-    icon: "🗺",
+    icon: '<img src="/img/plugins/worldedit.webp" alt="" loading="lazy" />',
     desc: "Terrain editor — copy, paste, fill, generate.",
   },
   {
     id: "P1OZGk5p",
     name: "ViaVersion",
-    icon: "🔄",
+    icon: '<img src="/img/plugins/viaversion.webp" alt="" loading="lazy" />',
     desc: "Cross-version compatibility — older clients connect.",
   },
   {
     id: "Lu3KuzdV",
     name: "CoreProtect",
-    icon: "🛡",
+    icon: '<img src="/img/plugins/coreprotect.png" alt="" loading="lazy" />',
     desc: "Block logging — roll back grief, audit changes.",
   },
   {
     id: "squaremap",
     name: "squaremap",
-    icon: "🗺",
+    icon: '<img src="/img/plugins/squaremap.webp" alt="" loading="lazy" />',
     desc: "Lightweight web map — view your world in a browser.",
   },
   // Bedrock cross-play (Geyser + Floodgate) is NOT shown as loose chips — toggling
@@ -151,7 +156,7 @@ const STARTER_PLUGINS = [
   {
     id: "wKkoqHrH",
     name: "GeyserMC",
-    icon: "📱",
+    icon: '<img src="/img/plugins/geyser.webp" alt="" loading="lazy" />',
     desc: "Bedrock cross-play — mobile / Xbox / Switch / PS players join.",
     bedrock: true,
   },
@@ -261,7 +266,7 @@ function renderStep1() {
       ${SERVER_TYPES.map(
         (t) => `
         <button class="type-pick ${wizState.type === t.id ? "selected" : ""}" onclick="pickType('${t.id}')">
-          <div class="tp-logo tp-logo-svg" style="background:${t.c}1f;border-color:${t.c}55;">${icon(t.id) || `<span style="color:${t.c};font-weight:800;font-size:22px;">${t.name[0]}</span>`}</div>
+          <div class="tp-logo tp-logo-svg" style="background:${t.c}1f;border-color:${t.c}55;">${t.img ? `<img src="${t.img}" alt="${t.name}" loading="lazy" />` : icon(t.id) || `<span style="color:${t.c};font-weight:800;font-size:22px;">${t.name[0]}</span>`}</div>
           <h4>${t.name}</h4>
           <p>${t.desc}</p>
         </button>
@@ -296,7 +301,7 @@ function renderStep2() {
   const cached = wizState._liveVersions[wizState.type];
   if (!cached) {
     // Lazy fetch
-    fetch(`/api/versions/${encodeURIComponent(wizState.type)}?limit=50`, {
+    fetch(`/api/versions/${encodeURIComponent(wizState.type)}?limit=200`, {
       credentials: "include",
     })
       .then((r) => (r.ok ? r.json() : { versions: [] }))
