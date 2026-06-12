@@ -35,9 +35,9 @@
   font-weight: 800; color: white;
   overflow: hidden; flex-shrink: 0;
 }
-.jar-logo img { width: 28px; height: 28px; object-fit: contain; filter: drop-shadow(0 1px 2px rgba(0,0,0,.3)); }
-.jar-card h4 { font-size: 15px; }
-.jar-card .meta { color: var(--text-muted); font-size: 12px; margin-top: 2px; font-family: var(--font-mono); }
+.jar-logo img { width: 32px; height: 32px; object-fit: contain; filter: drop-shadow(0 1px 2px rgba(0,0,0,.3)); }
+.jar-card h4 { font-size: 16px; font-weight: 800; letter-spacing: -0.01em; color: var(--text-strong); }
+.jar-card .meta { color: var(--emerald); font-size: 12px; font-weight: 600; margin-top: 2px; font-family: var(--font-mono); }
 .jar-card .desc { color: var(--text); font-size: 13px; line-height: 1.5; margin-bottom: 14px; min-height: 40px; }
 .jar-card .stats { display: flex; gap: 12px; font-size: 12px; color: var(--text-muted); margin-bottom: 14px; }
 .upload-zone {
@@ -156,14 +156,14 @@ function fmtRel(ms) {
 // is heavily cached and almost never goes down. A text-initial fallback
 // renders if the image errors.
 const TYPES = [
-  { id: 'paper',    name: 'Paper',    c: '#10B981', domain: 'papermc.io',     desc: 'High-performance plugin server. Recommended for most setups.' },
-  { id: 'vanilla',  name: 'Vanilla',  c: '#7CB342', domain: 'minecraft.net',  desc: 'Pure Mojang Minecraft. No mods, no plugins.' },
-  { id: 'purpur',   name: 'Purpur',   c: '#283593', domain: 'purpurmc.org',   desc: 'Configurable Paper fork with extra features.' },
-  { id: 'fabric',   name: 'Fabric',   c: '#01579B', domain: 'fabricmc.net',   desc: 'Lightweight modding API. Great for client-side mods.' },
-  { id: 'neoforge', name: 'NeoForge', c: '#F59E0B', domain: 'neoforged.net',  desc: 'Modern Forge fork. Faster release cycle.' },
-  { id: 'spigot',   name: 'Spigot',   c: '#E65100', domain: 'spigotmc.org',   desc: 'Classic plugin-enabled server.' },
+  { id: 'paper',    name: 'Paper',    c: '#10B981', img: '/img/engines/paper.svg',    desc: 'High-performance plugin server. Recommended for most setups.' },
+  { id: 'vanilla',  name: 'Vanilla',  c: '#7CB342', img: '/img/engines/vanilla.svg',  desc: 'Pure Mojang Minecraft. No mods, no plugins.' },
+  { id: 'purpur',   name: 'Purpur',   c: '#283593', img: '/img/engines/purpur.svg',   desc: 'Configurable Paper fork with extra features.' },
+  { id: 'fabric',   name: 'Fabric',   c: '#01579B', img: '/img/engines/fabric.png',   desc: 'Lightweight modding API. Great for client-side mods.' },
+  { id: 'neoforge', name: 'NeoForge', c: '#F59E0B', img: '/img/engines/neoforge.png', desc: 'Modern Forge fork. Faster release cycle.' },
+  { id: 'spigot',   name: 'Spigot',   c: '#E65100', img: '/img/engines/spigot.png',   desc: 'Classic plugin-enabled server.' },
 ];
-function logoFor(t) { return `https://www.google.com/s2/favicons?domain=${t.domain}&sz=64`; }
+function logoFor(t) { return t.img; }
 
 async function loadOfficial() {
   const grid = document.getElementById('officialGrid');
