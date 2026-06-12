@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const multer = require('multer');
 const db = require('../db');
 const { authMiddleware } = require('../lib/auth');
+const uploadErrors = require('../lib/upload-errors');
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -87,10 +88,7 @@ function audit(user_id, action, resource_id, ip, metadata) {
   } catch {}
 }
 
-// Multer error handler
-router.use((err, req, res, next) => {
-  if (err) return res.status(400).json({ error: err.message || 'Upload error' });
-  next();
-});
+// Shared upload error handler (413 for oversized, 400 otherwise)
+router.use(uploadErrors({ catchAll: true }));
 
 module.exports = router;

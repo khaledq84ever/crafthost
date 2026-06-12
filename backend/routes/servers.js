@@ -4,6 +4,7 @@ const multer = require("multer");
 const os = require("os");
 const db = require("../db");
 const { authMiddleware } = require("../lib/auth");
+const uploadErrors = require("../lib/upload-errors");
 const dc = require("../lib/controller");
 const jvm = require("../lib/jvm-controller");
 const railway = require("../lib/railway-api");
@@ -2290,15 +2291,7 @@ function audit(user_id, action, resource_id, ip, metadata) {
 
 // Multer error handler for the world.zip / icon uploads — without this an
 // oversized file falls through to Express's default handler as an HTML 500.
-router.use((err, req, res, next) => {
-  if (err instanceof multer.MulterError) {
-    if (err.code === "LIMIT_FILE_SIZE") {
-      return res.status(413).json({ error: "File too large" });
-    }
-    return res.status(400).json({ error: err.message || "Upload error" });
-  }
-  next(err);
-});
+router.use(uploadErrors());
 
 module.exports = router;
 module.exports.createServerForUser = createServerForUser;

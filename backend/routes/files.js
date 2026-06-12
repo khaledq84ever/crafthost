@@ -9,6 +9,7 @@ const multer = require("multer");
 const archiver = null; // optional, not required for v1
 const db = require("../db");
 const { authMiddleware } = require("../lib/auth");
+const uploadErrors = require("../lib/upload-errors");
 
 const router = express.Router({ mergeParams: true });
 router.use(authMiddleware);
@@ -240,11 +241,9 @@ router.get("/download", async (req, res) => {
     res.setHeader("Content-Length", st.size);
     fs.createReadStream(target).pipe(res);
   } catch (err) {
-    res
-      .status(err.code === "EPATH" ? 400 : 500)
-      .json({
-        error: err.code === "EPATH" ? "Invalid path" : "Download failed",
-      });
+    res.status(err.code === "EPATH" ? 400 : 500).json({
+      error: err.code === "EPATH" ? "Invalid path" : "Download failed",
+    });
   }
 });
 
@@ -313,18 +312,11 @@ function audit(user_id, action, resource_id, ip, metadata) {
 
 // Multer error handler — without this an oversized upload (or a destination
 // error) falls through to Express's default handler and returns an HTML 500.
-router.use((err, req, res, next) => {
-  if (err) {
-    if (err.code === "LIMIT_FILE_SIZE") {
-      return res
-        .status(413)
-        .json({
-          error: `File too large (max ${MAX_UPLOAD_BYTES / 1024 / 1024} MB per file)`,
-        });
-    }
-    return res.status(400).json({ error: err.message || "Upload error" });
-  }
-  next();
-});
+router.use(
+  uploadErrors({
+    catchAll: true,
+    maxLabel: `${MAX_UPLOAD_BYTES / 1024 / 1024} MB per file`,
+  }),
+);
 
 module.exports = router;
