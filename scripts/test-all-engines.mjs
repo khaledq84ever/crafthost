@@ -26,7 +26,8 @@ const ENGINES = [
   { type: 'fabric',   version: '1.20.1', timeoutMs: 180_000, marker: /Done \(\d+\.\d+s\)!/ },
   // NeoForge installer is heavy (~3 min on cold cache). Skip if SKIP_NEOFORGE=1.
   ...(process.env.SKIP_NEOFORGE === '1' ? [] : [
-    { type: 'neoforge', version: '1.20.1', timeoutMs: 300_000, marker: /Done \(\d+\.\d+s\)!/ },
+    // NeoForge's own versioning starts at MC 1.20.2 — 1.20.1 does not exist.
+    { type: 'neoforge', version: '1.21.1', timeoutMs: 300_000, marker: /Done \(\d+\.\d+s\)!/ },
   ]),
 ];
 

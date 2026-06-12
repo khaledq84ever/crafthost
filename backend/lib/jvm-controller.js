@@ -99,6 +99,77 @@ function pickHostPort(server) {
   return PUBLIC_PORT;
 }
 
+// True when nothing in the container currently listens on the port.
+function portIsFree(port) {
+  return new Promise((resolve) => {
+    const srv = net.createServer();
+    srv.once("error", () => resolve(false));
+    srv.listen({ port, host: "0.0.0.0", exclusive: true }, () => {
+      srv.close(() => resolve(true));
+    });
+  });
+}
+
+// pickHostPort is purely deterministic, so a stale listener (e.g. a JVM that
+// survived its server's deletion) poisons that slot forever: every new server
+// assigned it dies on "Failed to bind … Address in use" with exit code 0.
+// Verify the slot is actually bindable and probe forward when it isn't.
+async function pickFreeHostPort(server) {
+  const preferred = pickHostPort(server);
+  if (await portIsFree(preferred)) return preferred;
+  console.warn(`[jvm] port ${preferred} is busy — probing for a free slot`);
+  const offset = Math.max(0, parseInt(server.port, 10) - 25565);
+  for (let i = 1; i < 1000; i++) {
+    const cand = INTERNAL_PORT_BASE + ((offset + i) % 1000);
+    if (cand === preferred || cand === PUBLIC_PORT) continue;
+    let taken = false;
+    for (const [, state] of running) {
+      if (state.hostPort === cand) {
+        taken = true;
+        break;
+      }
+    }
+    if (!taken && (await portIsFree(cand))) {
+      console.warn(`[jvm] using fallback port ${cand} for ${server.id}`);
+      return cand;
+    }
+  }
+  return preferred; // nothing free — let the boot fail loudly in the log
+}
+
+// Kill any process whose cwd is (or was, before deletion) the given server
+// dir but which we no longer track — JVMs orphaned by a Node restart keep
+// their ports bound and poison every future boot on that slot.
+function killOrphansByDir(dir) {
+  let killed = 0;
+  const target = path.resolve(dir);
+  let entries = [];
+  try {
+    entries = fs.readdirSync("/proc");
+  } catch {
+    return 0;
+  }
+  for (const ent of entries) {
+    if (!/^\d+$/.test(ent)) continue;
+    const pid = Number(ent);
+    if (pid === process.pid) continue;
+    let cwd;
+    try {
+      cwd = fs.readlinkSync(`/proc/${ent}/cwd`);
+    } catch {
+      continue;
+    }
+    if (cwd === target || cwd === `${target} (deleted)`) {
+      try {
+        process.kill(pid, "SIGKILL");
+        killed++;
+        console.warn(`[jvm] killed orphan pid=${pid} (cwd=${cwd})`);
+      } catch {}
+    }
+  }
+  return killed;
+}
+
 // Unique local UDP port for THIS server's Geyser (Bedrock). Multiple servers
 // share one container, so each Geyser must bind a distinct UDP port. Derived
 // deterministically from the server's DB-assigned port so it's stable across
@@ -283,16 +354,30 @@ async function fabricJarUrl(version) {
 // init step run it (see ensureJar).
 async function neoforgeJarUrl(version) {
   const MAVEN = "https://maven.neoforged.net/releases/net/neoforged/neoforge";
-  // NeoForge versions look like "21.1.181" (matches MC 1.21.1). The user picks
-  // a neoforge version directly from the versions endpoint.
+  const r = await fetch(
+    "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge",
+    { headers: { "User-Agent": "CraftHost/1.0" } },
+  );
+  const m = await r.json();
+  const all = m.versions || [];
+  if (!all.length) throw new Error("No NeoForge versions found");
   if (!version || version === "LATEST") {
-    const r = await fetch(
-      "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge",
-      { headers: { "User-Agent": "CraftHost/1.0" } },
-    );
-    const m = await r.json();
-    version = (m.versions || []).slice(-1)[0];
-    if (!version) throw new Error("No NeoForge versions found");
+    version = all[all.length - 1];
+  } else if (!all.includes(version)) {
+    // The create form passes a MINECRAFT version ("1.21.1"), but the maven
+    // needs a NeoForge version ("21.1.x" for MC 1.21.1, "26.1.2.x" for MC
+    // 26.1.2) — requesting the MC version directly 404s. Map to the newest
+    // NeoForge build for that MC version.
+    const old = version.match(/^1\.(\d+)(?:\.(\d+))?$/);
+    const prefix = old ? `${old[1]}.${old[2] || 0}.` : `${version}.`;
+    const match = all.filter((v) => v.startsWith(prefix)).pop();
+    if (!match) {
+      // e.g. MC 1.20.1: NeoForge's own versioning starts at MC 1.20.2.
+      throw new Error(
+        `NeoForge has no builds for Minecraft ${version} (oldest supported is 1.20.2)`,
+      );
+    }
+    version = match;
   }
   return {
     url: `${MAVEN}/${version}/neoforge-${version}-installer.jar`,
@@ -826,7 +911,7 @@ async function startServer(containerId, server) {
 
   const dir = serverDir(id);
   const jarPath = await ensureJar(server);
-  const hostPort = pickHostPort(server);
+  const hostPort = await pickFreeHostPort(server);
   writeServerConfig(server, dir, hostPort);
   await ensureViaVersion(dir); // version bridge so Bedrock can join older Paper
   // Detect a fresh-Bedrock first boot BEFORE Geyser generates its config, so we
@@ -1230,7 +1315,12 @@ async function startServer(containerId, server) {
 async function stopServer(containerId, server) {
   const id = String(containerId || "").replace(/^jvm-/, "") || server?.id;
   const state = running.get(id);
-  if (!state || !state.proc || state.proc.killed) return { status: "offline" };
+  if (!state || !state.proc || state.proc.killed) {
+    // Not in the in-memory map (e.g. spawned before a Node restart) — make
+    // sure no orphaned JVM lives on holding this server's port.
+    killOrphansByDir(path.join(DATA_DIR, id));
+    return { status: "offline" };
+  }
   // Mark this as an intentional shutdown — the exit handler uses this to skip
   // the auto-restart trigger.
   state.intentional = true;
@@ -1245,7 +1335,18 @@ async function stopServer(containerId, server) {
         try {
           state.proc.kill("SIGTERM");
         } catch {}
-        resolve();
+        // SIGTERM can be ignored mid-boot; escalate so a deleted server can
+        // never leave a port-squatting JVM behind.
+        const t2 = setTimeout(() => {
+          try {
+            state.proc.kill("SIGKILL");
+          } catch {}
+          resolve();
+        }, 8000);
+        state.proc.once("exit", () => {
+          clearTimeout(t2);
+          resolve();
+        });
       }, 20000);
       state.proc.once("exit", () => {
         clearTimeout(t);
