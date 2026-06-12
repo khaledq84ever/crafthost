@@ -2288,5 +2288,17 @@ function audit(user_id, action, resource_id, ip, metadata) {
   }
 }
 
+// Multer error handler for the world.zip / icon uploads — without this an
+// oversized file falls through to Express's default handler as an HTML 500.
+router.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(413).json({ error: "File too large" });
+    }
+    return res.status(400).json({ error: err.message || "Upload error" });
+  }
+  next(err);
+});
+
 module.exports = router;
 module.exports.createServerForUser = createServerForUser;
