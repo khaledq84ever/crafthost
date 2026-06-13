@@ -443,20 +443,38 @@ function bedrockListenPort(server) {
     : parseInt(process.env.GEYSER_PORT || "19132", 10);
 }
 
-// Download Geyser-Standalone once into the shared cache (~28 MB). Re-used by
-// every sidecar via cwd, so we never copy the jar per server.
+// Download Geyser-Standalone into the shared cache (~28 MB). Re-used by every
+// sidecar via cwd, so we never copy the jar per server. Refreshed if the cached
+// jar is older than 24h so we track the latest Geyser build (the URL always
+// points at latest), matching the plugin-cache freshness convention.
+const GEYSER_STANDALONE_MAX_AGE_MS = 24 * 3600 * 1000;
 async function ensureGeyserStandaloneJar() {
   try {
+    const st = fs.statSync(GEYSER_STANDALONE_JAR);
     if (
-      fs.existsSync(GEYSER_STANDALONE_JAR) &&
-      fs.statSync(GEYSER_STANDALONE_JAR).size > 1_000_000
+      st.size > 1_000_000 &&
+      Date.now() - st.mtimeMs < GEYSER_STANDALONE_MAX_AGE_MS
     )
       return GEYSER_STANDALONE_JAR;
   } catch {}
   fs.mkdirSync(JAR_CACHE_DIR, { recursive: true });
   const tmp = `${GEYSER_STANDALONE_JAR}.tmp`;
-  await downloadFile(GEYSER_STANDALONE_URL, tmp, "Geyser-Standalone");
-  fs.renameSync(tmp, GEYSER_STANDALONE_JAR);
+  try {
+    await downloadFile(GEYSER_STANDALONE_URL, tmp, "Geyser-Standalone");
+    fs.renameSync(tmp, GEYSER_STANDALONE_JAR);
+  } catch (err) {
+    // Refresh failed — fall back to the existing cached jar (stale but working)
+    // so a transient download blip doesn't block server starts.
+    try {
+      fs.unlinkSync(tmp);
+    } catch {}
+    if (
+      fs.existsSync(GEYSER_STANDALONE_JAR) &&
+      fs.statSync(GEYSER_STANDALONE_JAR).size > 1_000_000
+    )
+      return GEYSER_STANDALONE_JAR;
+    throw err;
+  }
   return GEYSER_STANDALONE_JAR;
 }
 
