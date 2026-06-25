@@ -86,13 +86,35 @@ check(diagnose([
   'Could not load plugin TestPlugin v1.0.0: java.lang.ClassNotFoundException: com.test.TestMain',
 ])?.kind, 'plugin', 'Plugin-context ClassNotFoundException is plugin, not jar');
 
-// ── Most-recent line wins (or at least matches): scan-window ─────────────────
-console.log(`${Y('▶')} Scans the recent log window`);
-const oldThenFresh = [
+// ── Paperclip / corrupt libraries cache ──────────────────────────────────────
+console.log(`${Y('▶')} Paperclip corrupt libs`);
+check(diagnose([
+  '[main/ERROR]: Hash check failed for extract: libraries/net/minecraft/server/1.20.4-R0.1-SNAPSHOT/server-1.20.4-R0.1-SNAPSHOT.jar',
+])?.kind, 'libs', 'Hash check failed for extract');
+
+check(diagnose([
+  'at io.papermc.paperclip.FileEntry.extractFile(FileEntry.java:42)',
+])?.kind, 'libs', 'paperclip FileEntry.extractFile stack frame');
+
+check(diagnose([
+  'at paperclip.Paperclip.extractEntries(Paperclip.java:88)',
+])?.kind, 'libs', 'Paperclip.extractEntries stack frame');
+
+// ── Scan-window boundary ──────────────────────────────────────────────────────
+console.log(`${Y('▶')} Scan-window boundary`);
+// Error is the very last line — within the 150-line window even with 200 healthy lines before it.
+const errorAtEnd = [
   ...Array(200).fill('[INFO] all good'),
   '[ERROR] java.net.BindException: Address already in use',
 ];
-check(diagnose(oldThenFresh)?.kind, 'port', 'bind exception buried under 200 healthy lines is still found');
+check(diagnose(errorAtEnd)?.kind, 'port', 'error at tail of 201-line log is within window and found');
+
+// Error is old (>150 lines ago) — should NOT be found; only recent logs are scanned.
+const errorTooOld = [
+  '[ERROR] java.net.BindException: Address already in use',
+  ...Array(151).fill('[INFO] all good'),
+];
+check(diagnose(errorTooOld), null, 'error older than 150 lines is outside scan window and ignored');
 
 console.log(`\n─── Summary ───`);
 console.log(`${pass} pass, ${fail} fail · ${fail === 0 ? G('PASS') : R('FAIL')}`);

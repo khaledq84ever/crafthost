@@ -84,6 +84,30 @@ const expect = (name, ok, detail = '') => {
   expect('Paper 1.20.1 reaches online', boot1.online, boot1.online ? `${Math.round(boot1.ms/1000)}s` : `last=${boot1.last}`);
   if (!boot1.online) { await api(jar, `/api/servers/${sid}`, { method: 'DELETE' }); process.exit(1); }
 
+  // ── Input validation (no extra boot needed) ───────────────────────────────
+  console.log(`\n${Y('▶')} Step 1b: swap-jar input validation`);
+  const vMissing = await api(jar, `/api/servers/${sid}/swap-jar`, { method: 'POST', body: {} });
+  expect('missing type → 400', vMissing.status === 400, `got ${vMissing.status}: ${vMissing.body?.error}`);
+
+  const vBad = await api(jar, `/api/servers/${sid}/swap-jar`, { method: 'POST', body: { type: 'hacked', version: '1.0' } });
+  expect('unsupported type → 400', vBad.status === 400, `got ${vBad.status}: ${vBad.body?.error}`);
+
+  // ── Auth isolation: second user cannot swap first user's server ───────────
+  console.log(`\n${Y('▶')} Step 1c: auth isolation`);
+  const jar2 = { cookie: '' };
+  const suffix2 = crypto.randomBytes(3).toString('hex');
+  const reg2 = await api(jar2, '/api/auth/register', {
+    method: 'POST',
+    body: { username: `up2_${suffix2}`, email: `up2_${suffix2}@test.io`, password: 'Pw_' + crypto.randomBytes(6).toString('hex') },
+  });
+  if (reg2.ok) {
+    const steal = await api(jar2, `/api/servers/${sid}/swap-jar`, { method: 'POST', body: { type: 'paper', version: '1.20.1' } });
+    expect('other user swap-jar → 403 or 404', steal.status === 403 || steal.status === 404, `got ${steal.status}`);
+    await api(jar2, '/api/auth/me', { method: 'DELETE', body: { password: 'irrelevant', confirm: 'DELETE' } }).catch(() => {});
+  } else {
+    console.log(`  ${Y('~')} skipped auth isolation (second register failed)`);
+  }
+
   // ── Write marker INSIDE world/ ────────────────────────────────────────────
   console.log(`\n${Y('▶')} Step 2: write marker into world/`);
   const markerToken = `UPGRADE_TEST_${crypto.randomBytes(8).toString('hex')}`;
@@ -127,10 +151,17 @@ const expect = (name, ok, detail = '') => {
   expect('logs reference 26.1.2', sawNewBoot, sawNewBoot ? '' : `no 26.1.2 line in last 80 logs`);
   expect('logs show "Done (Xs)!" after swap', sawDone);
 
-  // server.properties must still parse (the auto-heal wipes Paper/Purpur configs;
-  // server.properties is kept). Just confirm it's readable.
+  // server.properties: must be readable AND retain key values that survive the swap.
+  // The swap wipes Paper-specific ymls but server.properties is explicitly kept.
   const props = await api(jar, `/api/servers/${sid}/files/read?path=server.properties`);
   expect('server.properties readable after swap', props.ok && typeof props.body?.content === 'string');
+  if (props.ok) {
+    const propsText = props.body.content;
+    // level-name is set on first boot and must persist — it controls which world dir is loaded.
+    expect('server.properties retains level-name key', /^level-name=/m.test(propsText), 'level-name line missing');
+    // online-mode line must be present (controls auth); its value is irrelevant here.
+    expect('server.properties retains online-mode key', /^online-mode=/m.test(propsText), 'online-mode line missing');
+  }
 
   // ── Bonus: cross-engine swap paper → vanilla 26.1.2 ───────────────────────
   console.log(`\n${Y('▶')} Step 5 (bonus): cross-engine swap paper → vanilla 26.1.2`);
