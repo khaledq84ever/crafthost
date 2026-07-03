@@ -683,6 +683,75 @@ server.listen(PORT, async () => {
     );
   }
 
+  // Join monitor: every few minutes, do a real Minecraft server-list ping
+  // through each online server's PUBLIC tunnel address — the exact check a
+  // player's multiplayer screen does. A wedged tunnel still accepts the
+  // dashboard's local traffic, so this is the only signal that catches
+  // "server looks online but nobody can join". Two consecutive failures →
+  // platform event + tunnel restart (bore re-establishes immediately; the
+  // playit upgrade path then re-runs as usual).
+  if (backend === "jvm" && process.env.JOIN_MONITOR !== "0") {
+    const mcping = require("./lib/mc-ping");
+    const pubtun = require("./lib/public-tunnel");
+    const monMin = parseInt(process.env.JOIN_MONITOR_MINUTES || "4", 10);
+    const failures = new Map(); // serverId → consecutive failed pings
+    // Mirrors routes/servers.js internalListenPort — the JVM's real local port.
+    const internalPort = (s) =>
+      26000 + (Math.max(0, parseInt(s.port, 10) - 25565) % 1000);
+    setInterval(async () => {
+      try {
+        const rows = db
+          .prepare(
+            `SELECT * FROM servers
+             WHERE status IN ('online','running')
+               AND container_id LIKE 'jvm-%'
+               AND tunnel_host IS NOT NULL AND tunnel_port IS NOT NULL`,
+          )
+          .all();
+        for (const s of rows) {
+          // Only alert on tunnel problems, not JVM problems — if the JVM
+          // itself is down the auto-restart loop owns that. Local ping first.
+          const local = await mcping.ping("127.0.0.1", internalPort(s), 5000);
+          if (!local.ok) {
+            failures.delete(s.id);
+            continue;
+          }
+          const pub = await mcping.ping(s.tunnel_host, s.tunnel_port, 8000);
+          if (pub.ok) {
+            failures.delete(s.id);
+            continue;
+          }
+          const n = (failures.get(s.id) || 0) + 1;
+          failures.set(s.id, n);
+          console.warn(
+            `[join-monitor] ${s.name} (${s.id}) unreachable at ${s.tunnel_host}:${s.tunnel_port} (${pub.error}) — strike ${n}/2`,
+          );
+          if (n >= 2) {
+            failures.delete(s.id);
+            require("./lib/events").record("tunnel_unreachable", s.id, {
+              address: `${s.tunnel_host}:${s.tunnel_port}`,
+              error: pub.error,
+            });
+            try {
+              pubtun.stop(s.id);
+              const t = await pubtun.start(s.id, internalPort(s));
+              console.log(
+                `[join-monitor] ${s.name}: tunnel restarted → ${t ? t.host + ":" + t.port : "pending"}`,
+              );
+            } catch (err) {
+              console.warn(`[join-monitor] ${s.id} tunnel restart failed:`, err.message);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[join-monitor] loop failed:", err.message);
+      }
+    }, monMin * 60_000);
+    console.log(
+      `🎮 Join monitor enabled (${monMin}min interval — real MC ping through the public tunnel, 2 strikes → tunnel restart)`,
+    );
+  }
+
   // Auto-heal loop: when ANY free-plan server OOMs (heavy MC version, Fabric's
   // heavier boot, modded server, etc.), automatically wipe server.jar, switch
   // to Paper 1.20.1 (the proven-safe combo for the 480MB heap), and restart.

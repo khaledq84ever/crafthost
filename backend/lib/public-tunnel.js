@@ -88,39 +88,60 @@ const _upgrading = new Set();
 function schedulePlayitUpgrade(serverId, localPort, secret) {
   if (_upgrading.has(serverId)) return;
   _upgrading.add(serverId);
-  setTimeout(async () => {
+  // A fresh playit java tunnel gets its address assigned anywhere between
+  // seconds and a few minutes. The old single attempt at t+8s missed that
+  // window almost every time, leaving servers on bore.pub (random port each
+  // boot — the #1 address complaint). Retry with backoff until the address
+  // lands, the server stops, or ~10 minutes pass.
+  const DELAYS_MS = [8000, 20000, 40000, 80000, 160000, 300000];
+  (async () => {
     try {
-      const addr = await playit.startJava(serverId, localPort, secret);
-      if (addr && addr.host && addr.port) {
-        // Stop bore FIRST — bore.stop() nulls tunnel_host/port — then write the
-        // playit address, so the swap doesn't clobber the new address.
+      for (const delay of DELAYS_MS) {
+        await new Promise((r) => setTimeout(r, delay));
+        let row = null;
         try {
-          bore.stop(serverId);
+          row = db
+            .prepare("SELECT status, tunnel_host FROM servers WHERE id = ?")
+            .get(serverId);
         } catch {}
-        try {
-          db.prepare(
-            "UPDATE servers SET tunnel_host = ?, tunnel_port = ? WHERE id = ?",
-          ).run(addr.host, addr.port, serverId);
-        } catch (e) {
-          console.warn("[pubtun] upgrade db update:", e.message);
+        if (!row || !/^(online|running|starting)$/.test(row.status || "")) {
+          return; // server stopped or deleted meanwhile — nothing to upgrade
         }
-        console.log(
-          `[pubtun] ${serverId}: upgraded bore → playit @ ${addr.host}:${addr.port}`,
-        );
-      } else {
-        console.warn(
-          `[pubtun] ${serverId}: playit upgrade still no address — staying on bore`,
-        );
+        if (/joinmc\.link$/.test(row.tunnel_host || "")) return; // already playit
+        try {
+          const addr = await playit.startJava(serverId, localPort, secret);
+          if (addr && addr.host && addr.port) {
+            // Stop bore FIRST — bore.stop() nulls tunnel_host/port — then write
+            // the playit address, so the swap doesn't clobber the new address.
+            try {
+              bore.stop(serverId);
+            } catch {}
+            try {
+              db.prepare(
+                "UPDATE servers SET tunnel_host = ?, tunnel_port = ? WHERE id = ?",
+              ).run(addr.host, addr.port, serverId);
+            } catch (e) {
+              console.warn("[pubtun] upgrade db update:", e.message);
+            }
+            console.log(
+              `[pubtun] ${serverId}: upgraded bore → playit @ ${addr.host}:${addr.port}`,
+            );
+            return;
+          }
+        } catch (e) {
+          console.warn(
+            `[pubtun] ${serverId}: playit upgrade attempt failed:`,
+            e.message,
+          );
+        }
       }
-    } catch (e) {
       console.warn(
-        `[pubtun] ${serverId}: playit upgrade failed — staying on bore:`,
-        e.message,
+        `[pubtun] ${serverId}: playit never assigned an address (~10min of retries) — staying on bore`,
       );
     } finally {
       _upgrading.delete(serverId);
     }
-  }, 8000);
+  })();
 }
 
 // Close the public Java tunnel. Stops the bore process (if any), drops the

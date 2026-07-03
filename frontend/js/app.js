@@ -980,15 +980,20 @@ window.useServerPicker = async (selectEl) => {
     else if (bg.classList.contains("modal-host")) bg.style.display = "none";
     else bg.classList.remove("show", "open");
   };
+  // Three overlay patterns exist: .modal-bg.show (class toggle), .modal.show
+  // (clone/world/health — the overlay IS the .modal), .modal-host (bedrock,
+  // display toggle). The inner ".modal" of the modal-bg pattern never carries
+  // .show, so ".modal.show" only matches the overlay variant.
+  const OPEN_SEL = ".modal-bg.show, .modal-bg.open, .modal.show, .modal-host";
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
-    // .modal-bg toggles a class; .modal-host (bedrock) toggles display.
-    const open = [...document.querySelectorAll(".modal-bg.show, .modal-bg.open, .modal-host")]
+    const open = [...document.querySelectorAll(OPEN_SEL)]
       .filter((el) => getComputedStyle(el).display !== "none");
     if (open.length) dismiss(open[open.length - 1]);
   });
   document.addEventListener("click", (e) => {
     const c = e.target.classList;
-    if (c && (c.contains("modal-bg") || c.contains("modal-host"))) dismiss(e.target);
+    if (c && (c.contains("modal-bg") || c.contains("modal-host") || (c.contains("modal") && c.contains("show"))))
+      dismiss(e.target);
   });
 })();

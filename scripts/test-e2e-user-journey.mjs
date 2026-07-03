@@ -42,8 +42,15 @@ const badResponses = []; // { url, status }
 const pageWeight = {}; // path -> bytes
 let currentPage = "(boot)";
 
+// MOBILE=1 runs the whole journey at phone size (iPhone-ish 390x844, touch).
+const MOBILE = process.env.MOBILE === "1";
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+const ctx = await browser.newContext(
+  MOBILE
+    ? { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true,
+        userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1" }
+    : { viewport: { width: 1280, height: 800 } },
+);
 const page = await ctx.newPage();
 page.on("console", (m) => { if (m.type() === "error") jsErrors.push({ page: currentPage, text: m.text().slice(0, 200) }); });
 page.on("pageerror", (e) => jsErrors.push({ page: currentPage, text: "PAGEERROR: " + e.message.slice(0, 200) }));
@@ -88,7 +95,7 @@ async function menuModal(sid, label, id) {
   await page.keyboard.press("Escape");
   await page.waitForTimeout(500);
   const stillOpen = await page.evaluate(() =>
-    [...document.querySelectorAll(".modal-bg.show, .modal-bg.open, .modal-host")]
+    [...document.querySelectorAll(".modal-bg.show, .modal-bg.open, .modal.show, .modal-host")]
       .filter((el) => getComputedStyle(el).display !== "none").length);
   expect(`"${label}" closes on Escape`, stillOpen === 0);
   if (stillOpen) await page.evaluate((mid) => {
