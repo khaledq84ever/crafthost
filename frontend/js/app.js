@@ -193,6 +193,13 @@ window.I18N = {
     menu_import_world: "Import world.zip",
     menu_backups: "Backups",
     menu_delete: "Delete server",
+    details: "Details",
+    bedrock_devices: "mobile / console",
+    enable_arrow: "Enable →",
+    files_new_file: "New File",
+    jars_official: "Official Types",
+    jars_custom: "My Custom JARs",
+    wiz_deploy: "Deploy Server",
   },
   ar: {
     nav_servers: "السيرفرات",
@@ -367,6 +374,13 @@ window.I18N = {
     menu_import_world: "استيراد world.zip",
     menu_backups: "النسخ الاحتياطية",
     menu_delete: "حذف السيرفر",
+    details: "التفاصيل",
+    bedrock_devices: "جوال / كونسول",
+    enable_arrow: "تفعيل ←",
+    files_new_file: "ملف جديد",
+    jars_official: "الأنواع الرسمية",
+    jars_custom: "ملفات JAR الخاصة بي",
+    wiz_deploy: "نشر السيرفر",
   },
 };
 window.t = (key) => {

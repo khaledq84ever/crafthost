@@ -201,7 +201,7 @@ function renderWizard() {
   m.innerHTML = `
   <div class="modal wiz-modal" onclick="event.stopPropagation()">
     <div class="modal-head">
-      <h3>Create New Server</h3>
+      <h3>${window.t("create_server")}</h3>
       <button class="close-btn" onclick="closeWizard()">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
@@ -217,7 +217,7 @@ function renderWizard() {
     <div class="modal-body" id="wizBody">${renderStep()}</div>
 
     <div class="modal-foot">
-      ${wizState.step > 1 ? '<button class="btn btn-ghost" onclick="wizPrev()">← Back</button>' : ""}
+      ${wizState.step > 1 ? `<button class="btn btn-ghost" onclick="wizPrev()">← ${window.t("back")}</button>` : ""}
       ${
         wizState.step < 4 && !canAdvance()
           ? `<span class="wiz-foot-hint" style="color:var(--text-disabled);font-size:13px;margin-right:auto;align-self:center;">${
@@ -231,8 +231,8 @@ function renderWizard() {
       }
       ${
         wizState.step < 4
-          ? `<button class="btn btn-primary" id="nextBtn" onclick="wizNext()" ${!canAdvance() ? "disabled" : ""}>Next →</button>`
-          : '<button class="btn btn-primary" onclick="wizDeploy()">🚀 Deploy Server</button>'
+          ? `<button class="btn btn-primary" id="nextBtn" onclick="wizNext()" ${!canAdvance() ? "disabled" : ""}>${window.t("next")} →</button>`
+          : `<button class="btn btn-primary" onclick="wizDeploy()">🚀 ${window.t("wiz_deploy")}</button>`
       }
     </div>
   </div>
