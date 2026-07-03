@@ -207,6 +207,34 @@ app.use("/api/modrinth", require("./routes/modrinth"));
 // Cached boot timestamp so /api/status can show platform uptime
 const BOOT_TS = Date.now();
 
+// Disaster-recovery DB dump. NOT part of the user/admin surface — gated by a
+// shared secret header so an off-box cron can pull nightly snapshots. The DB
+// (accounts, servers, settings) is the one thing that can't be re-created if
+// the Railway volume dies. 404s when BACKUP_KEY isn't configured.
+app.get("/api/platform/db-backup", async (req, res) => {
+  const key = process.env.BACKUP_KEY;
+  if (!key || req.get("X-Backup-Key") !== key) return res.status(404).end();
+  const os = require("os");
+  const fsp = require("fs/promises");
+  const zlib = require("zlib");
+  const tmp = path.join(os.tmpdir(), `chdb-${Date.now()}.db`);
+  try {
+    await db.backup(tmp); // better-sqlite3 online backup — safe while live
+    const raw = await fsp.readFile(tmp);
+    const gz = zlib.gzipSync(raw);
+    res.setHeader("Content-Type", "application/gzip");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="crafthost-${new Date().toISOString().slice(0, 10)}.db.gz"`,
+    );
+    res.send(gz);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    fsp.unlink(tmp).catch(() => {});
+  }
+});
+
 app.get("/api/health", async (req, res) => {
   const dockerOk = await dockerCtl.isDockerAvailable();
   const jvmOk = jvmCtl.isAvailable();
