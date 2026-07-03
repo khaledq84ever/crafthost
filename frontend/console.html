@@ -317,9 +317,9 @@
       <select class="select" style="width:220px;max-width:48vw;" id="serverPicker"></select>
       <div class="topbar-actions">
         <span id="connDot" class="dot offline" title="Disconnected"></span>
-        <button class="btn btn-primary btn-sm" id="startBtn" title="Start"><span class="lbl-full"><span class="msr">play_arrow</span> Start</span><span class="lbl-short"><span class="msr">play_arrow</span></span></button>
-        <button class="btn btn-warning btn-sm" id="restartBtn" title="Restart"><span class="lbl-full"><span class="msr">restart_alt</span> Restart</span><span class="lbl-short"><span class="msr">restart_alt</span></span></button>
-        <button class="btn btn-danger btn-sm" id="stopBtn" title="Stop"><span class="lbl-full"><span class="msr">stop</span> Stop</span><span class="lbl-short"><span class="msr">stop</span></span></button>
+        <button class="btn btn-primary btn-sm" id="startBtn" title="Start"><span class="lbl-full"><span class="msr">play_arrow</span> <span data-i18n="start">Start</span></span><span class="lbl-short"><span class="msr">play_arrow</span></span></button>
+        <button class="btn btn-warning btn-sm" id="restartBtn" title="Restart"><span class="lbl-full"><span class="msr">restart_alt</span> <span data-i18n="restart">Restart</span></span><span class="lbl-short"><span class="msr">restart_alt</span></span></button>
+        <button class="btn btn-danger btn-sm" id="stopBtn" title="Stop"><span class="lbl-full"><span class="msr">stop</span> <span data-i18n="stop">Stop</span></span><span class="lbl-short"><span class="msr">stop</span></span></button>
         <div class="avatar">K</div>
       </div>
     </div>
@@ -329,14 +329,14 @@
 
         <!-- Players -->
         <div class="players-panel">
-          <div class="pp-head">Players Online <span class="text-muted" id="playerCount">0/0</span></div>
+          <div class="pp-head"><span data-i18n="stat_players_online">Players Online</span> <span class="text-muted" id="playerCount">0/0</span></div>
           <div class="pp-list" id="playerList"></div>
         </div>
 
         <!-- Terminal -->
         <div class="terminal-panel">
           <div class="term-head">
-            <div><strong>Console</strong> <span class="text-muted" id="termHost" style="margin-left:6px;font-family:var(--font-mono);font-size:12px;"></span></div>
+            <div><strong data-i18n="nav_console">Console</strong> <span class="text-muted" id="termHost" style="margin-left:6px;font-family:var(--font-mono);font-size:12px;"></span></div>
             <div style="display:flex;gap:6px;">
               <button class="btn btn-ghost btn-sm" id="autoscrollBtn" title="Toggle auto-scroll">⤓ Auto</button>
               <button class="btn btn-ghost btn-sm" onclick="document.getElementById('term').innerHTML=''">Clear</button>
