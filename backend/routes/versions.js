@@ -55,17 +55,29 @@ router.get("/spigot", (req, res, next) => {
 router.get("/paper", async (req, res) => {
   try {
     const data = await cached("paper", async () => {
+      // PaperMC sunset api.papermc.io/v2 — its error object has no `versions`
+      // array, which made this list silently empty (broken version pickers).
+      // v3 ("fill") groups versions: { "26.2": ["26.2","26.2-rc-2"], ... }
+      // with each group's array newest-first.
       const r = await fetch(
-        (process.env.PAPER_API || "https://api.papermc.io/v2") +
+        (process.env.PAPER_V3_API || "https://fill.papermc.io/v3") +
           "/projects/paper",
         { headers: { "User-Agent": UA } },
       );
+      if (!r.ok) throw new Error(`paper v3: HTTP ${r.status}`);
       const m = await r.json();
+      const groups = m.versions || {};
+      const groupKeys = Object.keys(groups).sort((a, b) => {
+        const pa = a.split(".").map(Number),
+          pb = b.split(".").map(Number);
+        return pb[0] - pa[0] || (pb[1] || 0) - (pa[1] || 0);
+      });
       // Newest first; hide rc/pre/snapshot builds — they OOM-bait free-plan
       // users and clutter the wizard dropdown.
-      const list = [...(m.versions || [])]
-        .reverse()
+      const list = groupKeys
+        .flatMap((k) => groups[k] || [])
         .filter((v) => !/-(rc|pre|snapshot)/i.test(String(v)));
+      if (!list.length) throw new Error("paper v3: empty version list");
       return list.map((v) => ({ id: v, type: "paper" }));
     });
     res.json({ versions: data.slice(0, clampLimit(req)) });
