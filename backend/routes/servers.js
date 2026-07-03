@@ -12,6 +12,7 @@ const tunnel = require("../lib/tunnel");
 const pubtun = require("../lib/public-tunnel");
 const playit = require("../lib/playit");
 const bk = require("../lib/backup");
+const capacity = require("../lib/capacity");
 
 const MAX_WORLD_ZIP_BYTES = 500 * 1024 * 1024; // 500MB cap for world.zip uploads
 const worldUpload = multer({
@@ -421,10 +422,13 @@ async function createServerForUser(user, opts, ip) {
       status: "created",
     };
     const quotaErr = checkRunningQuota(enrichedForStart, user);
+    const capErr = quotaErr ? null : capacity.checkCapacity(db, enrichedForStart);
     if (skipAutoStart) {
       startSkippedReason = "skipped by caller";
     } else if (quotaErr) {
       startSkippedReason = quotaErr.message;
+    } else if (capErr) {
+      startSkippedReason = capErr.error;
     } else {
       try {
         await dc.startServer(enrichedForStart);
@@ -644,8 +648,11 @@ router.post("/clone", async (req, res) => {
       )
       .get(out.id);
     const quotaErr = checkRunningQuota(dst, req.user);
+    const capErr = quotaErr ? null : capacity.checkCapacity(db, dst);
     if (quotaErr) {
       startSkippedReason = quotaErr.message;
+    } else if (capErr) {
+      startSkippedReason = capErr.error;
     } else {
       await dc.startServer(dst);
       db.prepare("UPDATE servers SET status = ? WHERE id = ?").run(
@@ -1042,6 +1049,8 @@ router.post("/:id/start", async (req, res) => {
       code: "running_quota",
       conflict: quotaErr.conflict,
     });
+  const capErr = capacity.checkCapacity(db, s);
+  if (capErr) return res.status(503).json(capErr);
   try {
     const r = await dc.startServer(s);
     // The start was cancelled by a stop that arrived while the jar was still
@@ -2011,6 +2020,8 @@ router.post("/:id/swap-jar", async (req, res) => {
       code: "running_quota",
       conflict: quotaErr.conflict,
     });
+  const capErr = capacity.checkCapacity(db, s);
+  if (capErr) return res.status(503).json(capErr);
 
   const path = require("path");
   const fsp = require("fs/promises");

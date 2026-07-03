@@ -300,6 +300,11 @@ app.get("/api/health", async (req, res) => {
     disk = { error: err.message };
   }
 
+  let cap = null;
+  try {
+    cap = require("./lib/capacity").snapshot(db);
+  } catch {}
+
   res.json({
     ok: true,
     docker: dockerOk,
@@ -309,6 +314,7 @@ app.get("/api/health", async (req, res) => {
     ts: Date.now(),
     uptime: Date.now() - BOOT_TS,
     disk,
+    capacity: cap,
     public_mc_port: parseInt(
       process.env.PUBLIC_MC_PROXY_PORT || process.env.MC_PORT || "25565",
       10,
