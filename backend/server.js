@@ -196,6 +196,7 @@ app.use("/api/servers", require("./routes/servers"));
 app.use("/api/servers/:id/files", require("./routes/files"));
 app.use("/api/servers/:id/plugins", require("./routes/plugins"));
 app.use("/api/servers/:id/backups", require("./routes/backups"));
+app.use("/api/admin", require("./routes/admin"));
 app.use("/api/jars", require("./routes/jars"));
 app.use("/api/plans", require("./routes/plans"));
 app.use("/api/versions", require("./routes/versions"));
@@ -660,6 +661,9 @@ server.listen(PORT, async () => {
                 "UPDATE servers SET status = ?, last_idle_stop_at = ? WHERE id = ?",
               ).run("offline", now, s.id);
               lastSeenPlayers.delete(s.id);
+              require("./lib/events").record("idle_stop", s.id, {
+                idle_minutes: idleMin,
+              });
               console.log(
                 `💤 Idle-stop: ${s.name} stopped + world saved · will resume from current state on next /start`,
               );
@@ -820,6 +824,11 @@ server.listen(PORT, async () => {
                   "UPDATE servers SET container_id = ? WHERE id = ?",
                 ).run(r.containerId, s.id);
               }
+              require("./lib/events").record("auto_heal", s.id, {
+                from: `${s.type} ${s.version || "latest"}`,
+                to: `${SAFE_TYPE} ${SAFE_VERSION}`,
+                reason: "oom",
+              });
               console.log(
                 `🔧 Auto-heal: ${s.name} restarted with ${SAFE_TYPE} ${SAFE_VERSION}`,
               );
@@ -863,6 +872,10 @@ server.listen(PORT, async () => {
                 "UPDATE servers SET container_id = ? WHERE id = ?",
               ).run(r.containerId, s.id);
             }
+            require("./lib/events").record("auto_fix", s.id, {
+              kind: fixed.kind,
+              diagnosis: fixed.diagnosis,
+            });
             console.log(
               `🔧 Auto-fix: ${s.name} restarted after ${fixed.kind} fix`,
             );
@@ -908,6 +921,10 @@ server.listen(PORT, async () => {
               s.id,
             );
             dc.clearCrash(id);
+            require("./lib/events").record("auto_restart_cap", s.id, {
+              restarts: count,
+              window_min: WINDOW_MS / 60000,
+            });
             console.warn(
               `⛔ Auto-restart cap reached for ${s.name} (${id}) — ${count} restarts in ${WINDOW_MS / 60000}min. Staying offline.`,
             );
@@ -922,6 +939,12 @@ server.listen(PORT, async () => {
             db.prepare(
               "UPDATE servers SET status = ?, last_auto_restart_at = ?, auto_restart_count = ? WHERE id = ?",
             ).run("starting", now, count + 1, s.id);
+            require("./lib/events").record("auto_restart", s.id, {
+              attempt: count + 1,
+              max: MAX,
+              crash_code: info.code,
+              signal: info.signal || null,
+            });
             if (r?.containerId && r.containerId !== s.container_id) {
               db.prepare(
                 "UPDATE servers SET container_id = ? WHERE id = ?",

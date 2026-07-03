@@ -1895,6 +1895,9 @@ router.get("/:id/playit/claim/status", (req, res) => {
         }
       }
     }
+    // Agent liveness for the modal: playit missing/broken means "Connecting…"
+    // would otherwise spin forever with no explanation.
+    out.agent_available = playit.isAvailable();
     res.json(out);
   } catch (err) {
     res.status(500).json({ error: err.message || "claim status failed" });
@@ -2044,6 +2047,9 @@ router.post("/:id/swap-jar", async (req, res) => {
           retention: parseInt(process.env.BACKUPS_PER_SERVER || "10", 10),
           label: CROSS_TO_VANILLA ? "auto-pre-engine-swap" : "auto-pre-downgrade",
         });
+        require("../lib/events").record("auto_backup", s.id, {
+          label: CROSS_TO_VANILLA ? "auto-pre-engine-swap" : "auto-pre-downgrade",
+        });
       } catch (err) {
         console.warn(`[swap-jar] ${s.id} auto-backup failed:`, err.message);
       }
@@ -2175,6 +2181,11 @@ router.post("/:id/swap-jar", async (req, res) => {
         "UPDATE servers SET type = ?, version = ?, status = ? WHERE id = ?",
       ).run(prev.type, prev.version, "offline", s.id);
     } catch {}
+    require("../lib/events").record("swap_rollback", s.id, {
+      attempted: `${type} ${version || "latest"}`,
+      restored: `${prev.type} ${prev.version || "latest"}`,
+      error: String(err.message || "").slice(0, 200),
+    });
     console.warn(`[swap-jar] ${s.id} failed, rolled back:`, err.message);
     res.status(500).json({
       error: `Version change failed (${err.message || "unknown error"}). Your server was restored to ${prev.type} ${prev.version || "latest"} and is stopped — start it again when ready.`,

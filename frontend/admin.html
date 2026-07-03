@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="dark" />
+<link rel="icon" type="image/svg+xml" href="/icon.svg" />
+<title>Ops · CraftHost Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/css/theme.css" />
+<style>
+.ops-wrap { max-width: 1080px; margin: 60px auto 40px; padding: 0 20px; font-family: Inter, sans-serif; }
+.ops-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+.ops-head h1 { margin: 0; font-size: 22px; }
+.ops-head .sub { color: var(--slate-400); font-size: 12px; }
+.ops-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.ops-card { background: rgba(148,163,184,0.06); border: 1px solid rgba(148,163,184,0.14); border-radius: 10px; padding: 12px 14px; }
+.ops-card .v { font-size: 20px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.ops-card .l { font-size: 11px; color: var(--slate-400); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+.ops-bar { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+select, .ops-bar button { background: rgba(148,163,184,0.08); color: inherit; border: 1px solid rgba(148,163,184,0.2); border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; color: var(--slate-400); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 10px; border-bottom: 1px solid rgba(148,163,184,0.2); }
+td { padding: 8px 10px; border-bottom: 1px solid rgba(148,163,184,0.08); vertical-align: top; }
+td.mono, .kind { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+.kind { padding: 2px 8px; border-radius: 999px; font-size: 11px; white-space: nowrap; }
+.k-idle_stop { background: rgba(56,189,248,0.12); color: #7dd3fc; }
+.k-auto_heal, .k-auto_fix { background: rgba(52,211,153,0.12); color: #6ee7b7; }
+.k-auto_restart { background: rgba(245,158,11,0.12); color: #fcd34d; }
+.k-auto_restart_cap, .k-swap_rollback { background: rgba(244,63,94,0.14); color: #fda4af; }
+.k-auto_backup { background: rgba(167,139,250,0.14); color: #c4b5fd; }
+.meta { color: var(--slate-400); font-size: 12px; word-break: break-word; }
+.gate { max-width: 460px; margin: 120px auto; text-align: center; color: var(--slate-400); }
+#tblWrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<div id="app" class="ops-wrap" style="display:none;">
+  <div class="ops-head">
+    <h1>🛠 Platform Ops</h1>
+    <span class="sub" id="updatedAt"></span>
+    <span class="sub"><a href="/dashboard.html" style="color:var(--blue,#38bdf8);">← dashboard</a></span>
+  </div>
+  <div class="ops-cards" id="cards"></div>
+  <div class="ops-bar">
+    <label class="sub">Event kind:</label>
+    <select id="kindFilter">
+      <option value="">all</option>
+      <option>idle_stop</option>
+      <option>auto_heal</option>
+      <option>auto_fix</option>
+      <option>auto_restart</option>
+      <option>auto_restart_cap</option>
+      <option>swap_rollback</option>
+      <option>auto_backup</option>
+    </select>
+    <button onclick="load()">↻ Refresh</button>
+    <span class="sub">auto-refreshes every 10s</span>
+  </div>
+  <div id="tblWrap">
+    <table>
+      <thead><tr><th>When</th><th>Event</th><th>Server</th><th>Details</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="4" class="meta">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+<div id="gate" class="gate" style="display:none;">
+  <h2>Admin only</h2>
+  <p id="gateMsg">Sign in with an admin account to view platform ops.</p>
+  <p><a href="/login.html" style="color:var(--blue,#38bdf8);">Sign in →</a></p>
+</div>
+<script>
+async function api(path) {
+  const r = await fetch(path, { credentials: "include" });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(data.error || "HTTP " + r.status); e.status = r.status; throw e; }
+  return data;
+}
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function fmtMeta(kind, m) {
+  if (!m) return "";
+  if (kind === "idle_stop") return `idle ${m.idle_minutes} min`;
+  if (kind === "auto_heal") return `${esc(m.from)} → ${esc(m.to)} (${esc(m.reason)})`;
+  if (kind === "auto_fix") return `${esc(m.kind)}: ${esc(m.diagnosis || "")}`;
+  if (kind === "auto_restart") return `attempt ${m.attempt}/${m.max} · crash code=${esc(m.crash_code)}${m.signal ? " sig=" + esc(m.signal) : ""}`;
+  if (kind === "auto_restart_cap") return `${m.restarts} restarts in ${m.window_min} min — left offline`;
+  if (kind === "swap_rollback") return `tried ${esc(m.attempted)}, restored ${esc(m.restored)} — ${esc(m.error)}`;
+  if (kind === "auto_backup") return esc(m.label);
+  return esc(JSON.stringify(m));
+}
+async function load() {
+  const kind = document.getElementById("kindFilter").value;
+  try {
+    const d = await api("/api/admin/ops" + (kind ? "?kind=" + encodeURIComponent(kind) : ""));
+    document.getElementById("gate").style.display = "none";
+    document.getElementById("app").style.display = "";
+    const f = d.fleet, c = d.config;
+    document.getElementById("cards").innerHTML = [
+      [f.running, "running servers"],
+      [f.total, "total servers"],
+      [f.users, "users"],
+      [c.idle_stop_minutes + "m", "idle-stop"],
+      [c.max_running_per_user, "run cap / user"],
+      [c.backups_per_server, "backups / server"],
+    ].map(([v, l]) => `<div class="ops-card"><div class="v">${esc(v)}</div><div class="l">${esc(l)}</div></div>`).join("");
+    const rows = (d.events || []).map(e => `
+      <tr>
+        <td class="mono" title="${new Date(e.created_at * 1000).toISOString()}">${new Date(e.created_at * 1000).toLocaleString()}</td>
+        <td><span class="kind k-${esc(e.kind)}">${esc(e.kind)}</span></td>
+        <td>${esc(e.server_name || e.server_id || "—")}</td>
+        <td class="meta">${fmtMeta(e.kind, e.metadata)}</td>
+      </tr>`).join("");
+    document.getElementById("rows").innerHTML = rows || '<tr><td colspan="4" class="meta">No platform events yet — the automation has had nothing to do. 🎉</td></tr>';
+    document.getElementById("updatedAt").textContent = "updated " + new Date().toLocaleTimeString();
+  } catch (err) {
+    if (err.status === 401 || err.status === 403) {
+      document.getElementById("app").style.display = "none";
+      document.getElementById("gate").style.display = "";
+      if (err.status === 403) document.getElementById("gateMsg").textContent = "Your account is signed in but not an admin.";
+    } else {
+      document.getElementById("rows").innerHTML = `<tr><td colspan="4" class="meta">Failed to load: ${esc(err.message)}</td></tr>`;
+    }
+  }
+}
+document.getElementById("kindFilter").onchange = load;
+load();
+setInterval(load, 10000);
+</script>
+</body>
+</html>
