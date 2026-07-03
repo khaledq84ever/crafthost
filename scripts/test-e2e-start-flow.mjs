@@ -6,7 +6,7 @@ import { chromium } from "playwright";
 
 const BASE = process.env.BASE || "http://localhost:4123";
 const rand = Math.random().toString(36).slice(2, 8);
-const USER = `e2e${rand}`;
+const USER = `smoke${rand}`; // smoke* users are auto-cleaned on server boot
 const PASS = "E2e-test-12345";
 
 const consoleErrors = [];
@@ -142,4 +142,16 @@ console.log("failedRequests:", failedRequests.length ? failedRequests : "none");
 console.log("dialogs:", dialogs);
 console.log("status bodies (last 20):", statusBodies.slice(-20).map((b) => `${b.st}/${b.online}/${b.hist}`).join(" "));
 console.log(JSON.stringify({ ok: /online/i.test(status), btnDeaths, consoleErrors: consoleErrors.length, failedRequests: failedRequests.length }));
+// 7) Cleanup: delete both servers so live runs leave nothing behind
+step("cleanup");
+const cleanup = await page.evaluate(async () => {
+  const list = await (await fetch("/api/servers", { credentials: "include" })).json();
+  const out = { idle_stop_minutes: list.idle_stop_minutes, deleted: [] };
+  for (const s of list.servers || []) {
+    const r = await fetch(`/api/servers/${s.id}`, { method: "DELETE", credentials: "include" });
+    out.deleted.push(`${s.name}:${r.status}`);
+  }
+  return out;
+});
+console.log("   idle_stop_minutes:", cleanup.idle_stop_minutes, "· deleted:", cleanup.deleted.join(", "));
 await browser.close();
