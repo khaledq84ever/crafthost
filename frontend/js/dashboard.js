@@ -348,9 +348,9 @@ function renderServer(s) {
       <div class="sc-primary-row">
         ${
           isOnline
-            ? `<button class="btn btn-danger sc-primary" onclick="serverAction('${escapeHtml(s.id)}', 'stop')">■ Stop Server</button>
+            ? `<button class="btn btn-danger sc-primary" onclick="serverAction('${escapeHtml(s.id)}', 'stop')">■ ${t("stop_server")}</button>
              <button class="btn btn-warning sc-icon-btn" onclick="serverAction('${escapeHtml(s.id)}', 'restart')" title="Restart server" aria-label="Restart server">⟳</button>`
-            : `<button class="btn btn-primary sc-primary" onclick="serverAction('${escapeHtml(s.id)}', 'start')">▶ Start Server</button>`
+            : `<button class="btn btn-primary sc-primary" onclick="serverAction('${escapeHtml(s.id)}', 'start')">▶ ${t("start_server")}</button>`
         }
         <button class="btn btn-secondary sc-icon-btn sc-console-btn" onclick="goToConsole('${escapeHtml(s.id)}')" title="Open console" aria-label="Open console">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
@@ -361,16 +361,16 @@ function renderServer(s) {
       </div>
       <div class="sc-menu" id="sc-menu-${escapeHtml(s.id)}" role="menu">
         <button role="menuitem" onclick="closeCardMenu();openLogs('${escapeHtml(s.id)}', '${jsArg(s.name)}')">
-          <span class="sc-menu-icon">📜</span><span>View Logs</span>
+          <span class="sc-menu-icon">📜</span><span>${t("menu_view_logs")}</span>
         </button>
         <button role="menuitem" onclick="closeCardMenu();openSettings('${escapeHtml(s.id)}', '${jsArg(s.name)}')">
-          <span class="sc-menu-icon">⚙️</span><span>Settings</span>
+          <span class="sc-menu-icon">⚙️</span><span>${t("nav_settings")}</span>
         </button>
         <button role="menuitem" onclick="closeCardMenu();openSwapJar('${escapeHtml(s.id)}', '${escapeHtml(s.type)}', '${escapeHtml(s.version || "")}', '${escapeHtml(s.plan_id || "free")}')">
-          <span class="sc-menu-icon">📦</span><span>Change JAR</span>
+          <span class="sc-menu-icon">📦</span><span>${t("menu_change_jar")}</span>
         </button>
         <button role="menuitem" onclick="closeCardMenu();copyText('${escapeHtml(ip)}')">
-          <span class="sc-menu-icon">📋</span><span>Copy address</span>
+          <span class="sc-menu-icon">📋</span><span>${t("menu_copy_address")}</span>
         </button>
         ${
           [
@@ -383,29 +383,29 @@ function renderServer(s) {
           ].includes((s.type || "").toLowerCase())
             ? `
         <button role="menuitem" onclick="closeCardMenu();openBedrockModal('${escapeHtml(s.id)}', '${jsArg(s.name)}')">
-          <span class="sc-menu-icon">📱</span><span>${s.playit_enabled ? "Bedrock cross-play (ON)" : "Enable Bedrock cross-play"}</span>
+          <span class="sc-menu-icon">📱</span><span>${s.playit_enabled ? t("menu_bedrock_on") : t("menu_bedrock_enable")}</span>
         </button>`
             : ""
         }
         ${
           !s.is_public
             ? `<button role="menuitem" onclick="closeCardMenu();promoteServer('${escapeHtml(s.id)}', '${jsArg(s.name)}')">
-          <span class="sc-menu-icon">🌍</span><span>Make Public</span>
+          <span class="sc-menu-icon">🌍</span><span>${t("menu_make_public")}</span>
         </button>`
             : ""
         }
         <button role="menuitem" onclick="closeCardMenu();openCloneDialog('${escapeHtml(s.id)}', '${jsArg(s.name)}')">
-          <span class="sc-menu-icon">📑</span><span>Clone server</span>
+          <span class="sc-menu-icon">📑</span><span>${t("menu_clone")}</span>
         </button>
         <button role="menuitem" onclick="closeCardMenu();openWorldImport('${escapeHtml(s.id)}', '${jsArg(s.name)}')">
-          <span class="sc-menu-icon">🌍</span><span>Import world.zip</span>
+          <span class="sc-menu-icon">🌍</span><span>${t("menu_import_world")}</span>
         </button>
         <button role="menuitem" onclick="closeCardMenu();openBackups('${escapeHtml(s.id)}', '${jsArg(s.name)}')">
-          <span class="sc-menu-icon">💾</span><span>Backups</span>
+          <span class="sc-menu-icon">💾</span><span>${t("menu_backups")}</span>
         </button>
         <div class="sc-menu-sep"></div>
         <button role="menuitem" class="sc-menu-danger" onclick="closeCardMenu();openDeleteConfirm('${escapeHtml(s.id)}', '${jsArg(s.name)}')">
-          <span class="sc-menu-icon">🗑</span><span>Delete server</span>
+          <span class="sc-menu-icon">🗑</span><span>${t("menu_delete")}</span>
         </button>
       </div>
     </div>
@@ -425,7 +425,7 @@ function openDeleteConfirm(sid, name) {
   modal.innerHTML = `
     <div class="modal" onclick="event.stopPropagation()" style="max-width:440px;">
       <div class="modal-head" style="border-bottom:1px solid var(--glass-border);">
-        <h3 style="color:var(--red);">🗑 Delete server</h3>
+        <h3 style="color:var(--red);">🗑 ${t("menu_delete")}</h3>
         <button class="close-btn" onclick="document.getElementById('delServerModal').classList.remove('show')">✕</button>
       </div>
       <div class="modal-body">
@@ -444,7 +444,7 @@ function openDeleteConfirm(sid, name) {
         </div>
       </div>
       <div class="modal-foot">
-        <button class="btn btn-ghost" onclick="document.getElementById('delServerModal').classList.remove('show')">Cancel</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('delServerModal').classList.remove('show')">${t("cancel")}</button>
         <button class="btn btn-danger" id="delServerGo" disabled>Delete forever</button>
       </div>
     </div>
@@ -484,7 +484,7 @@ async function openLogs(sid, name) {
   modal.innerHTML = `
     <div class="modal" onclick="event.stopPropagation()" style="max-width:820px;width:95%;">
       <div class="modal-head">
-        <h3>📜 Logs · ${escapeHtml(name)}</h3>
+        <h3>📜 ${t("menu_view_logs")} · ${escapeHtml(name)}</h3>
         <div style="display:flex;gap:8px;align-items:center;">
           <button class="btn btn-ghost btn-sm" id="logsRefresh">↻ Refresh</button>
           <button class="close-btn" id="logsClose">✕</button>
@@ -642,7 +642,7 @@ async function openSwapJar(sid, curType, curVer, planId) {
   modal.innerHTML = `
     <div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">
       <div class="modal-head">
-        <h3>Change Server JAR</h3>
+        <h3>${t("menu_change_jar")}</h3>
         <button class="close-btn" onclick="document.getElementById('swapJarModal').classList.remove('show')">✕</button>
       </div>
       <div class="modal-body">
@@ -661,8 +661,8 @@ async function openSwapJar(sid, curType, curVer, planId) {
         <p class="text-muted" style="font-size:13px;">⚠ Server will stop, download new JAR (~30s), and restart automatically. Your world data is preserved.</p>
       </div>
       <div class="modal-foot">
-        <button class="btn btn-ghost" onclick="document.getElementById('swapJarModal').classList.remove('show')">Cancel</button>
-        <button class="btn btn-primary" id="sjApply">Apply</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('swapJarModal').classList.remove('show')">${t("cancel")}</button>
+        <button class="btn btn-primary" id="sjApply">${t("apply")}</button>
       </div>
     </div>
   `;
@@ -835,7 +835,7 @@ async function openBackups(sid, name) {
   modal.innerHTML = `
     <div class="modal" onclick="event.stopPropagation()" style="max-width:560px;">
       <div class="modal-head">
-        <h3>💾 Backups — ${escapeHtml(name)}</h3>
+        <h3>💾 ${t("menu_backups")} — ${escapeHtml(name)}</h3>
         <button class="close-btn" onclick="document.getElementById('backupsModal').classList.remove('show')">✕</button>
       </div>
       <div class="modal-body">
@@ -1011,7 +1011,7 @@ async function openSettings(sid, name) {
   modal.innerHTML = `
     <div class="modal" onclick="event.stopPropagation()" style="max-width:560px;">
       <div class="modal-head">
-        <h3>⚙ Settings · ${escapeHtml(name)}</h3>
+        <h3>⚙ ${t("nav_settings")} · ${escapeHtml(name)}</h3>
         <button class="close-btn" onclick="document.getElementById('settingsModal').classList.remove('show')">✕</button>
       </div>
       <div class="modal-body">
@@ -1071,7 +1071,7 @@ async function openSettings(sid, name) {
       </div>
       <div class="modal-foot">
         <label class="flex items-center gap-2" style="margin-right:auto;"><input type="checkbox" id="set_restart" checked /> Restart to apply</label>
-        <button class="btn btn-ghost" onclick="document.getElementById('settingsModal').classList.remove('show')">Cancel</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('settingsModal').classList.remove('show')">${t("cancel")}</button>
         <button class="btn btn-primary" id="set_save" disabled>Save</button>
       </div>
     </div>
@@ -1962,7 +1962,7 @@ async function openCloneDialog(sourceId, sourceName) {
     modal.innerHTML = `
       <div class="modal-card" style="max-width: 460px;width:100%;">
         <div class="modal-head">
-          <h3 style="margin:0;font-size:17px;">📑 Clone server</h3>
+          <h3 style="margin:0;font-size:17px;">📑 ${t("menu_clone")}</h3>
           <button class="modal-close" onclick="closeCloneDialog()" aria-label="Close">✕</button>
         </div>
         <div class="modal-body" style="padding:18px 20px;">
@@ -1979,7 +1979,7 @@ async function openCloneDialog(sourceId, sourceName) {
           <div id="cloneStatus" style="margin-top:14px;font-size:13px;color:var(--slate-400);display:none;"></div>
         </div>
         <div class="modal-foot" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;border-top:1px solid var(--glass-border);">
-          <button class="btn btn-ghost" onclick="closeCloneDialog()">Cancel</button>
+          <button class="btn btn-ghost" onclick="closeCloneDialog()">${t("cancel")}</button>
           <button class="btn btn-primary" id="cloneSubmit">📑 Clone now</button>
         </div>
       </div>`;
@@ -2050,7 +2050,7 @@ async function openWorldImport(sid, sname) {
     modal.innerHTML = `
       <div class="modal-card" style="max-width:480px;width:100%;">
         <div class="modal-head">
-          <h3 style="margin:0;font-size:17px;">🌍 Import world</h3>
+          <h3 style="margin:0;font-size:17px;">🌍 ${t("menu_import_world")}</h3>
           <button class="modal-close" onclick="closeWorldImport()" aria-label="Close">✕</button>
         </div>
         <div class="modal-body" style="padding:18px 20px;">
@@ -2087,7 +2087,7 @@ async function openWorldImport(sid, sname) {
           </p>
         </div>
         <div class="modal-foot" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;border-top:1px solid var(--glass-border);">
-          <button class="btn btn-ghost" onclick="closeWorldImport()">Cancel</button>
+          <button class="btn btn-ghost" onclick="closeWorldImport()">${t("cancel")}</button>
           <button class="btn btn-primary" id="wiSubmit" disabled>🌍 Upload & restart</button>
         </div>
       </div>`;
@@ -2394,7 +2394,7 @@ async function renderBedrockStatus(sid, sname) {
           Waiting for approval… (${status.elapsed_sec || 0}s)
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
-          <button class="btn btn-secondary btn-sm" onclick="cancelBedrockClaim('${escapeHtml(sid)}', '${jsArg(sname)}')">Cancel</button>
+          <button class="btn btn-secondary btn-sm" onclick="cancelBedrockClaim('${escapeHtml(sid)}', '${jsArg(sname)}')">${t("cancel")}</button>
         </div>`;
       if (bedrockPollTimer) clearInterval(bedrockPollTimer);
       bedrockPollTimer = setInterval(async () => {
@@ -2435,7 +2435,7 @@ async function renderBedrockStatus(sid, sname) {
         auto-installs Geyser + Floodgate so Java and Bedrock players share the same world.
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
-        <button class="btn btn-secondary btn-sm" onclick="closeBedrockModal()">Cancel</button>
+        <button class="btn btn-secondary btn-sm" onclick="closeBedrockModal()">${t("cancel")}</button>
         <button class="btn btn-primary btn-sm" id="bedrockEnableBtn" onclick="enableBedrock('${escapeHtml(sid)}', '${jsArg(sname)}')">⚡ Enable Bedrock cross-play</button>
       </div>`;
   } catch (err) {
