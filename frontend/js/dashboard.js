@@ -2279,6 +2279,8 @@ async function renderBedrockStatus(sid, sname) {
 
     if (srv.playit_enabled && srv.playit_host && srv.playit_port) {
       // Connected + agent running with assigned address
+      if (window.__bedrockConnectingSince)
+        delete window.__bedrockConnectingSince[sid];
       const bp = status.bedrock_plugins || {};
       const pluginsReady = bp.geyser && bp.floodgate;
       const pluginsRow = pluginsReady
@@ -2311,7 +2313,40 @@ async function renderBedrockStatus(sid, sname) {
     }
 
     if (srv.playit_enabled) {
-      // Secret set but no address yet — agent is connecting
+      // Secret set but no address yet — agent is connecting. Track how long
+      // this server has been stuck here so we can escalate instead of showing
+      // "Connecting…" forever when the agent is down or the tunnel is broken.
+      window.__bedrockConnectingSince = window.__bedrockConnectingSince || {};
+      const since = (window.__bedrockConnectingSince[sid] =
+        window.__bedrockConnectingSince[sid] || Date.now());
+      const stuckMs = Date.now() - since;
+      const agentDown = status.agent_available === false;
+
+      if (agentDown || stuckMs > 45000) {
+        body.innerHTML = `
+          <div style="background:rgba(244,63,94,0.10);border:1px solid rgba(244,63,94,0.3);border-radius:9px;padding:12px;margin-bottom:14px;">
+            <div style="font-weight:700;color:var(--rose);margin-bottom:4px;">⚠ Bedrock isn't connecting</div>
+            <div style="font-size:12px;color:var(--slate-400);">
+              ${agentDown
+                ? "The Bedrock relay agent is not available on the platform right now."
+                : "No public address after " + Math.round(stuckMs / 1000) + "s — the tunnel may be stuck."}
+              Restarting the server usually re-wires it. If it keeps failing, disable and re-enable Bedrock.
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-warning btn-sm" onclick="delete window.__bedrockConnectingSince['${escapeHtml(sid)}']; serverAction('${escapeHtml(sid)}', 'restart'); closeBedrockModal();">⟳ Restart server</button>
+            <button class="btn btn-secondary btn-sm" onclick="delete window.__bedrockConnectingSince['${escapeHtml(sid)}']; renderBedrockStatus('${escapeHtml(sid)}', '${escapeHtml(sname)}')">↻ Retry</button>
+            <button class="btn btn-danger btn-sm" onclick="disableBedrock('${escapeHtml(sid)}')">Disable</button>
+          </div>`;
+        // Keep polling — the address may still show up on its own.
+        if (bedrockPollTimer) clearInterval(bedrockPollTimer);
+        bedrockPollTimer = setInterval(
+          () => renderBedrockStatus(sid, sname),
+          5000,
+        );
+        return;
+      }
+
       body.innerHTML = `
         <div style="text-align:center;padding:18px 0;">
           <div style="font-weight:700;margin-bottom:8px;">⏳ Connecting to playit.gg…</div>
@@ -2329,6 +2364,8 @@ async function renderBedrockStatus(sid, sname) {
       );
       return;
     }
+    // Address resolved or Bedrock off — clear the stuck-tracker for this server.
+    if (window.__bedrockConnectingSince) delete window.__bedrockConnectingSince[sid];
 
     if (status.status === "pending" && status.claim_url) {
       // Claim in progress — show the URL + poll
