@@ -53,10 +53,21 @@ const expect = (name, ok, detail = '') => {
   if (!ADMIN_DB) {
     console.log(`\n${Y('~')} ADMIN_DB not set — skipping admin-side checks (live mode: gate only)`);
   } else {
-    console.log(`\n${Y('▶')} Admin-side checks (sqlite promote)`);
-    execFileSync('sqlite3', [ADMIN_DB, `UPDATE users SET role='admin' WHERE username='smokeadm${suffix}';`]);
-    // The existing token keeps working: authMiddleware re-selects the user
-    // (incl. role) from the DB on every request.
+    // The ops API is gated to a single username (ADMIN_USERNAME, default
+    // khaledq84ever). Locally: boot the server with ADMIN_USERNAME=<owner>,
+    // free the name in the scratch DB, then register it.
+    const OWNER = process.env.ADMIN_USERNAME || 'smokeboss';
+    console.log(`\n${Y('▶')} Admin-side checks (owner username: ${OWNER})`);
+    execFileSync('sqlite3', [ADMIN_DB, `DELETE FROM users WHERE username='${OWNER}';`]);
+    const regOwner = await j('POST', '/api/auth/register', {
+      username: OWNER, email: `${OWNER}@test.io`,
+      password: 'Pw_' + crypto.randomBytes(6).toString('hex'),
+    }, false);
+    if (regOwner.status !== 200) { console.error(R('owner register failed'), regOwner.data); process.exit(2); }
+    TOKEN = regOwner.data.token;
+    // Wipe the auto-started starter so the quota can't block the swap below.
+    const lsOwner = await j('GET', '/api/servers');
+    for (const s of lsOwner.data?.servers || []) await j('DELETE', `/api/servers/${s.id}`);
     const ops = await j('GET', '/api/admin/ops');
     expect('admin → 200', ops.status === 200, `got ${ops.status}`);
     expect('fleet summary present', typeof ops.data?.fleet?.total === 'number' && typeof ops.data?.fleet?.users === 'number', JSON.stringify(ops.data?.fleet || {}).slice(0, 80));

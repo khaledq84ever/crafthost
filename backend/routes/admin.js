@@ -5,12 +5,24 @@
 
 const express = require("express");
 const db = require("../db");
-const { authMiddleware, adminOnly } = require("../lib/auth");
+const { authMiddleware } = require("../lib/auth");
 const events = require("../lib/events");
 const dc = require("../lib/controller");
 
 const router = express.Router();
-router.use(authMiddleware, adminOnly);
+
+// Owner-only by explicit request: the ops API answers to a single username
+// (khaledq84ever), regardless of the role column. ADMIN_USERNAME env
+// overrides for local testing.
+const ADMIN_USERNAME = (
+  process.env.ADMIN_USERNAME || "khaledq84ever"
+).toLowerCase();
+function ownerOnly(req, res, next) {
+  if ((req.user?.username || "").toLowerCase() !== ADMIN_USERNAME)
+    return res.status(403).json({ error: "Admin only" });
+  next();
+}
+router.use(authMiddleware, ownerOnly);
 
 // GET /api/admin/ops?limit=200&kind=idle_stop
 router.get("/ops", async (req, res) => {
