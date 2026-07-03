@@ -1004,9 +1004,38 @@ function checkRunningQuota(s, user) {
   return null;
 }
 
+// Servers with a jar swap currently in flight. Start/restart are rejected for
+// these (stop stays allowed — it's the universal cancel via startTokens).
+const swapsInFlight = new Set();
+
+// Compare two MC version strings numerically ("1.20.1" < "1.21" < "26.2").
+// Returns true only when both parse and `to` is strictly older than `from` —
+// a world saved by a newer MC generally cannot be loaded by an older one.
+function isVersionDowngrade(from, to) {
+  const parse = (v) => {
+    const m = String(v || "").match(/^(\d+(?:\.\d+)*)/);
+    return m ? m[1].split(".").map(Number) : null;
+  };
+  const a = parse(from);
+  const b = parse(to);
+  if (!a || !b) return false;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] || 0;
+    const y = b[i] || 0;
+    if (y < x) return true;
+    if (y > x) return false;
+  }
+  return false;
+}
+
 router.post("/:id/start", async (req, res) => {
   const s = getOwnedServer(req, res);
   if (!s) return;
+  if (swapsInFlight.has(s.id))
+    return res.status(409).json({
+      error: "A version change is in progress for this server. Wait for it to finish.",
+      code: "busy",
+    });
   const quotaErr = checkRunningQuota(s, req.user);
   if (quotaErr)
     return res.status(409).json({
@@ -1064,6 +1093,11 @@ router.post("/:id/stop", async (req, res) => {
 router.post("/:id/restart", async (req, res) => {
   const s = getOwnedServer(req, res);
   if (!s) return;
+  if (swapsInFlight.has(s.id))
+    return res.status(409).json({
+      error: "A version change is in progress for this server. Wait for it to finish.",
+      code: "busy",
+    });
   try {
     pubtun.stop(s.id);
     playit.stop(s.id);
@@ -1934,7 +1968,7 @@ router.post("/:id/playit", async (req, res) => {
 router.post("/:id/swap-jar", async (req, res) => {
   const s = getOwnedServer(req, res);
   if (!s) return;
-  const { type, version } = req.body || {};
+  const { type, version, force } = req.body || {};
   if (!type) return res.status(400).json({ error: "Missing type" });
   const allowed = new Set([
     "paper",
@@ -1947,13 +1981,61 @@ router.post("/:id/swap-jar", async (req, res) => {
   ]);
   if (!allowed.has(type))
     return res.status(400).json({ error: "Unsupported type" });
+  if (
+    version != null &&
+    version !== "" &&
+    !/^[0-9A-Za-z][0-9A-Za-z._-]{0,31}$/.test(String(version))
+  )
+    return res
+      .status(400)
+      .json({ error: "Invalid version", code: "bad_version" });
+
+  if (swapsInFlight.has(s.id))
+    return res.status(409).json({
+      error: "A version change is already in progress for this server.",
+      code: "busy",
+    });
+
+  // A world saved by a newer MC usually cannot load on an older one. Refuse
+  // downgrades unless the caller explicitly forces (accepting world risk).
+  if (!force && isVersionDowngrade(s.version, version))
+    return res.status(409).json({
+      error: `This server's world was saved with ${s.version}. Going back to ${version} can corrupt it. Choose ${s.version} or newer, or confirm the downgrade to proceed anyway.`,
+      code: "unsafe_downgrade",
+    });
+
+  // The swap ends with a start. checkRunningQuota only counts OTHER running
+  // servers, so swapping a running server always passes — but swapping a
+  // stopped server while another one runs must 409 like start does.
+  const quotaErr = checkRunningQuota(s, req.user);
+  if (quotaErr)
+    return res.status(409).json({
+      error: quotaErr.message,
+      code: "running_quota",
+      conflict: quotaErr.conflict,
+    });
 
   const path = require("path");
   const fsp = require("fs/promises");
   const DATA_DIR =
     process.env.DATA_DIR || path.resolve(__dirname, "../../data/servers");
 
+  swapsInFlight.add(s.id);
+  const prev = { type: s.type, version: s.version };
   try {
+    // Mark starting up-front so the UI shows progress (and disables buttons)
+    // during the stop+wipe+download phase, not just after the new JVM spawns.
+    db.prepare("UPDATE servers SET status = ? WHERE id = ?").run(
+      "starting",
+      s.id,
+    );
+    // A stale crash record would let the auto-restart loop spawn a competing
+    // start mid-swap — consume it, this swap supersedes any crash recovery.
+    try {
+      dc.clearCrash(s.id);
+    } catch {}
+    pubtun.stop(s.id);
+    playit.stop(s.id);
     // Stop, wipe server.jar + type-specific configs, persist new fields, restart.
     await dc.stopServer(s);
     const serverRoot = path.join(DATA_DIR, s.id);
@@ -2034,16 +2116,46 @@ router.post("/:id/swap-jar", async (req, res) => {
     ).run(type, version || null, "starting", s.id);
     const updated = { ...s, type, version: version || null };
     const r = await dc.startServer(updated);
+    // A stop arrived while the new jar was downloading — the stop already set
+    // status=offline; keep the new type/version (it applies on next start).
+    if (r?.status === "cancelled")
+      return res.json({ ok: true, type, version, ...r });
     if (r.containerId && r.containerId !== s.container_id) {
       db.prepare("UPDATE servers SET container_id = ? WHERE id = ?").run(
         r.containerId,
         s.id,
       );
     }
+    // Bring the public tunnels back up, same as the restart route.
+    if (pubtun.isAvailable()) {
+      pubtun
+        .start(s.id, internalListenPort(updated))
+        .catch((err) => console.warn("[swap-jar] tunnel:", err.message));
+    }
+    if (s.playit_secret && playit.isAvailable()) {
+      playit
+        .start(s.id, bedrockLocalPort(updated), s.playit_secret)
+        .catch((err) => console.warn("[swap-jar] playit:", err.message));
+    }
     audit(req.user.id, "server.swap_jar", s.id, req.ip, { type, version });
     res.json({ ok: true, type, version, ...r });
   } catch (err) {
-    res.status(500).json({ error: err.message || "swap-jar failed" });
+    // The new jar failed to download or boot. Restore the previous
+    // type/version (the old jar re-links from the cache on next start) and
+    // mark offline so the card doesn't sit on "starting" forever.
+    try {
+      db.prepare(
+        "UPDATE servers SET type = ?, version = ?, status = ? WHERE id = ?",
+      ).run(prev.type, prev.version, "offline", s.id);
+    } catch {}
+    console.warn(`[swap-jar] ${s.id} failed, rolled back:`, err.message);
+    res.status(500).json({
+      error: `Version change failed (${err.message || "unknown error"}). Your server was restored to ${prev.type} ${prev.version || "latest"} and is stopped — start it again when ready.`,
+      code: "swap_failed",
+      rolled_back: true,
+    });
+  } finally {
+    swapsInFlight.delete(s.id);
   }
 });
 

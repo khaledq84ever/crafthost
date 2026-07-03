@@ -571,8 +571,10 @@ async function autoFixOom(sid, name) {
   try {
     toast(`🔧 Healing ${name}…`);
     await api(`/api/servers/${sid}/swap-jar`, {
+      // force: the user just confirmed this recovery swap, and the crashed
+      // version may be newer than 1.21.1 (which would trip the downgrade guard).
       method: "POST",
-      body: { type: "paper", version: "1.21.1" },
+      body: { type: "paper", version: "1.21.1", force: true },
     });
     toast(`✓ ${name} restarted with Paper 1.21.1`);
     loadServers();
@@ -598,6 +600,24 @@ async function openSwapJar(sid, curType, curVer, planId) {
     if (!v || v === "LATEST") return true;
     const m = String(v).match(/^1\.(\d+)/);
     return m ? parseInt(m[1], 10) >= 21 : false;
+  };
+  // Numeric MC version compare, mirrors the backend's downgrade guard
+  // ("1.20.1" < "1.21" < "26.2"). True when `to` is strictly older.
+  const isDowngrade = (from, to) => {
+    const parse = (v) => {
+      const m = String(v || "").match(/^(\d+(?:\.\d+)*)/);
+      return m ? m[1].split(".").map(Number) : null;
+    };
+    const a = parse(from),
+      b = parse(to);
+    if (!a || !b) return false;
+    for (let i = 0; i < Math.max(a.length, b.length); i++) {
+      const x = a[i] || 0,
+        y = b[i] || 0;
+      if (y < x) return true;
+      if (y > x) return false;
+    }
+    return false;
   };
   let modal = document.getElementById("swapJarModal");
   if (!modal) {
@@ -625,6 +645,7 @@ async function openSwapJar(sid, curType, curVer, planId) {
           <select class="select" id="sjVersion"><option>Loading…</option></select>
         </div>
         <div id="sjWarn"></div>
+        <div id="sjError"></div>
         <p class="text-muted" style="font-size:13px;">⚠ Server will stop, download new JAR (~30s), and restart automatically. Your world data is preserved.</p>
       </div>
       <div class="modal-foot">
@@ -686,6 +707,7 @@ async function openSwapJar(sid, curType, curVer, planId) {
                   const isSel = v.id === safeFor;
                   const tags = [];
                   if (isCur) tags.push("Current");
+                  if (isDowngrade(curVer, v.id)) tags.push("⚠ older than current");
                   if (isFree && heavy(v.id)) tags.push("⚠ may OOM");
                   if (isFree && !heavy(v.id) && v.id === safeFor)
                     tags.push("✓ recommended");
@@ -695,29 +717,86 @@ async function openSwapJar(sid, curType, curVer, planId) {
                 .join("")}</optgroup>`,
           )
           .join("") || "<option>(no versions)</option>";
-      sel.onchange = updateWarn;
+      sel.onchange = () => {
+        // New selection invalidates a pending downgrade confirmation.
+        forceNext = false;
+        document.getElementById("sjError").innerHTML = "";
+        document.getElementById("sjApply").textContent = "Apply";
+        updateWarn();
+      };
       updateWarn();
     } catch {
       sel.innerHTML = "<option>Failed to fetch</option>";
     }
   }
-  document.getElementById("sjType").onchange = loadVer;
+  document.getElementById("sjType").onchange = () => {
+    // Changing the picker invalidates a pending downgrade confirmation.
+    forceNext = false;
+    document.getElementById("sjError").innerHTML = "";
+    document.getElementById("sjApply").textContent = "Apply";
+    loadVer();
+  };
+  // Set after an unsafe_downgrade 409: the next Apply click resends with
+  // force:true. Reset whenever the selection changes.
+  let forceNext = false;
+  const sjError = (html) => {
+    document.getElementById("sjError").innerHTML = html
+      ? `<div class="wiz-warn" role="alert">${html}</div>`
+      : "";
+  };
   document.getElementById("sjApply").onclick = async () => {
     const type = document.getElementById("sjType").value;
     const version = document.getElementById("sjVersion").value;
     const btn = document.getElementById("sjApply");
     btn.disabled = true;
     btn.textContent = "⏳ Swapping…";
+    sjError("");
     try {
       await api(`/api/servers/${sid}/swap-jar`, {
         method: "POST",
-        body: { type, version },
+        body: forceNext ? { type, version, force: true } : { type, version },
       });
-      toast(`✓ Swapped to ${type} ${version}`);
+      toast(`✓ Swapping to ${type} ${version} — restarting…`);
       document.getElementById("swapJarModal").classList.remove("show");
+      // Flip the card to "Starting…" immediately and tight-poll until online,
+      // same as serverAction — the backend marks it starting right away.
+      const s = servers.find((x) => x.id === sid);
+      if (s) {
+        s.status = "starting";
+        s.type = type;
+        s.version = version;
+      }
+      renderServers();
+      tightPollServerStatus(sid, "online");
       loadServers();
     } catch (err) {
-      toast(err.message, "error");
+      const code = err?.data?.code;
+      if (code === "unsafe_downgrade") {
+        forceNext = true;
+        sjError(
+          `<strong>⚠ Older version selected</strong><p>${escapeHtml(err.message)}</p>`,
+        );
+        btn.disabled = false;
+        btn.textContent = "⚠ Downgrade anyway";
+        return;
+      }
+      forceNext = false;
+      if (code === "busy") {
+        sjError(
+          `<strong>⏳ Server is busy</strong><p>${escapeHtml(err.message)}</p>`,
+        );
+      } else if (code === "running_quota") {
+        sjError(
+          `<strong>Another server is running</strong><p>${escapeHtml(err.message)}</p>`,
+        );
+      } else if (code === "swap_failed") {
+        sjError(
+          `<strong>Version change failed — server restored</strong><p>${escapeHtml(err.message)}</p>`,
+        );
+        loadServers();
+      } else {
+        sjError(`<p>${escapeHtml(err.message || "Swap failed")}</p>`);
+      }
       btn.disabled = false;
       btn.textContent = "Apply";
     }
