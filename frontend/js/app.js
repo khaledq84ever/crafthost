@@ -174,6 +174,13 @@ window.I18N = {
     priority_support: "Priority support",
     ddos: "DDoS protection",
     bedrock_java: "Bedrock & Java",
+    status_title: "System status",
+    status_sub: "Real-time platform health. Auto-refreshes every 30 seconds.",
+    status_users: "Users",
+    status_running_now: "Running now",
+    settings_profile: "Profile",
+    settings_current_pw: "Current password (required to save)",
+    save_changes: "Save changes",
   },
   ar: {
     nav_servers: "السيرفرات",
@@ -329,6 +336,13 @@ window.I18N = {
     priority_support: "دعم ذو أولوية",
     ddos: "حماية DDoS",
     bedrock_java: "Bedrock و Java",
+    status_title: "حالة النظام",
+    status_sub: "صحة المنصة في الوقت الفعلي. يتم التحديث تلقائيًا كل 30 ثانية.",
+    status_users: "المستخدمون",
+    status_running_now: "يعمل الآن",
+    settings_profile: "الملف الشخصي",
+    settings_current_pw: "كلمة المرور الحالية (مطلوبة للحفظ)",
+    save_changes: "حفظ التغييرات",
   },
 };
 window.t = (key) => {
