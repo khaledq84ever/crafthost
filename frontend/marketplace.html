@@ -32,7 +32,7 @@
       rel="stylesheet"
     />
     <link
-      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=add_moderator,arrow_upward,auto_awesome,close,create_new_folder,delete,deployed_code,download,extension,folder_open,forest,gavel,local_fire_department,logout,my_location,note_add,play_arrow,remove_moderator,restart_alt,save,settings,sports_esports,star,stop,sync,upload,visibility,warning&display=block"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/css/theme.css" />
@@ -322,6 +322,24 @@
             server.
           </p>
 
+          <div class="mp-searchbar" style="margin: 0 0 18px;">
+            <input
+              type="search"
+              id="mpSearch"
+              class="input"
+              placeholder="Search 200,000+ plugins & mods…"
+              autocomplete="off"
+              style="max-width: 460px; width: 100%;"
+            />
+          </div>
+          <div class="mp-section" id="searchSection" style="display: none;">
+            <span class="mp-section-label"
+              ><span class="msr">extension</span> Search Results</span
+            >
+            <span class="mp-section-sub" id="searchSub">Live · Modrinth</span>
+          </div>
+          <div class="mp-feed" id="searchRow" style="display: none;"></div>
+
           <div class="mp-section">
             <span class="mp-section-label"
               ><span class="msr">star</span>
@@ -574,6 +592,26 @@
         if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
         return String(n);
       }
+      function renderHits(row, hits) {
+        row.innerHTML = hits
+          .map((m) => {
+            const icon = m.icon_url
+              ? `<img class="mp-feed-icon" src="${escapeHtml(m.icon_url)}" loading="lazy" alt="" />`
+              : `<div class="mp-feed-icon"></div>`;
+            // Compact card: icon + name + downloads only. Description removed
+            // because it's pure clutter at this density on mobile.
+            return `
+        <a class="mp-feed-card" href="https://modrinth.com/mod/${escapeHtml(m.slug || m.project_id)}" target="_blank" rel="noopener">
+          ${icon}
+          <div class="mp-feed-text">
+            <div class="mp-feed-name">${escapeHtml(m.title || "?")}</div>
+            <div class="mp-feed-meta">⬇ ${fmtDownloads(m.downloads)}</div>
+          </div>
+        </a>
+      `;
+          })
+          .join("");
+      }
       async function loadFeed(targetId, sort) {
         const row = document.getElementById(targetId);
         if (!row) return;
@@ -593,28 +631,51 @@
             row.innerHTML = '<div class="mp-feed-loading">No results</div>';
             return;
           }
-          row.innerHTML = hits
-            .map((m) => {
-              const icon = m.icon_url
-                ? `<img class="mp-feed-icon" src="${escapeHtml(m.icon_url)}" loading="lazy" alt="" />`
-                : `<div class="mp-feed-icon"></div>`;
-              // Compact card: icon + name + downloads only. Description removed
-              // because it's pure clutter at this density on mobile.
-              return `
-        <a class="mp-feed-card" href="https://modrinth.com/mod/${escapeHtml(m.slug || m.project_id)}" target="_blank" rel="noopener">
-          ${icon}
-          <div class="mp-feed-text">
-            <div class="mp-feed-name">${escapeHtml(m.title || "?")}</div>
-            <div class="mp-feed-meta">⬇ ${fmtDownloads(m.downloads)}</div>
-          </div>
-        </a>
-      `;
-            })
-            .join("");
+          renderHits(row, hits);
         } catch (err) {
           row.innerHTML = `<div class="mp-feed-loading">Failed to load (${escapeHtml(err.message)})</div>`;
         }
       }
+
+      // ── Search — same Modrinth proxy, debounced as-you-type ──────────
+      let searchTimer = null,
+        searchSeq = 0;
+      async function doSearch(q) {
+        const section = document.getElementById("searchSection");
+        const row = document.getElementById("searchRow");
+        if (!q) {
+          section.style.display = "none";
+          row.style.display = "none";
+          return;
+        }
+        section.style.display = "";
+        row.style.display = "";
+        row.innerHTML = '<div class="mp-feed-loading">Searching…</div>';
+        const seq = ++searchSeq;
+        try {
+          const r = await fetch(
+            `/api/modrinth/search?q=${encodeURIComponent(q)}&limit=18`,
+            { credentials: "include" },
+          );
+          const data = await r.json();
+          if (seq !== searchSeq) return; // a newer search superseded this one
+          const hits = data.hits || [];
+          document.getElementById("searchSub").textContent =
+            `${data.total_hits ?? hits.length} results · Modrinth`;
+          if (!hits.length) {
+            row.innerHTML = '<div class="mp-feed-loading">No results</div>';
+            return;
+          }
+          renderHits(row, hits);
+        } catch (err) {
+          if (seq !== searchSeq) return;
+          row.innerHTML = `<div class="mp-feed-loading">Search failed (${escapeHtml(err.message)})</div>`;
+        }
+      }
+      document.getElementById("mpSearch").addEventListener("input", (e) => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => doSearch(e.target.value.trim()), 350);
+      });
 
       (async function init() {
         picker = await useServerPicker(document.getElementById("serverPicker"));

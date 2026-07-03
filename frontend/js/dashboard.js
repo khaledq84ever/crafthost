@@ -59,6 +59,15 @@ function escapeHtml(s) {
   );
 }
 
+// For interpolating a user-controlled string into a '…'-quoted JS argument
+// inside an inline onclick attribute. escapeHtml alone is NOT enough there:
+// the browser decodes &#39; back to ' before the JS engine parses the
+// handler, so "Steve's server" still breaks the call. Backslash-escape for
+// JS first, then entity-escape for the attribute.
+function jsArg(s) {
+  return escapeHtml(String(s == null ? "" : s).replace(/\\/g, "\\\\").replace(/'/g, "\\'"));
+}
+
 function typeLabel(s) {
   const t = (s.type || "").charAt(0).toUpperCase() + (s.type || "").slice(1);
   return `${t} ${s.version === "LATEST" ? "" : s.version || ""}`.trim();
@@ -227,7 +236,7 @@ function renderServer(s) {
         <strong>⚠ Out of memory</strong>
         <div>Minecraft ${escapeHtml(s.version || "latest")} exceeded available heap. The platform will auto-fix this within 20 seconds.</div>
       </div>
-      <button class="btn btn-primary btn-sm sc-fix-btn" onclick="autoFixOom('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')">
+      <button class="btn btn-primary btn-sm sc-fix-btn" onclick="autoFixOom('${escapeHtml(s.id)}', '${jsArg(s.name)}')">
         🔧 Fix it now
       </button>
     </div>`;
@@ -297,7 +306,7 @@ function renderServer(s) {
     </div>`
         : s.playit_enabled
           ? `
-    <div class="sc-ip" title="Bedrock cross-play is on — waiting for tunnel address" onclick="openBedrockModal('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')" style="cursor:pointer;border-color:rgba(255,107,53,0.35);background:rgba(255,107,53,0.05);">
+    <div class="sc-ip" title="Bedrock cross-play is on — waiting for tunnel address" onclick="openBedrockModal('${escapeHtml(s.id)}', '${jsArg(s.name)}')" style="cursor:pointer;border-color:rgba(255,107,53,0.35);background:rgba(255,107,53,0.05);">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ff6b35" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
       <span style="flex:1;"><span style="font-weight:600;">Bedrock:</span> on — connecting…</span>
       <span class="sc-copy">Details</span>
@@ -311,7 +320,7 @@ function renderServer(s) {
                 "neoforge",
               ].includes((s.type || "").toLowerCase())
             ? `
-    <div class="sc-ip sc-bedrock-enable" title="Enable Bedrock cross-play — mobile / Xbox / Switch / PS players" onclick="openBedrockModal('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')" style="cursor:pointer;border-style:dashed;border-color:rgba(255,107,53,0.5);background:rgba(255,107,53,0.04);">
+    <div class="sc-ip sc-bedrock-enable" title="Enable Bedrock cross-play — mobile / Xbox / Switch / PS players" onclick="openBedrockModal('${escapeHtml(s.id)}', '${jsArg(s.name)}')" style="cursor:pointer;border-style:dashed;border-color:rgba(255,107,53,0.5);background:rgba(255,107,53,0.04);">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ff6b35" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
       <span style="flex:1;"><span style="font-weight:600;">Enable Bedrock cross-play</span> <span style="opacity:.65;font-size:11px;">mobile / console</span></span>
       <span class="sc-copy" style="background:rgba(255,107,53,0.18);color:#ff6b35;">Enable →</span>
@@ -351,10 +360,10 @@ function renderServer(s) {
         </button>
       </div>
       <div class="sc-menu" id="sc-menu-${escapeHtml(s.id)}" role="menu">
-        <button role="menuitem" onclick="closeCardMenu();openLogs('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')">
+        <button role="menuitem" onclick="closeCardMenu();openLogs('${escapeHtml(s.id)}', '${jsArg(s.name)}')">
           <span class="sc-menu-icon">📜</span><span>View Logs</span>
         </button>
-        <button role="menuitem" onclick="closeCardMenu();openSettings('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')">
+        <button role="menuitem" onclick="closeCardMenu();openSettings('${escapeHtml(s.id)}', '${jsArg(s.name)}')">
           <span class="sc-menu-icon">⚙️</span><span>Settings</span>
         </button>
         <button role="menuitem" onclick="closeCardMenu();openSwapJar('${escapeHtml(s.id)}', '${escapeHtml(s.type)}', '${escapeHtml(s.version || "")}', '${escapeHtml(s.plan_id || "free")}')">
@@ -373,29 +382,29 @@ function renderServer(s) {
             "neoforge",
           ].includes((s.type || "").toLowerCase())
             ? `
-        <button role="menuitem" onclick="closeCardMenu();openBedrockModal('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')">
+        <button role="menuitem" onclick="closeCardMenu();openBedrockModal('${escapeHtml(s.id)}', '${jsArg(s.name)}')">
           <span class="sc-menu-icon">📱</span><span>${s.playit_enabled ? "Bedrock cross-play (ON)" : "Enable Bedrock cross-play"}</span>
         </button>`
             : ""
         }
         ${
           !s.is_public
-            ? `<button role="menuitem" onclick="closeCardMenu();promoteServer('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')">
+            ? `<button role="menuitem" onclick="closeCardMenu();promoteServer('${escapeHtml(s.id)}', '${jsArg(s.name)}')">
           <span class="sc-menu-icon">🌍</span><span>Make Public</span>
         </button>`
             : ""
         }
-        <button role="menuitem" onclick="closeCardMenu();openCloneDialog('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')">
+        <button role="menuitem" onclick="closeCardMenu();openCloneDialog('${escapeHtml(s.id)}', '${jsArg(s.name)}')">
           <span class="sc-menu-icon">📑</span><span>Clone server</span>
         </button>
-        <button role="menuitem" onclick="closeCardMenu();openWorldImport('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')">
+        <button role="menuitem" onclick="closeCardMenu();openWorldImport('${escapeHtml(s.id)}', '${jsArg(s.name)}')">
           <span class="sc-menu-icon">🌍</span><span>Import world.zip</span>
         </button>
-        <button role="menuitem" onclick="closeCardMenu();openBackups('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')">
+        <button role="menuitem" onclick="closeCardMenu();openBackups('${escapeHtml(s.id)}', '${jsArg(s.name)}')">
           <span class="sc-menu-icon">💾</span><span>Backups</span>
         </button>
         <div class="sc-menu-sep"></div>
-        <button role="menuitem" class="sc-menu-danger" onclick="closeCardMenu();openDeleteConfirm('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')">
+        <button role="menuitem" class="sc-menu-danger" onclick="closeCardMenu();openDeleteConfirm('${escapeHtml(s.id)}', '${jsArg(s.name)}')">
           <span class="sc-menu-icon">🗑</span><span>Delete server</span>
         </button>
       </div>
@@ -640,7 +649,7 @@ async function openSwapJar(sid, curType, curVer, planId) {
         <div class="field">
           <label class="label">Server Type</label>
           <select class="select" id="sjType">
-            ${["paper", "vanilla", "purpur", "fabric"].map((t) => `<option value="${t}" ${t === curType ? "selected" : ""}>${t[0].toUpperCase() + t.slice(1)}</option>`).join("")}
+            ${["paper", "vanilla", "purpur", "fabric", "neoforge"].map((t) => `<option value="${t}" ${t === curType ? "selected" : ""}>${t[0].toUpperCase() + t.slice(1)}</option>`).join("")}
           </select>
         </div>
         <div class="field">
@@ -890,9 +899,9 @@ async function openBackups(sid, name) {
               <div style="font-size:13px;">${badge}${label}</div>
               <div class="text-muted" style="font-size:11px;">${escapeHtml(when)} · ${fmtBackupSize(b.size)}</div>
             </div>
-            <button class="btn btn-secondary btn-sm" onclick="restoreBackup('${escapeHtml(sid)}','${escapeHtml(b.id)}','${escapeHtml(name)}')">↩ Restore</button>
+            <button class="btn btn-secondary btn-sm" onclick="restoreBackup('${escapeHtml(sid)}','${escapeHtml(b.id)}','${jsArg(name)}')">↩ Restore</button>
             <button class="btn btn-ghost btn-sm" onclick="window.open('/api/servers/${escapeHtml(sid)}/backups/${encodeURIComponent(b.id)}/download','_blank')" title="Download zip">⬇</button>
-            <button class="btn btn-ghost btn-sm" style="color:var(--red,#f87171);" onclick="deleteBackup('${escapeHtml(sid)}','${escapeHtml(b.id)}','${escapeHtml(name)}')" title="Delete backup">🗑</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--red,#f87171);" onclick="deleteBackup('${escapeHtml(sid)}','${escapeHtml(b.id)}','${jsArg(name)}')" title="Delete backup">🗑</button>
           </div>`;
         })
         .join("");
@@ -2335,7 +2344,7 @@ async function renderBedrockStatus(sid, sname) {
           </div>
           <div style="display:flex;gap:8px;justify-content:flex-end;">
             <button class="btn btn-warning btn-sm" onclick="delete window.__bedrockConnectingSince['${escapeHtml(sid)}']; serverAction('${escapeHtml(sid)}', 'restart'); closeBedrockModal();">⟳ Restart server</button>
-            <button class="btn btn-secondary btn-sm" onclick="delete window.__bedrockConnectingSince['${escapeHtml(sid)}']; renderBedrockStatus('${escapeHtml(sid)}', '${escapeHtml(sname)}')">↻ Retry</button>
+            <button class="btn btn-secondary btn-sm" onclick="delete window.__bedrockConnectingSince['${escapeHtml(sid)}']; renderBedrockStatus('${escapeHtml(sid)}', '${jsArg(sname)}')">↻ Retry</button>
             <button class="btn btn-danger btn-sm" onclick="disableBedrock('${escapeHtml(sid)}')">Disable</button>
           </div>`;
         // Keep polling — the address may still show up on its own.
@@ -2353,7 +2362,7 @@ async function renderBedrockStatus(sid, sname) {
           <div style="color:var(--slate-400);font-size:12px;">The agent is starting. Address will appear here within ~20s.</div>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
-          <button class="btn btn-secondary btn-sm" onclick="renderBedrockStatus('${escapeHtml(sid)}', '${escapeHtml(sname)}')">↻ Refresh</button>
+          <button class="btn btn-secondary btn-sm" onclick="renderBedrockStatus('${escapeHtml(sid)}', '${jsArg(sname)}')">↻ Refresh</button>
           <button class="btn btn-secondary btn-sm" onclick="closeBedrockModal()">Close</button>
         </div>`;
       // Auto-refresh every 3s
@@ -2385,7 +2394,7 @@ async function renderBedrockStatus(sid, sname) {
           Waiting for approval… (${status.elapsed_sec || 0}s)
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
-          <button class="btn btn-secondary btn-sm" onclick="cancelBedrockClaim('${escapeHtml(sid)}', '${escapeHtml(sname)}')">Cancel</button>
+          <button class="btn btn-secondary btn-sm" onclick="cancelBedrockClaim('${escapeHtml(sid)}', '${jsArg(sname)}')">Cancel</button>
         </div>`;
       if (bedrockPollTimer) clearInterval(bedrockPollTimer);
       bedrockPollTimer = setInterval(async () => {
@@ -2427,7 +2436,7 @@ async function renderBedrockStatus(sid, sname) {
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
         <button class="btn btn-secondary btn-sm" onclick="closeBedrockModal()">Cancel</button>
-        <button class="btn btn-primary btn-sm" id="bedrockEnableBtn" onclick="enableBedrock('${escapeHtml(sid)}', '${escapeHtml(sname)}')">⚡ Enable Bedrock cross-play</button>
+        <button class="btn btn-primary btn-sm" id="bedrockEnableBtn" onclick="enableBedrock('${escapeHtml(sid)}', '${jsArg(sname)}')">⚡ Enable Bedrock cross-play</button>
       </div>`;
   } catch (err) {
     body.innerHTML = `<div style="color:var(--rose);">Error: ${escapeHtml(err.message)}</div>`;

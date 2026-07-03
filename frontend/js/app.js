@@ -969,3 +969,26 @@ window.useServerPicker = async (selectEl) => {
     onChange: (fn) => listeners.push(fn),
   };
 };
+
+// ── Global modal UX: Escape or backdrop-click closes any open modal ────────
+// Routes through the modal's own ✕ button when it has one (so per-modal
+// cleanup like claim-poll timers still runs); otherwise just hides it.
+(() => {
+  const dismiss = (bg) => {
+    const btn = bg.querySelector(".close-btn, .modal-close, [data-close]");
+    if (btn) btn.click();
+    else if (bg.classList.contains("modal-host")) bg.style.display = "none";
+    else bg.classList.remove("show", "open");
+  };
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    // .modal-bg toggles a class; .modal-host (bedrock) toggles display.
+    const open = [...document.querySelectorAll(".modal-bg.show, .modal-bg.open, .modal-host")]
+      .filter((el) => getComputedStyle(el).display !== "none");
+    if (open.length) dismiss(open[open.length - 1]);
+  });
+  document.addEventListener("click", (e) => {
+    const c = e.target.classList;
+    if (c && (c.contains("modal-bg") || c.contains("modal-host"))) dismiss(e.target);
+  });
+})();

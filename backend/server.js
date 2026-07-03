@@ -84,6 +84,7 @@ if (process.env.EMERGENCY_PURGE !== "0") {
 }
 
 const express = require("express");
+const compression = require("compression");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -101,6 +102,7 @@ const { verifyToken } = require("./lib/auth");
 
 const app = express();
 const server = http.createServer(app);
+app.use(compression());
 
 // Trust Railway's proxy so req.ip + secure cookies work correctly behind their TLS terminator
 app.set("trust proxy", 1);
