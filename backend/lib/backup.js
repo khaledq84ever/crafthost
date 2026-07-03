@@ -35,11 +35,17 @@ function listBackups(serverId) {
     if (!e.isFile() || !e.name.endsWith('.zip')) continue;
     const full = path.join(d, e.name);
     const st = fs.statSync(full);
+    const id = e.name.replace(/\.zip$/, '');
+    // Optional label is encoded in the filename after "__" (e.g.
+    // "2026-07-03T10-00-00_ab12__auto-pre-downgrade.zip").
+    const label = id.includes('__') ? id.split('__').slice(1).join('__') : null;
     out.push({
-      id: e.name.replace(/\.zip$/, ''),
+      id,
       filename: e.name,
       size: st.size,
       created_at: st.mtimeMs,
+      label,
+      auto: !!(label && label.startsWith('auto-')),
     });
   }
   out.sort((a, b) => b.created_at - a.created_at);
@@ -64,23 +70,38 @@ async function createBackup(serverId, ctx = {}) {
     zip.addFile('EMPTY.txt', Buffer.from('Server had no world data at backup time.\n'));
   }
 
-  const id = `${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}_${crypto.randomBytes(3).toString('hex')}`;
+  const safeLabel = ctx.label
+    ? String(ctx.label).toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 40)
+    : '';
+  const id =
+    `${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}_${crypto.randomBytes(3).toString('hex')}` +
+    (safeLabel ? `__${safeLabel}` : '');
   const dest = path.join(backupDirFor(serverId), `${id}.zip`);
   zip.writeZip(dest);
   const st = fs.statSync(dest);
 
-  // Enforce retention (oldest-first delete)
+  // Enforce retention (oldest-first delete). ctx.protect names a backup id
+  // that must survive eviction — the pre-restore safety snapshot would
+  // otherwise be able to evict the very backup that is about to be restored.
   if (ctx.retention && ctx.retention > 0) {
     const all = listBackups(serverId);
     if (all.length > ctx.retention) {
-      const toDelete = all.slice(ctx.retention);
+      const toDelete = all
+        .slice(ctx.retention)
+        .filter((b) => !ctx.protect || b.id !== ctx.protect);
       for (const b of toDelete) {
         try { fs.unlinkSync(path.join(backupDirFor(serverId), b.filename)); } catch {}
       }
     }
   }
 
-  return { id, filename: path.basename(dest), size: st.size, created_at: st.mtimeMs };
+  return {
+    id,
+    filename: path.basename(dest),
+    size: st.size,
+    created_at: st.mtimeMs,
+    label: safeLabel || null,
+  };
 }
 
 async function restoreBackup(serverId, backupId) {
@@ -122,6 +143,14 @@ async function restoreBackup(serverId, backupId) {
   return { ok: true };
 }
 
+// Remove every backup for a server (called when the server itself is deleted,
+// and by the orphan janitor). Best-effort.
+async function deleteAllBackups(serverId) {
+  const d = path.join(BACKUP_DIR, serverId);
+  try { fs.rmSync(d, { recursive: true, force: true }); } catch {}
+  return { ok: true };
+}
+
 async function deleteBackup(serverId, backupId) {
   const p = path.join(backupDirFor(serverId), `${backupId}.zip`);
   if (!fs.existsSync(p)) throw new Error('Backup not found');
@@ -140,8 +169,10 @@ function totalBackupBytes(serverId) {
 }
 
 module.exports = {
+  BACKUP_DIR,
   listBackups,
   createBackup,
+  deleteAllBackups,
   restoreBackup,
   deleteBackup,
   pathForDownload,

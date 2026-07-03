@@ -11,6 +11,7 @@ const railway = require("../lib/railway-api");
 const tunnel = require("../lib/tunnel");
 const pubtun = require("../lib/public-tunnel");
 const playit = require("../lib/playit");
+const bk = require("../lib/backup");
 
 const MAX_WORLD_ZIP_BYTES = 500 * 1024 * 1024; // 500MB cap for world.zip uploads
 const worldUpload = multer({
@@ -1004,9 +1005,10 @@ function checkRunningQuota(s, user) {
   return null;
 }
 
-// Servers with a jar swap currently in flight. Start/restart are rejected for
-// these (stop stays allowed — it's the universal cancel via startTokens).
-const swapsInFlight = new Set();
+// Per-server exclusive-op lock shared with the backups routes: swap, backup,
+// and restore are mutually exclusive, and start/restart are rejected while one
+// runs (stop stays allowed — it's the universal cancel via startTokens).
+const oplock = require("../lib/oplock");
 
 // Compare two MC version strings numerically ("1.20.1" < "1.21" < "26.2").
 // Returns true only when both parse and `to` is strictly older than `from` —
@@ -1031,11 +1033,8 @@ function isVersionDowngrade(from, to) {
 router.post("/:id/start", async (req, res) => {
   const s = getOwnedServer(req, res);
   if (!s) return;
-  if (swapsInFlight.has(s.id))
-    return res.status(409).json({
-      error: "A version change is in progress for this server. Wait for it to finish.",
-      code: "busy",
-    });
+  if (oplock.has(s.id))
+    return res.status(409).json(oplock.busyPayload(s.id));
   const quotaErr = checkRunningQuota(s, req.user);
   if (quotaErr)
     return res.status(409).json({
@@ -1093,11 +1092,8 @@ router.post("/:id/stop", async (req, res) => {
 router.post("/:id/restart", async (req, res) => {
   const s = getOwnedServer(req, res);
   if (!s) return;
-  if (swapsInFlight.has(s.id))
-    return res.status(409).json({
-      error: "A version change is in progress for this server. Wait for it to finish.",
-      code: "busy",
-    });
+  if (oplock.has(s.id))
+    return res.status(409).json(oplock.busyPayload(s.id));
   try {
     pubtun.stop(s.id);
     playit.stop(s.id);
@@ -1148,6 +1144,7 @@ router.delete("/:id", async (req, res) => {
       console.warn("[delete] proxy cleanup failed:", err.message);
     }
   }
+  await bk.deleteAllBackups(s.id).catch(() => {});
   db.prepare("DELETE FROM servers WHERE id = ?").run(s.id);
   audit(req.user.id, "server.delete", s.id, req.ip);
   res.json({ ok: true });
@@ -1990,11 +1987,8 @@ router.post("/:id/swap-jar", async (req, res) => {
       .status(400)
       .json({ error: "Invalid version", code: "bad_version" });
 
-  if (swapsInFlight.has(s.id))
-    return res.status(409).json({
-      error: "A version change is already in progress for this server.",
-      code: "busy",
-    });
+  if (oplock.has(s.id))
+    return res.status(409).json(oplock.busyPayload(s.id));
 
   // A world saved by a newer MC usually cannot load on an older one. Refuse
   // downgrades unless the caller explicitly forces (accepting world risk).
@@ -2020,7 +2014,7 @@ router.post("/:id/swap-jar", async (req, res) => {
   const DATA_DIR =
     process.env.DATA_DIR || path.resolve(__dirname, "../../data/servers");
 
-  swapsInFlight.add(s.id);
+  oplock.acquire(s.id, "swap");
   const prev = { type: s.type, version: s.version };
   try {
     // Mark starting up-front so the UI shows progress (and disables buttons)
@@ -2038,6 +2032,22 @@ router.post("/:id/swap-jar", async (req, res) => {
     playit.stop(s.id);
     // Stop, wipe server.jar + type-specific configs, persist new fields, restart.
     await dc.stopServer(s);
+    // World-risky swaps get an automatic snapshot (after the stop, so chunks
+    // are flushed; before any wiping): forced downgrades can corrupt the
+    // world, and cross-engine swaps into vanilla wipe level.dat below.
+    const CROSS_TO_VANILLA =
+      ["paper", "purpur", "spigot", "fabric"].includes(s.type) &&
+      type === "vanilla";
+    if ((force && isVersionDowngrade(prev.version, version)) || CROSS_TO_VANILLA) {
+      try {
+        await bk.createBackup(s.id, {
+          retention: parseInt(process.env.BACKUPS_PER_SERVER || "10", 10),
+          label: CROSS_TO_VANILLA ? "auto-pre-engine-swap" : "auto-pre-downgrade",
+        });
+      } catch (err) {
+        console.warn(`[swap-jar] ${s.id} auto-backup failed:`, err.message);
+      }
+    }
     const serverRoot = path.join(DATA_DIR, s.id);
     await fsp.unlink(path.join(serverRoot, "server.jar")).catch(() => {});
     // CRITICAL: when swapping types (e.g. purpur → paper), wipe type-specific
@@ -2155,7 +2165,7 @@ router.post("/:id/swap-jar", async (req, res) => {
       rolled_back: true,
     });
   } finally {
-    swapsInFlight.delete(s.id);
+    oplock.release(s.id);
   }
 });
 
@@ -2175,6 +2185,11 @@ router.post(
     if (!s) return;
     if (!req.file)
       return res.status(400).json({ error: 'No "world" file in upload' });
+    if (oplock.has(s.id)) {
+      try { require("fs/promises").unlink(req.file.path).catch(() => {}); } catch {}
+      return res.status(409).json(oplock.busyPayload(s.id));
+    }
+    oplock.acquire(s.id, "import");
 
     const fsp = require("fs/promises");
     const fs = require("fs");
@@ -2231,7 +2246,18 @@ router.post(
         }
       }
 
-      // 3) Wipe existing world dirs so we start clean.
+      // 3) Snapshot the current world before wiping it — an imported zip is
+      // irreversible otherwise.
+      try {
+        await bk.createBackup(s.id, {
+          retention: parseInt(process.env.BACKUPS_PER_SERVER || "10", 10),
+          label: "auto-pre-import",
+        });
+      } catch (err) {
+        console.warn("[import-world] auto-backup failed:", err.message);
+      }
+
+      // 4) Wipe existing world dirs so we start clean.
       for (const d of dimDirs) await rmTree(path.join(root, d));
 
       // 4) Extract.
@@ -2300,6 +2326,8 @@ router.post(
         await fsp.unlink(req.file.path);
       } catch {}
       res.status(500).json({ error: err.message || "World import failed" });
+    } finally {
+      oplock.release(s.id);
     }
   },
 );

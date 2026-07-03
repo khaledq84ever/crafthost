@@ -540,6 +540,42 @@ server.listen(PORT, async () => {
     console.warn("[janitor] startup sweep failed:", err.message);
   }
 
+  // Startup janitor for backups: /data/backups/<id>/ whose server no longer
+  // exists is unreachable junk (delete-server erases backups going forward,
+  // but older deletes leaked them). Same id-format safety rule as above.
+  try {
+    const fsp = require("fs/promises");
+    const pathMod = require("path");
+    const { BACKUP_DIR } = require("./lib/backup");
+    let entries;
+    try {
+      entries = await fsp.readdir(BACKUP_DIR, { withFileTypes: true });
+    } catch {
+      entries = [];
+    }
+    const knownIds = new Set(
+      db
+        .prepare("SELECT id FROM servers")
+        .all()
+        .map((r) => r.id),
+    );
+    let removed = 0;
+    for (const e of entries) {
+      if (!e.isDirectory() || knownIds.has(e.name)) continue;
+      if (!/^[0-9a-f]{16}$/.test(e.name)) continue;
+      try {
+        await fsp.rm(pathMod.join(BACKUP_DIR, e.name), {
+          recursive: true,
+          force: true,
+        });
+        removed++;
+      } catch {}
+    }
+    if (removed) console.log(`🧹 Janitor: ${removed} orphaned backup dir(s) removed`);
+  } catch (err) {
+    console.warn("[janitor] backup sweep failed:", err.message);
+  }
+
   // Idle-stop loop: stop ANY server with 0 players for IDLE_STOP_MINUTES (default 10).
   // Only the pinned is_public showcase server is exempt (always-on by design).
   // Before stopping, sends `save-all flush` over the JVM's stdin to guarantee the
