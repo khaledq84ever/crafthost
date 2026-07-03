@@ -391,6 +391,9 @@ function renderServer(s) {
         <button role="menuitem" onclick="closeCardMenu();openWorldImport('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')">
           <span class="sc-menu-icon">🌍</span><span>Import world.zip</span>
         </button>
+        <button role="menuitem" onclick="closeCardMenu();openBackups('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')">
+          <span class="sc-menu-icon">💾</span><span>Backups</span>
+        </button>
         <div class="sc-menu-sep"></div>
         <button role="menuitem" class="sc-menu-danger" onclick="closeCardMenu();openDeleteConfirm('${escapeHtml(s.id)}', '${escapeHtml(s.name)}')">
           <span class="sc-menu-icon">🗑</span><span>Delete server</span>
@@ -803,6 +806,169 @@ async function openSwapJar(sid, curType, curVer, planId) {
   };
   loadVer();
 }
+
+// ── Backups modal ──────────────────────────────────────────────────
+function fmtBackupSize(b) {
+  if (b >= 1024 * 1024) return (b / 1024 / 1024).toFixed(1) + " MB";
+  if (b >= 1024) return Math.round(b / 1024) + " KB";
+  return b + " B";
+}
+
+async function openBackups(sid, name) {
+  let modal = document.getElementById("backupsModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "backupsModal";
+    modal.className = "modal-bg";
+    document.body.appendChild(modal);
+  }
+  modal.classList.add("show");
+  modal.innerHTML = `
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:560px;">
+      <div class="modal-head">
+        <h3>💾 Backups — ${escapeHtml(name)}</h3>
+        <button class="close-btn" onclick="document.getElementById('backupsModal').classList.remove('show')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="bkError"></div>
+        <div id="bkList" class="text-muted">Loading…</div>
+        <p class="text-muted" style="font-size:12px;margin-top:10px;">
+          Snapshots include your worlds, server.properties, and player lists.
+          A running server is stopped for a few seconds while the snapshot is taken, then restarted.
+          Automatic backups are taken before risky changes (downgrades, engine swaps, world imports, restores).
+        </p>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-ghost" onclick="document.getElementById('backupsModal').classList.remove('show')">Close</button>
+        <button class="btn btn-primary" id="bkCreate">📸 Back up now</button>
+      </div>
+    </div>
+  `;
+  const bkError = (html) => {
+    document.getElementById("bkError").innerHTML = html
+      ? `<div class="wiz-warn" role="alert">${html}</div>`
+      : "";
+  };
+  const setBusy = (busy, text) => {
+    const btn = document.getElementById("bkCreate");
+    btn.disabled = busy;
+    btn.textContent = busy ? text || "⏳ Working…" : "📸 Back up now";
+    document
+      .querySelectorAll("#bkList button")
+      .forEach((b) => (b.disabled = busy));
+  };
+  const showErr = (err, fallback) => {
+    const code = err?.data?.code;
+    if (code === "busy") {
+      bkError(`<strong>⏳ Server is busy</strong><p>${escapeHtml(err.message)}</p>`);
+    } else {
+      bkError(`<p>${escapeHtml(err.message || fallback)}</p>`);
+    }
+  };
+
+  async function refresh() {
+    const host = document.getElementById("bkList");
+    try {
+      const r = await api(`/api/servers/${sid}/backups`);
+      const items = r.backups || [];
+      if (!items.length) {
+        host.innerHTML = `<div class="text-muted">No backups yet. Take one before making big changes!</div>`;
+        return;
+      }
+      host.innerHTML = items
+        .map((b) => {
+          const when = new Date(b.created_at).toLocaleString();
+          const badge = b.auto
+            ? `<span class="badge" style="background:rgba(56,189,248,0.15);color:var(--blue);font-size:10px;">auto</span>`
+            : `<span class="badge badge-emerald" style="font-size:10px;">manual</span>`;
+          const label = b.label
+            ? `<span class="text-muted" style="font-size:11px;"> · ${escapeHtml(b.label.replace(/^auto-/, "").replace(/-/g, " "))}</span>`
+            : "";
+          return `
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(148,163,184,0.12);">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;">${badge}${label}</div>
+              <div class="text-muted" style="font-size:11px;">${escapeHtml(when)} · ${fmtBackupSize(b.size)}</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="restoreBackup('${escapeHtml(sid)}','${escapeHtml(b.id)}','${escapeHtml(name)}')">↩ Restore</button>
+            <button class="btn btn-ghost btn-sm" onclick="window.open('/api/servers/${escapeHtml(sid)}/backups/${encodeURIComponent(b.id)}/download','_blank')" title="Download zip">⬇</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--red,#f87171);" onclick="deleteBackup('${escapeHtml(sid)}','${escapeHtml(b.id)}','${escapeHtml(name)}')" title="Delete backup">🗑</button>
+          </div>`;
+        })
+        .join("");
+    } catch (err) {
+      host.innerHTML = `<div class="text-muted">Could not load backups — ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  document.getElementById("bkCreate").onclick = async () => {
+    bkError("");
+    setBusy(true, "⏳ Snapshotting…");
+    try {
+      const r = await api(`/api/servers/${sid}/backups`, {
+        method: "POST",
+        body: {},
+      });
+      toast(`✓ Backup created (${fmtBackupSize(r.size)})`);
+      if (r.was_running) {
+        const s = servers.find((x) => x.id === sid);
+        if (s) s.status = "starting";
+        renderServers();
+        tightPollServerStatus(sid, "online");
+      }
+      await refresh();
+    } catch (err) {
+      showErr(err, "Backup failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Expose per-item handlers (inline onclick above).
+  window.restoreBackup = async (sid2, bid, name2) => {
+    if (
+      !confirm(
+        `Restore this backup on "${name2}"?\n\nYour CURRENT world will be replaced. A safety backup of it is taken first, so you can undo this restore.`,
+      )
+    )
+      return;
+    bkError("");
+    setBusy(true, "⏳ Restoring…");
+    try {
+      const r = await api(`/api/servers/${sid2}/backups/${encodeURIComponent(bid)}/restore`, {
+        method: "POST",
+      });
+      toast("✓ World restored" + (r.restarted ? " — restarting server" : ""));
+      if (r.restarted) {
+        const s = servers.find((x) => x.id === sid2);
+        if (s) s.status = "starting";
+        renderServers();
+        tightPollServerStatus(sid2, "online");
+      }
+      await refresh();
+    } catch (err) {
+      showErr(err, "Restore failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+  window.deleteBackup = async (sid2, bid, name2) => {
+    if (!confirm(`Delete this backup of "${name2}"? This cannot be undone.`)) return;
+    bkError("");
+    try {
+      await api(`/api/servers/${sid2}/backups/${encodeURIComponent(bid)}`, {
+        method: "DELETE",
+      });
+      toast("✓ Backup deleted");
+      await refresh();
+    } catch (err) {
+      showErr(err, "Delete failed");
+    }
+  };
+
+  refresh();
+}
+window.openBackups = openBackups;
 
 async function promoteServer(sid, name) {
   if (
