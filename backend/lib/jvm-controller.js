@@ -669,10 +669,10 @@ async function ensureJar(server) {
         stdio: "inherit",
         timeout: 180_000,
       });
-      // NeoForge generates run.sh + a jar in libraries/. Use the @user_jvm_args.txt + @libraries
-      // path approach by replacing server.jar with a small wrapper script's main jar.
-      // Simpler: run from the generated `run.sh` script — but we use server.jar throughout,
-      // so symlink the resulting forge jar.
+      // Older NeoForge generated a neoforge-*.jar launcher next to the
+      // installer — symlink server.jar to it when present. Modern NeoForge
+      // (26.x) generates only run.sh + libraries/.../unix_args.txt; startServer
+      // launches via that args file, so server.jar can stay as-is.
       const fsList = fs.readdirSync(dir);
       const forgeJar = fsList.find(
         (f) => /^neoforge-.*\.jar$/.test(f) && !f.includes("installer"),
@@ -680,6 +680,10 @@ async function ensureJar(server) {
       if (forgeJar) {
         fs.unlinkSync(jarPath);
         fs.symlinkSync(path.join(dir, forgeJar), jarPath);
+      } else if (!findNeoforgeArgsFile(dir)) {
+        throw new Error(
+          "installer produced neither a launcher jar nor unix_args.txt",
+        );
       }
     } catch (err) {
       throw new Error(`NeoForge installer failed: ${err.message}`);
@@ -687,6 +691,19 @@ async function ensureJar(server) {
   }
 
   return jarPath;
+}
+
+// Locate NeoForge's generated server-launch args file (modern install layout):
+// libraries/net/neoforged/neoforge/<version>/unix_args.txt
+function findNeoforgeArgsFile(dir) {
+  try {
+    const base = path.join(dir, "libraries", "net", "neoforged", "neoforge");
+    for (const v of fs.readdirSync(base)) {
+      const f = path.join(base, v, "unix_args.txt");
+      if (fs.existsSync(f)) return f;
+    }
+  } catch {}
+  return null;
 }
 
 function writeServerConfig(server, dir, hostPort) {
@@ -1008,6 +1025,19 @@ async function startServer(containerId, server) {
     jarPath,
     "nogui",
   ];
+
+  // Modern NeoForge (26.x) has no launcher jar — the installer generates
+  // libraries/net/neoforged/neoforge/<ver>/unix_args.txt and the official
+  // launch is `java @that-file`. Without this, `-jar server.jar` re-runs the
+  // INSTALLER (clean exit code 0) and the server never actually boots.
+  if (String(server.type || "").toLowerCase() === "neoforge") {
+    const argsFile = findNeoforgeArgsFile(dir);
+    if (argsFile) {
+      const jarIdx = args.indexOf("-jar");
+      args.splice(jarIdx, 3, `@${path.relative(dir, argsFile)}`, "nogui");
+      console.log(`[jvm/${id}] neoforge args-file launch: @${path.relative(dir, argsFile)}`);
+    }
+  }
 
   // One-shot recovery: if swap-jar dropped the safemode sentinel for a
   // cross-engine swap into Vanilla, append --safeMode to bypass the broken

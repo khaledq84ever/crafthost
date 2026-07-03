@@ -19,15 +19,19 @@ const BASE = process.env.BASE || 'https://crafthost-production.up.railway.app';
 // Each engine + a version known to be available + a regex matching the engine's
 // "boot complete" marker in stdout. Most use Minecraft's standard "Done (Xs)!"
 // but Fabric/NeoForge may use different phrasing.
+// CURRENT latest versions per engine (MC 26.2 era). Override any of them via
+// env, e.g. PAPER_V=1.21.1 for a legacy spot-check.
+const V = (k, d) => process.env[k] || d;
 const ENGINES = [
-  { type: 'paper',    version: '1.20.1', timeoutMs: 120_000, marker: /Done \(\d+\.\d+s\)!/ },
-  { type: 'vanilla',  version: '1.20.1', timeoutMs: 180_000, marker: /Done \(\d+\.\d+s\)!/ },
-  { type: 'purpur',   version: '1.20.1', timeoutMs: 120_000, marker: /Done \(\d+\.\d+s\)!/ },
-  { type: 'fabric',   version: '1.20.1', timeoutMs: 180_000, marker: /Done \(\d+\.\d+s\)!/ },
+  { type: 'paper',    version: V('PAPER_V', '26.2'),    timeoutMs: 180_000, marker: /Done \(\d+\.\d+s\)!/ },
+  { type: 'vanilla',  version: V('VANILLA_V', '26.2'),  timeoutMs: 240_000, marker: /Done \(\d+\.\d+s\)!/ },
+  { type: 'purpur',   version: V('PURPUR_V', '26.2'),   timeoutMs: 180_000, marker: /Done \(\d+\.\d+s\)!/ },
+  { type: 'fabric',   version: V('FABRIC_V', '26.2'),   timeoutMs: 240_000, marker: /Done \(\d+\.\d+s\)!/ },
   // NeoForge installer is heavy (~3 min on cold cache). Skip if SKIP_NEOFORGE=1.
   ...(process.env.SKIP_NEOFORGE === '1' ? [] : [
-    // NeoForge's own versioning starts at MC 1.20.2 — 1.20.1 does not exist.
-    { type: 'neoforge', version: '1.21.1', timeoutMs: 300_000, marker: /Done \(\d+\.\d+s\)!/ },
+    // NeoForge tracks MC releases with its own versioning; 26.1.2 is the
+    // latest with a stable (non-beta) build.
+    { type: 'neoforge', version: V('NEOFORGE_V', '26.1.2'), timeoutMs: 300_000, marker: /Done \(\d+\.\d+s\)!/ },
   ]),
 ];
 
@@ -144,11 +148,17 @@ async function testOne(engine) {
       if (done) console.log(`     ✓ ${String(done).trim().slice(0, 130)}`);
       else      console.log(`     ! marker not in last 300 lines`);
 
-      console.log('  [5] TCP probe public port');
-      const live = (await fetchJson(`/api/servers`)).servers?.find(s => s.id === id);
-      const host = live?.tunnel_host || 'bore.pub';
-      const port = live?.tunnel_port || live?.port;
-      const ok = port ? await tcpProbe(host, port, 6000) : false;
+      console.log('  [5] TCP probe public port (retries up to 45s — tunnel can lag the boot)');
+      let ok = false, host = null, port = null;
+      const tEnd = Date.now() + 45_000;
+      while (!ok && Date.now() < tEnd) {
+        // Re-read each attempt: the tunnel address can appear/change after boot.
+        const live = (await fetchJson(`/api/servers`)).servers?.find(s => s.id === id);
+        host = live?.tunnel_host || 'bore.pub';
+        port = live?.tunnel_port || live?.port;
+        if (port) ok = await tcpProbe(host, port, 6000);
+        if (!ok) await new Promise(r => setTimeout(r, 5000));
+      }
       result.steps.tcp = ok;
       console.log(`     ${ok ? '✓' : '✗'} ${host}:${port}`);
     }
