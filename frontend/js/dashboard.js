@@ -94,6 +94,9 @@ window.typeIcon = typeIcon;
 
 let publicHost = "crafthost-production.up.railway.app";
 let publicMcPort = 25565;
+// Actual idle-stop window, sent by the backend so the UI never promises a
+// different number than the platform enforces.
+let idleStopMinutes = 30;
 function ipFor(s) {
   if (s.id?.startsWith("demo-"))
     return `${s.name.toLowerCase().replace(/\s+/g, "-")}.crafthost.gg:${s.port}`;
@@ -160,7 +163,14 @@ function renderServer(s) {
 
   // Prefer the live stats.online flag (proven by SLP) over the DB status (can lag/lie)
   const liveOnline = stats.online === true;
-  const isStarting = !liveOnline && s.status === "starting";
+  // While the DB says the server is running/starting but SLP hasn't confirmed
+  // yet (probe lag, 5s SLP cache, boot in progress), show "Starting…" — never
+  // fall back to "Offline". Before this, the card flapped Online → Offline →
+  // Online on poll ticks and the Start/Stop button flickered with it.
+  const dbRunning = ["starting", "online", "running"].includes(
+    String(s.status || "").toLowerCase(),
+  );
+  const isStarting = !liveOnline && dbRunning;
   const isOnline = liveOnline || isStarting;
   const statusKey = liveOnline ? "online" : isStarting ? "starting" : "offline";
   // Pull translated status label so it follows the user's language setting.
@@ -196,8 +206,11 @@ function renderServer(s) {
   // effectively never true for normal MC versions — kept as a hook for very
   // heavy modpacks that might still OOM.
   const versionIsHeavy = false;
+  // auto_healed_at is stored in MILLISECONDS (Date.now() in the auto-heal loop).
+  // Comparing it against seconds made this true forever once a server had ever
+  // auto-healed, so the green banner never went away.
   const healedRecently =
-    s.auto_healed_at && Date.now() / 1000 - s.auto_healed_at < 600; // 10 min window
+    s.auto_healed_at && Date.now() - s.auto_healed_at < 600_000; // 10 min window
   // Auto-restart badge — visible for 10 min after the platform restarted a crashed server
   const restartedRecently =
     s.last_auto_restart_at && Date.now() - s.last_auto_restart_at < 600_000;
@@ -206,7 +219,7 @@ function renderServer(s) {
   if (healedRecently) {
     crashHint = `<div class="sc-warn sc-warn-healed">
       <strong>✓ Auto-healed</strong>
-      <div>The platform detected an out-of-memory crash and switched this server to <strong>Paper 1.20.1</strong>. It will restart automatically.</div>
+      <div>The platform detected an out-of-memory crash and switched this server to <strong>Paper 1.21.1</strong>. It will restart automatically.</div>
     </div>`;
   } else if (isOomCrash && versionIsHeavy) {
     crashHint = `<div class="sc-warn sc-warn-actionable">
@@ -237,7 +250,7 @@ function renderServer(s) {
       Math.round((Date.now() - s.last_idle_stop_at) / 60_000),
     );
     crashHint = `<div class="sc-warn sc-warn-healed">
-      <strong>💤 Auto-stopped (no players for 30 min)</strong>
+      <strong>💤 Auto-stopped (no players for ${idleStopMinutes} min)</strong>
       <div>World was saved before shutdown — click <strong>Start</strong> to resume. Player progress, builds, and inventories are intact (last stop: ${mins} min ago).</div>
     </div>`;
   }
@@ -462,7 +475,7 @@ async function openLogs(sid, name) {
         <h3>📜 Logs · ${escapeHtml(name)}</h3>
         <div style="display:flex;gap:8px;align-items:center;">
           <button class="btn btn-ghost btn-sm" id="logsRefresh">↻ Refresh</button>
-          <button class="close-btn" onclick="document.getElementById('logsModal').classList.remove('show')">✕</button>
+          <button class="close-btn" id="logsClose">✕</button>
         </div>
       </div>
       <div class="modal-body" style="padding:0;">
@@ -503,6 +516,12 @@ async function openLogs(sid, name) {
   document.getElementById("logsRefresh").onclick = refresh;
   document.getElementById("logsAuto").onchange = (e) =>
     e.target.checked ? startAuto() : clearAuto();
+  // ✕ must also stop the auto-refresh timer — before this it kept polling
+  // /logs every 3s forever after the modal was closed.
+  document.getElementById("logsClose").onclick = () => {
+    clearAuto();
+    modal.classList.remove("show");
+  };
   modal.addEventListener("click", (e) => {
     if (e.target === modal) {
       clearAuto();
@@ -545,7 +564,7 @@ window.toggleCardMenu = toggleCardMenu;
 async function autoFixOom(sid, name) {
   if (
     !confirm(
-      `Swap "${name}" to Paper 1.20.1 and restart now?\n\nThis fixes the out-of-memory crash. Your world data is preserved.`,
+      `Swap "${name}" to Paper 1.21.1 and restart now?\n\nThis fixes the out-of-memory crash. Your world data is preserved.`,
     )
   )
     return;
@@ -555,7 +574,7 @@ async function autoFixOom(sid, name) {
       method: "POST",
       body: { type: "paper", version: "1.21.1" },
     });
-    toast(`✓ ${name} restarted with Paper 1.20.1`);
+    toast(`✓ ${name} restarted with Paper 1.21.1`);
     loadServers();
   } catch (err) {
     toast(err.message || "Auto-fix failed", "error");
@@ -1168,10 +1187,55 @@ function renderServers() {
     const existing = grid.querySelector(
       `.server-card[data-id="${CSS.escape(id)}"]`,
     );
-    if (existing) existing.outerHTML = html;
+    if (existing) patchCard(existing, html);
     else grid.insertAdjacentHTML("beforeend", html);
   });
   updateSummary();
+}
+
+// Replace only the top-level sections of a card that actually changed instead
+// of swapping the whole card's outerHTML. Stats (uptime/CPU/RAM) tick every
+// few seconds, and a full swap destroyed the action buttons mid-click, killed
+// hover states, and closed the ⋯ menu — the "glitchy buttons" bug. With this,
+// the Start/Stop row is only rebuilt when the server's status truly changes.
+function patchCard(existing, html) {
+  const tpl = document.createElement("template");
+  tpl.innerHTML = html.trim();
+  const next = tpl.content.firstElementChild;
+  if (!next) return;
+  const oldKids = Array.from(existing.children);
+  const newKids = Array.from(next.children);
+  // Structure changed (section added/removed, e.g. crash banner appeared or
+  // tunnel address row toggled) — full swap is correct there.
+  if (
+    oldKids.length !== newKids.length ||
+    oldKids.some(
+      (el, i) =>
+        el.tagName !== newKids[i].tagName ||
+        el.className !== newKids[i].className,
+    )
+  ) {
+    if (window.__patchDebug)
+      window.__patchDebug.push(
+        "FULL " +
+          oldKids.map((k) => k.className || k.tagName).join("|") +
+          "  →  " +
+          newKids.map((k) => k.className || k.tagName).join("|"),
+      );
+    existing.replaceWith(next);
+    return;
+  }
+  // Same structure — swap only the children whose markup differs. Keep the
+  // actions row untouched while its menu is open so the menu doesn't snap shut.
+  oldKids.forEach((el, i) => {
+    if (el.outerHTML === newKids[i].outerHTML) return;
+    if (
+      el.classList.contains("sc-actions") &&
+      el.querySelector(".sc-menu.show")
+    )
+      return;
+    el.replaceWith(newKids[i]);
+  });
 }
 
 function updateSummary() {
@@ -1243,25 +1307,35 @@ async function loadServers() {
   } catch {}
   try {
     const r = await api("/api/servers");
-    servers = r.servers || [];
+    // Build the refreshed list OFF-GLOBALS first. Publishing it before the
+    // per-server stats fetches resolved let concurrent render ticks draw
+    // stat-less cards (sparkline/MOTD vanish, then reappear) — a full DOM
+    // swap of every card twice per cycle, i.e. the flickering buttons.
+    const next = r.servers || [];
     if (r.public_host) publicHost = r.public_host;
+    if (r.idle_stop_minutes) idleStopMinutes = r.idle_stop_minutes;
     isDemo = false;
     // Also fetch /api/health to get the real public mc port
     try {
       const h = await api("/api/health");
       if (h.public_mc_port) publicMcPort = h.public_mc_port;
     } catch {}
-    // Fetch live stats for each running server
+    // Fetch live stats for each running server; keep the previous stats if a
+    // fetch hiccups so the card doesn't blank out for one tick.
     await Promise.all(
-      servers.map(async (s) => {
+      next.map(async (s) => {
+        const prev = servers.find((x) => x.id === s.id);
         if (s.status === "online" || s.status === "starting") {
           try {
             const st = await api(`/api/servers/${s.id}/status`);
-            s.stats = st.stats || {};
-          } catch {}
+            s.stats = st.stats || prev?.stats || {};
+          } catch {
+            if (prev?.stats) s.stats = prev.stats;
+          }
         }
       }),
     );
+    servers = next;
   } catch (err) {
     // 401 = truly not signed in → show demo cards.
     // Any other error (5xx, network blip) when the user IS signed in: keep
@@ -1306,6 +1380,31 @@ async function serverAction(id, action) {
     const target = action === "stop" ? "offline" : "online";
     tightPollServerStatus(id, target);
   } catch (err) {
+    // Running-cap conflict: another server holds the single running slot.
+    // Offer to stop it and start this one, instead of a dead-end error toast.
+    if (
+      action === "start" &&
+      err?.status === 409 &&
+      err?.data?.code === "running_quota" &&
+      err?.data?.conflict?.id
+    ) {
+      const other = err.data.conflict;
+      if (
+        confirm(
+          `"${other.name}" is already running and your plan allows one running server at a time.\n\nStop "${other.name}" and start this one?`,
+        )
+      ) {
+        try {
+          await api(`/api/servers/${other.id}/stop`, { method: "POST" });
+          const o = servers.find((x) => x.id === other.id);
+          if (o) o.status = "offline";
+          await serverAction(id, "start");
+        } catch (e2) {
+          toast(e2.message, "error");
+        }
+      }
+      return;
+    }
     toast(err.message, "error");
   }
 }

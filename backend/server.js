@@ -413,6 +413,8 @@ server.on("upgrade", (req, socket, head) => {
     // Stream stats every 5s
     const statTimer = setInterval(async () => {
       try {
+        // Live console open = owner activity (idle-stop guard).
+        require("./lib/activity").touch(srv.id);
         const s = await dc.getStats(srv);
         if (ws.readyState === 1)
           ws.send(JSON.stringify({ type: "stats", stats: s }));
@@ -548,6 +550,7 @@ server.listen(PORT, async () => {
     const idleMin = parseInt(process.env.IDLE_STOP_MINUTES || "10", 10);
     const lastSeenPlayers = new Map(); // serverId → ts when last had >0 players
     const jvm = require("./lib/jvm-controller");
+    const activity = require("./lib/activity");
     setInterval(async () => {
       try {
         const rows = db
@@ -569,6 +572,14 @@ server.listen(PORT, async () => {
           } catch {}
           if (!stats?.online) continue;
           if ((stats.players || 0) > 0) {
+            lastSeenPlayers.set(s.id, now);
+            continue;
+          }
+          // Owner has the dashboard/console open for this server (status polls
+          // arrive every few seconds while the tab is foreground) — treat that
+          // like presence. Fixes "I started my server and it shut itself off
+          // while I was still setting it up / waiting for friends".
+          if (activity.ownerActiveWithin(s.id, 5 * 60_000)) {
             lastSeenPlayers.set(s.id, now);
             continue;
           }

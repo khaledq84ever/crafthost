@@ -174,6 +174,12 @@ router.get("/", (req, res) => {
     public_host: publicHost(),
     proxy_enabled: railway.isConfigured(),
     playit_available: playit.isAvailable(),
+    // Surface the real idle-stop window so the UI text always matches what
+    // the platform actually enforces.
+    idle_stop_minutes:
+      process.env.IDLE_STOP === "0"
+        ? 0
+        : parseInt(process.env.IDLE_STOP_MINUTES || "10", 10),
   });
 });
 
@@ -417,7 +423,7 @@ async function createServerForUser(user, opts, ip) {
     if (skipAutoStart) {
       startSkippedReason = "skipped by caller";
     } else if (quotaErr) {
-      startSkippedReason = quotaErr;
+      startSkippedReason = quotaErr.message;
     } else {
       try {
         await dc.startServer(enrichedForStart);
@@ -638,7 +644,7 @@ router.post("/clone", async (req, res) => {
       .get(out.id);
     const quotaErr = checkRunningQuota(dst, req.user);
     if (quotaErr) {
-      startSkippedReason = quotaErr;
+      startSkippedReason = quotaErr.message;
     } else {
       await dc.startServer(dst);
       db.prepare("UPDATE servers SET status = ? WHERE id = ?").run(
@@ -990,7 +996,10 @@ function checkRunningQuota(s, user) {
     )
     .all(s.user_id, s.id);
   if (running.length >= MAX) {
-    return `You can have up to ${MAX} servers running at a time. Stop one (e.g. "${running[0].name}") to start another.`;
+    return {
+      message: `You can have up to ${MAX} servers running at a time. Stop one (e.g. "${running[0].name}") to start another.`,
+      conflict: { id: running[0].id, name: running[0].name },
+    };
   }
   return null;
 }
@@ -999,9 +1008,17 @@ router.post("/:id/start", async (req, res) => {
   const s = getOwnedServer(req, res);
   if (!s) return;
   const quotaErr = checkRunningQuota(s, req.user);
-  if (quotaErr) return res.status(409).json({ error: quotaErr });
+  if (quotaErr)
+    return res.status(409).json({
+      error: quotaErr.message,
+      code: "running_quota",
+      conflict: quotaErr.conflict,
+    });
   try {
     const r = await dc.startServer(s);
+    // The start was cancelled by a stop that arrived while the jar was still
+    // downloading — leave the status alone (stop already set it to offline).
+    if (r?.status === "cancelled") return res.json(r);
     if (r.containerId && r.containerId !== s.container_id) {
       db.prepare("UPDATE servers SET container_id = ? WHERE id = ?").run(
         r.containerId,
@@ -1105,6 +1122,10 @@ router.delete("/:id", async (req, res) => {
 router.get("/:id/status", async (req, res) => {
   const s = getOwnedServer(req, res);
   if (!s) return;
+  // Owner is watching this server's card/console — feed the idle-stop guard.
+  try {
+    require("../lib/activity").touch(s.id);
+  } catch {}
   try {
     const stats = await dc.getStats(s);
     res.json({ ...s, stats, public_host: publicHost() });

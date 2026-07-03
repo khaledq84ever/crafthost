@@ -64,6 +64,13 @@ const crashes = new Map(); // id → { when, code, signal }
 const persistentListeners = new Map(); // id → Set<fn>
 const running = new Map();
 const SLP_CACHE_TTL = 5_000;
+// id → token of the most recent start attempt. A jar download can take tens of
+// seconds; if the user hits Stop (or clicks Start again) in that window, the
+// original in-flight start must NOT spawn a JVM when its download finishes —
+// that "stopped" server coming back to life on its own looked like the
+// platform randomly starting/stopping servers. stopServer clears the token;
+// a newer startServer replaces it; either way the stale attempt aborts.
+const startTokens = new Map();
 
 function isAvailable() {
   if (process.env.DISABLE_JVM === "1") return false;
@@ -927,9 +934,18 @@ async function startServer(containerId, server) {
     return { status: "running" };
   }
 
+  const startToken = {};
+  startTokens.set(id, startToken);
+
   const dir = serverDir(id);
   const jarPath = await ensureJar(server);
   const hostPort = await pickFreeHostPort(server);
+  // A stop (or a newer start) arrived while we were downloading the jar /
+  // probing ports — abort instead of spawning a JVM nobody wants anymore.
+  if (startTokens.get(id) !== startToken) {
+    console.log(`[jvm/${id}] start cancelled (stopped while preparing)`);
+    return { status: "cancelled" };
+  }
   writeServerConfig(server, dir, hostPort);
   await ensureViaVersion(dir); // version bridge so Bedrock can join older Paper
   // Detect a fresh-Bedrock first boot BEFORE Geyser generates its config, so we
@@ -1009,6 +1025,13 @@ async function startServer(containerId, server) {
         `[jvm/${id}] vanilla --safeMode (cross-engine swap recovery)`,
       );
     }
+  }
+
+  // Re-check after the remaining awaits (plugin/via downloads) — same reason
+  // as above: never spawn for a start attempt that was stopped/superseded.
+  if (startTokens.get(id) !== startToken) {
+    console.log(`[jvm/${id}] start cancelled (stopped while preparing)`);
+    return { status: "cancelled" };
   }
 
   const proc = spawn("java", args, {
@@ -1332,6 +1355,9 @@ async function startServer(containerId, server) {
 
 async function stopServer(containerId, server) {
   const id = String(containerId || "").replace(/^jvm-/, "") || server?.id;
+  // Cancel any in-flight start attempt (jar still downloading) so it can't
+  // spawn a JVM after this stop completes.
+  startTokens.delete(id);
   const state = running.get(id);
   if (!state || !state.proc || state.proc.killed) {
     // Not in the in-memory map (e.g. spawned before a Node restart) — make
