@@ -288,7 +288,7 @@ function renderServer(s) {
     <div class="sc-ip" title="Java Edition · click to copy" onclick="copyText('${escapeHtml(ip)}')" style="cursor:pointer;">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
       <span style="flex:1;"><span style="font-weight:600;">Java:</span> ${escapeHtml(ip)}</span>
-      <span class="sc-copy">Copy</span>
+      <span class="sc-copy">${t("copy")}</span>
     </div>`
         : `
     <div class="sc-ip" title="Start the server to get its join address" style="opacity:0.7;">
@@ -302,14 +302,14 @@ function renderServer(s) {
     <div class="sc-ip" title="Bedrock Edition (mobile / console) · click to copy" onclick="copyText('${escapeHtml(s.playit_host + ":" + s.playit_port)}')" style="cursor:pointer;border-color:rgba(255,107,53,0.35);background:rgba(255,107,53,0.05);">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ff6b35" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
       <span style="flex:1;"><span style="font-weight:600;">Bedrock:</span> ${escapeHtml(s.playit_host + ":" + s.playit_port)}</span>
-      <span class="sc-copy">Copy</span>
+      <span class="sc-copy">${t("copy")}</span>
     </div>`
         : s.playit_enabled
           ? `
     <div class="sc-ip" title="Bedrock cross-play is on — waiting for tunnel address" onclick="openBedrockModal('${escapeHtml(s.id)}', '${jsArg(s.name)}')" style="cursor:pointer;border-color:rgba(255,107,53,0.35);background:rgba(255,107,53,0.05);">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ff6b35" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
       <span style="flex:1;"><span style="font-weight:600;">Bedrock:</span> on — connecting…</span>
-      <span class="sc-copy">Details</span>
+      <span class="sc-copy">${t("details")}</span>
     </div>`
           : [
                 "paper",
@@ -322,8 +322,8 @@ function renderServer(s) {
             ? `
     <div class="sc-ip sc-bedrock-enable" title="Enable Bedrock cross-play — mobile / Xbox / Switch / PS players" onclick="openBedrockModal('${escapeHtml(s.id)}', '${jsArg(s.name)}')" style="cursor:pointer;border-style:dashed;border-color:rgba(255,107,53,0.5);background:rgba(255,107,53,0.04);">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ff6b35" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
-      <span style="flex:1;"><span style="font-weight:600;">Enable Bedrock cross-play</span> <span style="opacity:.65;font-size:11px;">mobile / console</span></span>
-      <span class="sc-copy" style="background:rgba(255,107,53,0.18);color:#ff6b35;">Enable →</span>
+      <span style="flex:1;"><span style="font-weight:600;">${t("menu_bedrock_enable")}</span> <span style="opacity:.65;font-size:11px;">${t("bedrock_devices")}</span></span>
+      <span class="sc-copy" style="background:rgba(255,107,53,0.18);color:#ff6b35;">${t("enable_arrow")}</span>
     </div>`
             : ""
     }
@@ -2309,7 +2309,7 @@ async function renderBedrockStatus(sid, sname) {
         </div>
         <div class="sc-ip" onclick="copyText('${escapeHtml(srv.playit_host + ":" + srv.playit_port)}')" style="cursor:pointer;margin-bottom:14px;border-color:rgba(255,107,53,0.4);">
           <span style="flex:1;font-family:monospace;font-size:14px;">📱 ${escapeHtml(srv.playit_host)}:${escapeHtml(String(srv.playit_port))}</span>
-          <span class="sc-copy">Copy</span>
+          <span class="sc-copy">${t("copy")}</span>
         </div>
         ${pluginsRow}
         ${restartHint}
