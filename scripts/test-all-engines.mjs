@@ -142,7 +142,7 @@ async function testOne(engine) {
     if (poll.ok) {
       console.log('  [4] Read /logs — Done marker');
       const logs = await fetchJson(`/api/servers/${id}/logs?lines=300`);
-      const lines = Array.isArray(logs.lines) ? logs.lines : (logs.text || '').split('\n');
+      const lines = Array.isArray(logs.logs) ? logs.logs : Array.isArray(logs.lines) ? logs.lines : (logs.text || '').split('\n');
       const done = lines.find(l => engine.marker.test(l));
       result.steps.bootMarker = !!done;
       if (done) console.log(`     ✓ ${String(done).trim().slice(0, 130)}`);
