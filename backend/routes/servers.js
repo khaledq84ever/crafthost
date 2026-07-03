@@ -1755,7 +1755,7 @@ router.post("/:id/playit/auto-enable", (req, res) => {
     const restartRequired = ["online", "running"].includes(s.status);
     res.json({
       ok: true,
-      mode: "shared",
+      mode: perServerBedrock ? "per-server" : "shared",
       restart_required: restartRequired,
       restart_reason: restartRequired
         ? spigotFamily
@@ -2119,6 +2119,23 @@ router.post("/:id/swap-jar", async (req, res) => {
           force: true,
         });
       } catch {}
+    }
+
+    // Bedrock continuity across engine swaps: spigot-family serves Bedrock via
+    // the Geyser+Floodgate PLUGINS, other engines via the standalone sidecar.
+    // A server that enabled Bedrock while on vanilla/fabric never got the
+    // plugins — swap it into spigot-family and Bedrock would silently die.
+    // (The reverse direction needs nothing: startServer starts the sidecar.)
+    const SPIGOT_FAMILY = new Set(["paper", "spigot", "purpur"]);
+    if (
+      s.playit_secret &&
+      SPIGOT_FAMILY.has(type) &&
+      !SPIGOT_FAMILY.has(String(s.type || "").toLowerCase())
+    ) {
+      // Await: the plugin jars must be in place before the new JVM boots.
+      await seedDefaultPlugins(req.user.id, s.id, ["wKkoqHrH", "bWrNNfkb"], version).catch(
+        (err) => console.warn("[swap-jar] geyser plugin seed:", err.message),
+      );
     }
 
     db.prepare(

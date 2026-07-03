@@ -64,9 +64,29 @@ async function main() {
   log('✓ A booted');
 
   const aEnable = await A.call('POST', `/api/servers/${aSid}/playit/auto-enable`);
-  assert(aEnable.status === 200 && aEnable.data?.mode === 'shared', 'A enables Bedrock (200, shared)');
+  assert(aEnable.status === 200, 'A enables Bedrock (200)');
+  const mode = aEnable.data?.mode;
+  log(`  backend mode: ${mode}`);
 
-  // B tries to enable while A holds it — must be blocked.
+  if (mode === 'per-server') {
+    // Per-server tunnels (BEDROCK_PER_SERVER=1): every server has its own
+    // Bedrock tunnel — B must ALSO enable fine, and A must stay enabled.
+    const bEnable = await B.call('POST', `/api/servers/${bSid}/playit/auto-enable`);
+    assert(bEnable.status === 200, 'B enables Bedrock too (200, no takeover needed)');
+
+    const aList = await A.call('GET', '/api/servers');
+    const aNow = (aList.data?.servers || []).find(x => x.id === aSid);
+    assert(aNow && aNow.playit_enabled === true, 'A remains enabled alongside B');
+
+    const bList = await B.call('GET', '/api/servers');
+    const bNow = (bList.data?.servers || []).find(x => x.id === bSid);
+    assert(bNow && bNow.playit_enabled === true, 'B is enabled');
+
+    log('\n✅ PASS — per-server mode: both servers hold Bedrock concurrently.');
+    return;
+  }
+
+  // Legacy shared tunnel: one holder platform-wide, takeover moves it.
   const bBlocked = await B.call('POST', `/api/servers/${bSid}/playit/auto-enable`);
   assert(bBlocked.status === 409, 'B is blocked with 409');
   assert(bBlocked.data?.code === 'bedrock_in_use', 'B 409 has code=bedrock_in_use');

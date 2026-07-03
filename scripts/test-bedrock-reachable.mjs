@@ -83,8 +83,8 @@ async function main() {
   log('✓ JVM up');
 
   const ae = await j('POST', `/api/servers/${serverId}/playit/auto-enable`);
-  if (ae.status !== 200 || ae.data?.mode !== 'shared') throw new Error(`auto-enable failed: ${ae.status} ${JSON.stringify(ae.data)}`);
-  log(`✓ auto-enable mode=shared (restart_required=${ae.data.restart_required})`);
+  if (ae.status !== 200) throw new Error(`auto-enable failed: ${ae.status} ${JSON.stringify(ae.data)}`);
+  log(`✓ auto-enable mode=${ae.data?.mode} (restart_required=${ae.data.restart_required})`);
 
   log('↻ restarting so Geyser loads + agent connects…');
   await j('POST', `/api/servers/${serverId}/restart`);
