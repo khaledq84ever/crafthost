@@ -360,6 +360,39 @@ async function prewarmPluginCache() {
   );
 }
 
+// Guarantee the 'any' cache slot for a custom-resolver plugin holds the
+// CURRENT upstream build. Called from the boot-time Bedrock plugin refresh —
+// the prewarm's 24h TTL is too slow there (a server can resume before prewarm
+// runs, or the TTL can mask a new Geyser build for a day, and a stale Geyser
+// means Bedrock is dead). One upstream API call, memoized for 10 minutes so a
+// mass resume of N servers doesn't hammer the GeyserMC API.
+const freshMemo = new Map(); // pid → ts of last successful check
+async function ensureFreshCustom(projectId, mcVersion) {
+  if (!CUSTOM_RESOLVERS[projectId]) return;
+  const last = freshMemo.get(projectId) || 0;
+  if (Date.now() - last < 10 * 60 * 1000) return;
+  const meta = await CUSTOM_RESOLVERS[projectId](mcVersion);
+  if (!meta) return; // resolver declined (legacy MC)
+  const idx = loadIndex();
+  const cached = idx[indexKey(projectId, null)];
+  const cp = cachePath(projectId, null);
+  if (
+    cached &&
+    cached.version_id === meta.version_id &&
+    fs.existsSync(cp) &&
+    fs.statSync(cp).size > 1000
+  ) {
+    freshMemo.set(projectId, Date.now());
+    return;
+  }
+  console.log(
+    `[plugin-cache] ${projectId}__any stale (${cached?.version_id || "missing"} → ${meta.version_id}) — refreshing`,
+  );
+  await downloadOne(projectId, null, idx);
+  saveIndex(idx);
+  freshMemo.set(projectId, Date.now());
+}
+
 // Copy a cached plugin JAR into a server's plugins/ dir. Looks up cache by
 // (projectId, mcVersion). If the exact MC slot is missing, falls back to the
 // 'any' universal slot. Returns null on full miss — caller fetches fresh.
