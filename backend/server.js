@@ -458,8 +458,9 @@ server.on("upgrade", (req, socket, head) => {
       if (ws.readyState === 1) ws.send(JSON.stringify({ type: "log", line }));
     });
 
-    // Stream stats every 5s
-    const statTimer = setInterval(async () => {
+    // Stream stats every 5s — and once immediately, so the console page's
+    // stat tiles fill on load instead of showing "—" until the first tick.
+    const pushStats = async () => {
       try {
         // Live console open = owner activity (idle-stop guard).
         require("./lib/activity").touch(srv.id);
@@ -467,7 +468,9 @@ server.on("upgrade", (req, socket, head) => {
         if (ws.readyState === 1)
           ws.send(JSON.stringify({ type: "stats", stats: s }));
       } catch {}
-    }, 5000);
+    };
+    pushStats();
+    const statTimer = setInterval(pushStats, 5000);
 
     ws.on("close", () => {
       clearInterval(statTimer);
