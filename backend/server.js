@@ -786,6 +786,28 @@ server.listen(PORT, async () => {
     );
   }
 
+  // Console health monitor: incrementally reads every running server's console
+  // ring for runtime errors / plugin task crashes / tick lag. Observe-only —
+  // it records platform events and feeds warn issues to /health-check; the
+  // heal/fix/restart loops still own anything that actually dies.
+  if (backend === "jvm" && process.env.CONSOLE_MONITOR !== "0") {
+    const consoleHealth = require("./lib/console-health");
+    const jvm = require("./lib/jvm-controller");
+    const secs = parseInt(process.env.CONSOLE_MONITOR_SECONDS || "60", 10);
+    setInterval(() => {
+      try {
+        const hits = consoleHealth.sweep(jvm);
+        for (const h of hits)
+          console.log(`[console-health] ${h.id}: ${h.added} new issue line(s)`);
+      } catch (err) {
+        console.warn("[console-health] sweep failed:", err.message);
+      }
+    }, secs * 1000);
+    console.log(
+      `📖 Console health monitor enabled (${secs}s sweeps — runtime errors/lag → events + health check)`,
+    );
+  }
+
   // Auto-heal loop: when ANY free-plan server OOMs (heavy MC version, Fabric's
   // heavier boot, modded server, etc.), automatically wipe server.jar, switch
   // to Paper 1.20.1 (the proven-safe combo for the 480MB heap), and restart.

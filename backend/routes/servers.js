@@ -802,6 +802,25 @@ router.get("/health-check", async (req, res) => {
         message: `RAM at ${Math.round((stats.ram_used / stats.ram_max) * 100)}% (${stats.ram_used}/${stats.ram_max} MB) — OOM risk.`,
       });
     }
+    // Console health — runtime errors / tick lag read from the live console
+    // ring by the console-health monitor (rolling 10-minute window).
+    if (stats?.online) {
+      const ch = require("../lib/console-health").summary(cid);
+      if (ch?.errors >= 5) {
+        issues.push({
+          severity: "warn",
+          code: "console_errors",
+          message: `${ch.errors} console errors in the last ${ch.window_min} min — open the console to inspect.${ch.lastError ? ` Latest: ${ch.lastError.slice(0, 120)}` : ""}`,
+        });
+      }
+      if (ch?.lag >= 3) {
+        issues.push({
+          severity: "warn",
+          code: "lagging",
+          message: `Server can't keep up — ${ch.lag} lag warnings in the last ${ch.window_min} min. TPS drops likely (too many chunks/entities for the plan).`,
+        });
+      }
+    }
     if (restartedRecently && (s.auto_restart_count || 0) >= 3) {
       issues.push({
         severity: "warn",
