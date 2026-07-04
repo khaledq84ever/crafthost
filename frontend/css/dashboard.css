@@ -481,7 +481,7 @@ body { background: var(--slate-900); }
   .qd-tile .qd-icon { width: 36px; height: 36px; border-radius: 9px; }
   .qd-tile .qd-icon .msr { font-size: 20px; }
   .qd-tile .qd-name { font-size: 13.5px; }
-  .qd-tile .qd-meta { font-size: 10.5px; }
+  .qd-tile .qd-meta { font-size: 10.5px; white-space: normal; line-height: 1.35; }
 }
 
 /* Stats row */
