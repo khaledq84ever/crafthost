@@ -1915,6 +1915,7 @@ async function prewarmJarCache() {
   let hits = 0,
     misses = 0,
     refreshed = 0,
+    skipped = 0,
     errors = 0,
     mb = 0;
   // Sweep partial downloads from a previous crashed/killed prewarm.
@@ -1964,15 +1965,23 @@ async function prewarmJarCache() {
       else misses++;
       mb += size / 1024 / 1024;
     } catch (err) {
-      errors++;
-      console.warn(
-        `[jar-cache/prewarm] ${t.type}-${t.version} failed: ${err.message.slice(0, 100)}`,
-      );
+      // Combos the engine simply doesn't ship (e.g. fabric/purpur < 1.14 —
+      // the wizard never offers them; /api/versions is per-engine) are
+      // expected: count as skipped so the summary's error count only flags
+      // real download/resolver failures.
+      if (/not found/i.test(err.message)) {
+        skipped++;
+      } else {
+        errors++;
+        console.warn(
+          `[jar-cache/prewarm] ${t.type}-${t.version} failed: ${err.message.slice(0, 100)}`,
+        );
+      }
     }
   }
   saveJarMeta(meta);
   console.log(
-    `📦 JAR cache prewarmed: ${hits} hit · ${misses} downloaded · ${refreshed} refreshed to latest build (${mb.toFixed(0)}MB) · ${errors} errors`,
+    `📦 JAR cache prewarmed: ${hits} hit · ${misses} downloaded · ${refreshed} refreshed to latest build (${mb.toFixed(0)}MB) · ${skipped} unsupported combos skipped · ${errors} errors`,
   );
 }
 
