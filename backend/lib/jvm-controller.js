@@ -2202,4 +2202,5 @@ module.exports = {
   __getState,
   getCrashes,
   clearCrash,
+  refreshManagedBedrockPlugins, // exported for tests
 };
