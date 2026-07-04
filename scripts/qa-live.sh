@@ -24,6 +24,7 @@ run() {
 }
 
 run "unit-console"    node scripts/test-console-health.mjs
+run "unit-rcon"       node scripts/test-rcon-tick.mjs
 run "pages-assets"    env BASE="$BASE" node scripts/test-pages.mjs
 run "pages-js"        env BASE="$BASE" node scripts/test-pages-js.mjs
 run "journey-desktop" env BASE="$BASE" node scripts/test-e2e-user-journey.mjs
