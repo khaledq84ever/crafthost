@@ -1646,6 +1646,39 @@ async function getCachedSlp(state, hostPort) {
   return data;
 }
 
+// Tick telemetry cache: query /tps + /mspt over RCON at most every 10s per
+// server. RCON port mirrors writeServerConfig ("rcon.port" = hostPort + 10).
+// Parsers strip § color codes; tps output is "TPS from last 1m, 5m, 15m:
+// *20.0, 20.0, 20.0" (match the first number AFTER the colon — the header's
+// "1m" would match a bare number regex); mspt output's only digit-triple is
+// the avg/min/max group of the 5s window.
+const PAPER_FAMILY = new Set(["paper", "purpur", "spigot"]);
+const TICK_TTL_MS = 10_000;
+async function getCachedTick(state, server) {
+  const now = Date.now();
+  if (state.tick && now - state.tick.ts < TICK_TTL_MS) return state.tick;
+  state.tick = { ...(state.tick || {}), ts: now }; // stampede guard for concurrent polls
+  try {
+    const { rconExec } = require("./rcon-client");
+    const port = state.hostPort + 10;
+    const strip = (s) => String(s || "").replace(/§./g, "");
+    const [tpsRaw, msptRaw] = await Promise.all([
+      rconExec(port, server.rcon_password, "tps"),
+      rconExec(port, server.rcon_password, "mspt").catch(() => ""),
+    ]);
+    const tpsM = strip(tpsRaw).match(/:\s*\*?([\d.]+)/);
+    const msptM = strip(msptRaw).match(/([\d.]+)\/[\d.]+\/[\d.]+/);
+    state.tick = {
+      ts: now,
+      tps: tpsM ? Math.min(20, parseFloat(tpsM[1])) : null,
+      mspt: msptM ? parseFloat(msptM[1]) : null,
+    };
+  } catch {
+    state.tick = { ts: now, tps: null, mspt: null };
+  }
+  return state.tick;
+}
+
 async function getStats(containerId, server) {
   const id = String(containerId || "").replace(/^jvm-/, "") || server?.id;
   const state = running.get(id);
@@ -1702,10 +1735,22 @@ async function getStats(containerId, server) {
   let slp = null;
   if (state.ready) slp = await getCachedSlp(state, state.hostPort);
 
+  // Real tick telemetry via RCON (/tps + /mspt) for Paper-family servers —
+  // silent (RCON socket, not stdin, so nothing appears in the live console),
+  // cached 10s per server. Other engines fall back to the ready-state estimate.
+  let tick = null;
+  if (
+    state.ready &&
+    PAPER_FAMILY.has(String(server?.type || "").toLowerCase()) &&
+    server?.rcon_password
+  ) {
+    tick = await getCachedTick(state, server);
+  }
+
   // Roll a tiny TPS history (last 30 samples ≈ last 60s at our 2s probe cadence
   // in /api/servers polling). Used by the dashboard sparkline to show recent
   // server health at a glance.
-  const tpsNow = state.ready ? 20.0 : 0;
+  const tpsNow = tick?.tps ?? (state.ready ? 20.0 : 0);
   if (!state.tpsHistory) state.tpsHistory = [];
   state.tpsHistory.push(tpsNow);
   if (state.tpsHistory.length > 30) state.tpsHistory.shift();
@@ -1715,7 +1760,8 @@ async function getStats(containerId, server) {
     ram_used: ramUsed,
     ram_max: ramMax,
     heap_max_mb: heapMb,
-    tps: tpsNow, // approximate; real TPS would need RCON `/tps`
+    tps: tpsNow, // real via RCON /tps on paper-family; estimate elsewhere
+    mspt: tick?.mspt ?? null, // real via RCON /mspt (paper-family only)
     tps_history: state.tpsHistory.slice(), // copy so the caller can't mutate
     uptime: Math.floor((Date.now() - state.startedAt) / 1000),
     players: slp?.players?.online ?? 0,
