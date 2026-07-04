@@ -18,6 +18,11 @@ fi
 
 echo "QA FAILED $(date -u)" >>/tmp/crafthost-qa-history.log
 
+# Hand the failure to the automated fixer (headless Claude session — guarded
+# by kill switch, flock, and timeout inside the script). It runs in the
+# background so issue filing below isn't delayed.
+nohup bash scripts/auto-fix-qa.sh "$LOG" >/dev/null 2>&1 &
+
 # Don't stack duplicate issues while a failure is already being tracked.
 if gh issue list -R "$REPO" --state open --label qa-failure --json number -q '.[0].number' 2>/dev/null | grep -q .; then
   exit 1
