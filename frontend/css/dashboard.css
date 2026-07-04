@@ -429,16 +429,15 @@ body { background: var(--slate-900); }
 .qd-tile {
   position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 18px 12px;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--c) 14%, var(--slate-800)), var(--slate-800));
-  border: 1px solid color-mix(in srgb, var(--c) 30%, var(--glass-border));
+  gap: 12px;
+  padding: 14px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--c) 10%, var(--slate-800)), var(--slate-800));
+  border: 1px solid color-mix(in srgb, var(--c) 28%, var(--glass-border));
   border-radius: 12px;
   cursor: pointer;
   transition: transform .15s, border-color .15s, box-shadow .15s;
-  text-align: center;
+  text-align: start;
 }
 .qd-tile:hover {
   transform: translateY(-2px);
@@ -447,24 +446,42 @@ body { background: var(--slate-900); }
 }
 .qd-tile:active { transform: scale(0.98); }
 .qd-tile .qd-icon {
-  font-size: 32px;
-  line-height: 1;
-  margin-bottom: 4px;
-  filter: drop-shadow(0 2px 8px color-mix(in srgb, var(--c) 40%, transparent));
+  flex: none;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--c) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 30%, transparent);
+  color: var(--c);
 }
+.qd-tile .qd-icon .msr {
+  font-size: 23px;
+  font-variation-settings: "FILL" 1, "wght" 500, "GRAD" 0, "opsz" 24;
+}
+.qd-tile .qd-text { min-width: 0; }
 .qd-tile .qd-name {
-  font-weight: 800;
-  font-size: 15px;
+  font-weight: 700;
+  font-size: 14.5px;
   color: var(--text-strong);
+  line-height: 1.25;
 }
 .qd-tile .qd-meta {
   font-size: 11.5px;
   color: var(--slate-400);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 @media (max-width: 768px) {
   .qd-grid { grid-template-columns: repeat(2, 1fr); }
-  .qd-tile { padding: 14px 8px; }
-  .qd-tile .qd-icon { font-size: 26px; }
+  .qd-tile { padding: 11px 12px; gap: 10px; }
+  .qd-tile .qd-icon { width: 36px; height: 36px; border-radius: 9px; }
+  .qd-tile .qd-icon .msr { font-size: 20px; }
+  .qd-tile .qd-name { font-size: 13.5px; }
+  .qd-tile .qd-meta { font-size: 10.5px; }
 }
 
 /* Stats row */
