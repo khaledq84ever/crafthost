@@ -765,6 +765,64 @@ function writeServerConfig(server, dir, hostPort) {
   fs.writeFileSync(propPath, out);
 }
 
+// Self-heal stale platform-managed Bedrock plugins before every boot. Geyser
+// hard-fails onEnable when its build predates the Paper it's loading into
+// (reflection against renamed CraftBukkit internals — seen live on Paper 26.2
+// with Geyser 2.10.1: Bedrock silently dead while the Java server ran fine).
+// The plugin cache always holds the current build (GeyserMC download API), so
+// if the jar seeded into plugins/ differs from the cache's, swap it out.
+// Managed jars only — anything the user uploaded themselves has a filename
+// that won't match a previous seed of these two projects.
+async function refreshManagedBedrockPlugins(dir, mcVersion) {
+  const MANAGED = [
+    { pid: "wKkoqHrH", re: /^(geyser[-_]?spigot|Geyser-Spigot)[^/]*\.jar$/i },
+    { pid: "bWrNNfkb", re: /^floodgate[-_]?(spigot)?[^/]*\.jar$/i },
+  ];
+  try {
+    const pluginsDir = path.join(dir, "plugins");
+    if (!fs.existsSync(pluginsDir)) return;
+    const pluginCache = require("./plugin-cache");
+    const entries = fs.readdirSync(pluginsDir);
+    for (const { pid, re } of MANAGED) {
+      const existing = entries.filter((f) => re.test(f));
+      if (!existing.length) continue; // Bedrock not enabled for this server
+      // What would the cache seed today?
+      const tmp = path.join(dir, ".bedrock-refresh-tmp");
+      let hit = null;
+      try {
+        hit = await pluginCache.copyFromCache(pid, tmp, mcVersion);
+      } catch {}
+      if (!hit) {
+        await fsp.rm(tmp, { recursive: true, force: true }).catch(() => {});
+        continue; // cache cold — seeding path owns downloads, don't block boot
+      }
+      if (existing.includes(hit.filename)) {
+        // Already current — drop the probe copy.
+        await fsp.rm(tmp, { recursive: true, force: true }).catch(() => {});
+        continue;
+      }
+      for (const f of existing) {
+        await fsp.unlink(path.join(pluginsDir, f)).catch(() => {});
+      }
+      await fsp.rename(
+        path.join(tmp, hit.filename),
+        path.join(pluginsDir, hit.filename),
+      );
+      await fsp.rm(tmp, { recursive: true, force: true }).catch(() => {});
+      console.log(
+        `[bedrock-refresh] ${path.basename(dir)}: ${existing.join(", ")} → ${hit.filename}`,
+      );
+      require("./events").record("bedrock_plugin_refresh", path.basename(dir), {
+        project: pid,
+        from: existing,
+        to: hit.filename,
+      });
+    }
+  } catch (err) {
+    console.warn(`[bedrock-refresh] ${path.basename(dir)}:`, err.message);
+  }
+}
+
 // Force Geyser's RakNet MTU low enough to survive the playit free tunnel.
 // The tunnel only forwards datagrams up to ~1200 bytes — the tiny RakNet
 // handshake gets through, but Geyser's default 1400-byte in-session packets
@@ -971,6 +1029,7 @@ async function startServer(containerId, server) {
   // Per-server Bedrock (flagged): give this server's Geyser its own UDP port.
   const bedrockPort = BEDROCK_PER_SERVER ? geyserUdpPort(server) : undefined;
   ensureGeyserConfig(dir, bedrockPort); // MTU 1200 + (optional) per-server port
+  await refreshManagedBedrockPlugins(dir, server.version); // stale Geyser/Floodgate → current build
 
   // Heap: respect plan but cap to fit Railway free tier
   const planRam = parseInt(server.ram_mb || 512, 10);

@@ -110,6 +110,40 @@ function migrateLegacyCache() {
 // CUSTOM_RESOLVERS receive mcVersion but most return a universal JAR (Floodgate
 // ships one Spigot JAR per Geyser release that covers all supported MC versions).
 const CUSTOM_RESOLVERS = {
+  // Geyser — Modrinth releases LAG the GeyserMC download API by weeks, and a
+  // stale Geyser-Spigot hard-fails onEnable on newer Paper (reflection against
+  // renamed CraftBukkit internals — seen live: 2.10.1 on Paper 26.2 threw
+  // NoSuchMethodException CraftItemStack.asBukkitCopy and Bedrock was silently
+  // dead). Always pull the latest build from GeyserMC directly. Returning null
+  // falls back to the Modrinth per-MC-version path (ancient servers <1.16.5,
+  // which the latest Geyser no longer supports).
+  wKkoqHrH: async (mcVersion) => {
+    const legacy = /^1\.(\d+)/.exec(String(mcVersion || ""));
+    if (legacy && parseInt(legacy[1], 10) < 16) return null;
+    const GEYSER = "https://download.geysermc.org/v2/projects/geyser";
+    const pr = await fetch(GEYSER, {
+      headers: { "User-Agent": UA },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!pr.ok) throw new Error(`geysermc project: HTTP ${pr.status}`);
+    const proj = await pr.json();
+    const latestVer = proj.versions[proj.versions.length - 1];
+    const br = await fetch(`${GEYSER}/versions/${latestVer}`, {
+      headers: { "User-Agent": UA },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!br.ok)
+      throw new Error(`geysermc version ${latestVer}: HTTP ${br.status}`);
+    const ver = await br.json();
+    const latestBuild = ver.builds[ver.builds.length - 1];
+    return {
+      version_id: `${latestVer}-b${latestBuild}`,
+      version_number: latestVer,
+      filename: `geyser-spigot-${latestVer}-b${latestBuild}.jar`,
+      url: `${GEYSER}/versions/${latestVer}/builds/${latestBuild}/downloads/spigot`,
+      sha512: null,
+    };
+  },
   bWrNNfkb: async (_mcVersion) => {
     const GEYSER = "https://download.geysermc.org/v2/projects/floodgate";
     const pr = await fetch(GEYSER, {
@@ -143,8 +177,10 @@ const CUSTOM_RESOLVERS = {
 // MC-specific match exists (e.g. for forward-compat plugins like LuckPerms
 // where one JAR works across many MC versions).
 async function resolveLatestVersion(projectId, mcVersion) {
-  if (CUSTOM_RESOLVERS[projectId])
-    return CUSTOM_RESOLVERS[projectId](mcVersion);
+  if (CUSTOM_RESOLVERS[projectId]) {
+    const r = await CUSTOM_RESOLVERS[projectId](mcVersion);
+    if (r) return r; // null → resolver declined (legacy MC), use Modrinth path
+  }
   const loaders = encodeURIComponent('["paper","spigot","bukkit"]');
   // Step 1: try filtered by (loaders, game_version) — strictest match
   const tryFetch = async (url) => {
@@ -240,7 +276,22 @@ async function prewarmPluginCache() {
   const targets = [];
   for (const pid of STARTER_PLUGIN_IDS) {
     if (CUSTOM_RESOLVERS[pid]) {
-      // Universal — one slot under 'any'
+      // Universal — one slot under 'any'. Per-MC slots for these pids are
+      // stale leftovers (old Modrinth resolutions, or seedDefaultPlugins
+      // cache writes) that would win copyFromCache's exact-match over the
+      // fresh 'any' slot and never get refreshed — delete them every boot.
+      try {
+        for (const f of fs.readdirSync(CACHE_DIR)) {
+          if (!f.startsWith(`${pid}__`) || f === `${pid}__any.jar`) continue;
+          try {
+            fs.unlinkSync(path.join(CACHE_DIR, f));
+            delete idx[f.replace(/\.jar$/, "")];
+            console.log(
+              `[plugin-cache/prewarm] ${f} stale per-MC slot removed (custom resolver owns 'any')`,
+            );
+          } catch {}
+        }
+      } catch {}
       targets.push({ pid, mc: null });
     } else {
       // Per-MC-version slots + an 'any' fallback for forward-compat plugins
@@ -313,6 +364,12 @@ async function prewarmPluginCache() {
 // (projectId, mcVersion). If the exact MC slot is missing, falls back to the
 // 'any' universal slot. Returns null on full miss — caller fetches fresh.
 async function copyFromCache(projectId, destPluginsDir, mcVersion) {
+  // Geyser's 'any' slot is the LATEST GeyserMC build, which doesn't support
+  // legacy MC (<1.16.5) — force a cache miss so the caller resolves a
+  // version-matched build from Modrinth instead.
+  const legacy = /^1\.(\d+)/.exec(String(mcVersion || ""));
+  if (projectId === "wKkoqHrH" && legacy && parseInt(legacy[1], 10) < 16)
+    return null;
   const idx = loadIndex();
   const candidates = [
     cachePath(projectId, mcVersion),
