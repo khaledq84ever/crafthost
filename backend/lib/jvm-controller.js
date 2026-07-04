@@ -644,6 +644,16 @@ async function ensureJar(server) {
       cachePath,
       `${t || "paper"} ${info.version} (cache)`,
     );
+    // Record the build so prewarm's staleness check knows what this blob is.
+    try {
+      const meta = loadJarMeta();
+      meta[path.basename(cachePath, ".jar")] = {
+        url: info.url,
+        build: info.build || null,
+        mtime: Date.now(),
+      };
+      saveJarMeta(meta);
+    } catch {}
     try {
       fs.linkSync(cachePath, jarPath);
     } catch (err) {
@@ -1858,25 +1868,54 @@ async function prewarmJarCache() {
 
   let hits = 0,
     misses = 0,
+    refreshed = 0,
     errors = 0,
     mb = 0;
+  // Sweep partial downloads from a previous crashed/killed prewarm.
+  try {
+    for (const f of fs.readdirSync(JAR_CACHE_DIR))
+      if (f.endsWith(".tmp")) fs.unlinkSync(path.join(JAR_CACHE_DIR, f));
+  } catch {}
+  const meta = loadJarMeta();
   for (const t of targets) {
     try {
       const info = await t.resolve(t.version);
       const cachePath = cachedJarPath(t.type, info.version, info);
-      if (fs.existsSync(cachePath) && fs.statSync(cachePath).size > 100000) {
+      const key = path.basename(cachePath, ".jar");
+      const have =
+        fs.existsSync(cachePath) && fs.statSync(cachePath).size > 100000;
+      // Every resolver's URL embeds the build (paper/purpur build number,
+      // fabric loader+installer versions, vanilla's immutable per-version
+      // manifest) — so "same URL" means "same build". A cached jar with NO
+      // recorded URL predates build tracking and may be months of builds
+      // behind (live: paper-1.21.1 was build 133 from 2025-03 and Paper
+      // printed "you've not updated in a while" on every boot) — re-download
+      // it once to establish a known build.
+      if (have && meta[key]?.url === info.url) {
         hits++;
         continue;
       }
+      const stale = have; // exists but unknown/outdated build
       console.log(
-        `[jar-cache/prewarm] ${t.type}-${info.version} → downloading`,
+        `[jar-cache/prewarm] ${t.type}-${info.version} → ${
+          stale
+            ? `refreshing (${meta[key]?.build || "untracked"} → build ${info.build || "?"})`
+            : "downloading"
+        }`,
       );
+      // Download to a tmp path, then atomically rename over the cache slot.
+      // Server dirs HARDLINK cache blobs — rename gives the slot a new inode
+      // while running servers keep the old one untouched.
+      const tmp = cachePath + ".tmp";
       const size = await downloadFile(
         info.url,
-        cachePath,
+        tmp,
         `${t.type} ${info.version} prewarm`,
       );
-      misses++;
+      fs.renameSync(tmp, cachePath);
+      meta[key] = { url: info.url, build: info.build || null, mtime: Date.now() };
+      if (stale) refreshed++;
+      else misses++;
       mb += size / 1024 / 1024;
     } catch (err) {
       errors++;
@@ -1885,9 +1924,26 @@ async function prewarmJarCache() {
       );
     }
   }
+  saveJarMeta(meta);
   console.log(
-    `📦 JAR cache prewarmed: ${hits} hit · ${misses} downloaded (${mb.toFixed(0)}MB) · ${errors} errors`,
+    `📦 JAR cache prewarmed: ${hits} hit · ${misses} downloaded · ${refreshed} refreshed to latest build (${mb.toFixed(0)}MB) · ${errors} errors`,
   );
+}
+
+// Build-tracking metadata for the jar cache: <type>-<version> → {url, build,
+// mtime}. The URL is the staleness signal (it embeds the upstream build).
+const JAR_META_FILE = path.join(JAR_CACHE_DIR, "_jar-meta.json");
+function loadJarMeta() {
+  try {
+    return JSON.parse(fs.readFileSync(JAR_META_FILE, "utf8"));
+  } catch {
+    return {};
+  }
+}
+function saveJarMeta(meta) {
+  try {
+    fs.writeFileSync(JAR_META_FILE, JSON.stringify(meta, null, 2));
+  } catch {}
 }
 
 // Persistent state for tracking which LATEST version we've successfully
