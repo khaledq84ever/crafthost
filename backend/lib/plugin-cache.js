@@ -307,7 +307,11 @@ async function prewarmPluginCache() {
       const cached = idx[key];
       const wrongLoader =
         cached && /\b(neoforge|fabric|forge)\b/i.test(cached.filename || "");
+      // Custom-resolver plugins (Geyser/Floodgate) skip the TTL fast path —
+      // a stale Geyser breaks Bedrock, and the version check below is one
+      // cheap API call. Modrinth plugins keep the 24h TTL.
       if (
+        !CUSTOM_RESOLVERS[pid] &&
         !wrongLoader &&
         cached &&
         fs.existsSync(cp) &&
@@ -494,6 +498,7 @@ module.exports = {
   PREWARM_MC_VERSIONS,
   CACHE_DIR,
   prewarmPluginCache,
+  ensureFreshCustom,
   copyFromCache,
   writeIntoCache,
   resolveLatestVersion,

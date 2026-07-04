@@ -786,6 +786,14 @@ async function refreshManagedBedrockPlugins(dir, mcVersion) {
     for (const { pid, re } of MANAGED) {
       const existing = entries.filter((f) => re.test(f));
       if (!existing.length) continue; // Bedrock not enabled for this server
+      // Make sure the cache itself is current FIRST — a server can resume
+      // before prewarm runs, and comparing against a stale cache would
+      // conclude "already current" while Geyser is actually broken.
+      try {
+        await pluginCache.ensureFreshCustom(pid, mcVersion);
+      } catch (err) {
+        console.warn(`[bedrock-refresh] ensureFresh ${pid}:`, err.message);
+      }
       // What would the cache seed today?
       const tmp = path.join(dir, ".bedrock-refresh-tmp");
       let hit = null;
