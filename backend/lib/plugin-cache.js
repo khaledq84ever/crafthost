@@ -39,8 +39,8 @@ const STARTER_PLUGIN_IDS = [
 ];
 
 // MC versions worth prewarming (one cache slot per plugin × version). Mirrors
-// the most popular wizard picks. Cache cost: 8 plugins × 3 versions ≈ 150 MB.
-const PREWARM_MC_VERSIONS = ["1.20.1", "1.21.1", "26.1.2"];
+// the most popular wizard picks. Cache cost: 8 plugins × 4 versions ≈ 180 MB.
+const PREWARM_MC_VERSIONS = ["1.20.1", "1.21.1", "26.1.2", "26.2"];
 
 function safeKey(s) {
   return String(s).replace(/[^a-zA-Z0-9._-]/g, "_");
