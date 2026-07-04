@@ -373,8 +373,11 @@ app.get("/api/status", async (req, res) => {
   }
 });
 
-// Static frontend — disable caching for HTML so users always pick up the latest UI;
-// keep modest caching for JS/CSS/img (revalidated on change since we don't fingerprint).
+// Static frontend — disable caching for HTML so users always pick up the latest UI.
+// JS/CSS aren't fingerprinted, so keep freshness at 60s but let the browser serve
+// stale-while-revalidate: repeat views render instantly from cache while the
+// background revalidation picks up any deploy (worst case one stale view).
+// Images/fonts/icons change rarely → cache a day, SWR a week.
 app.use(
   express.static(path.join(__dirname, "../frontend"), {
     extensions: ["html"],
@@ -382,7 +385,15 @@ app.use(
       if (filePath.endsWith(".html")) {
         res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       } else if (/\.(js|css)$/.test(filePath)) {
-        res.setHeader("Cache-Control", "public, max-age=60, must-revalidate");
+        res.setHeader(
+          "Cache-Control",
+          "public, max-age=60, stale-while-revalidate=3600",
+        );
+      } else if (/\.(png|webp|svg|ico|jpg|jpeg|gif|woff2?)$/.test(filePath)) {
+        res.setHeader(
+          "Cache-Control",
+          "public, max-age=86400, stale-while-revalidate=604800",
+        );
       }
     },
   }),
