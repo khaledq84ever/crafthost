@@ -2087,3 +2087,19 @@ h1 .msr {
     "GRAD" 0,
     "opsz" 24;
 }
+
+/* Discord join button */
+.btn-discord {
+  background: #5865f2;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-discord:hover {
+  background: #6b76f5;
+  color: #fff;
+}
+.btn-discord svg {
+  flex: none;
+}
