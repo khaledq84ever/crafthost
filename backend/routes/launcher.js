@@ -1,7 +1,7 @@
 // Public one-click launcher endpoints — consumed by the downloadable
-// start-<server>.bat (GET /api/servers/:id/launcher.bat in routes/servers.js).
+// <server>.bat (GET /api/servers/:id/launcher.bat in routes/servers.js).
 // Auth is the long random per-server launcher_token itself: it can only
-// start/inspect its one server, so no login session is needed on the PC that
+// start/stop/inspect its one server, so no login session is needed on the PC that
 // double-clicks the file. Responses are single-line text/plain because the
 // consumer is a Windows batch script, not a browser.
 const express = require("express");
@@ -72,15 +72,83 @@ router.post("/:token/start", async (req, res) => {
   }
 });
 
-// "<status> <host:port>" — address only once the public tunnel is up, so the
-// .bat keeps polling until players actually have something to paste.
-router.get("/:token/status", (req, res) => {
+router.post("/:token/stop", async (req, res) => {
+  res.type("text/plain");
+  const s = byToken(req);
+  if (!s)
+    return res
+      .status(404)
+      .send("ERROR unknown launcher - re-download the .bat from your dashboard");
+  if (s.status === "offline" || s.status === "stopped")
+    return res.send("OK already offline");
+  try {
+    pubtun.stop(s.id).catch(() => {});
+    await dc.stopServer(s);
+    db.prepare("UPDATE servers SET status = ? WHERE id = ?").run(
+      "offline",
+      s.id,
+    );
+    servers.audit(s.user_id, "server.stop.launcher", s.id, req.ip);
+    res.send("OK stopped");
+  } catch (err) {
+    res.status(500).send(`ERROR ${err.message || "stop failed"}`);
+  }
+});
+
+router.post("/:token/restart", async (req, res) => {
+  res.type("text/plain");
+  const s = byToken(req);
+  if (!s)
+    return res
+      .status(404)
+      .send("ERROR unknown launcher - re-download the .bat from your dashboard");
+  if (s.status === "offline" || s.status === "stopped")
+    return res.send("ERROR server is offline - start it first");
+  try {
+    await dc.restartServer(s);
+    db.prepare("UPDATE servers SET status = ? WHERE id = ?").run(
+      "starting",
+      s.id,
+    );
+    servers.audit(s.user_id, "server.restart.launcher", s.id, req.ip);
+    res.send("OK restarting");
+  } catch (err) {
+    res.status(500).send(`ERROR ${err.message || "restart failed"}`);
+  }
+});
+
+// Multi-line status response for the enhanced .bat menu:
+// Line 1: <status>
+// Line 2: <host:port>  (or "—" if no tunnel)
+// Line 3: <type> <version>
+// Line 4: <player_count>/<max_players>
+// Line 5: <motd>
+router.get("/:token/status", async (req, res) => {
   res.type("text/plain");
   const s = byToken(req);
   if (!s) return res.status(404).send("ERROR unknown launcher");
   const addr =
-    s.tunnel_host && s.tunnel_port ? `${s.tunnel_host}:${s.tunnel_port}` : "";
-  res.send(`${s.status || "offline"} ${addr}`.trim());
+    s.tunnel_host && s.tunnel_port ? `${s.tunnel_host}:${s.tunnel_port}` : "—";
+  let players = "0";
+  let motd = s.motd || "";
+  if (s.status === "online" || s.status === "running") {
+    try {
+      const stats = await dc.getStats(s);
+      if (stats) {
+        players = `${stats.players || 0}/${stats.players_max || s.max_players || 20}`;
+        motd = stats.motd || motd;
+      }
+    } catch {}
+  }
+  res.send(
+    [
+      s.status || "offline",
+      addr,
+      `${s.type || "?"} ${s.version || ""}`.trim(),
+      players,
+      motd,
+    ].join("\n"),
+  );
 });
 
 module.exports = router;
