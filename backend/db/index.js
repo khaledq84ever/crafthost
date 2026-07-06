@@ -153,6 +153,22 @@ if (!hasColumn('servers', 'last_scheduled_restart_at')) {
 if (!hasColumn('servers', 'launcher_token')) {
   db.exec(`ALTER TABLE servers ADD COLUMN launcher_token TEXT`);
 }
+// Unique both enforces one server per token and turns the public launcher
+// lookup (hit on every .bat request, unauthenticated) into an index seek.
+// Duplicates should be impossible (one crypto-random writer), but a failed
+// migration here would crash-loop the platform at boot — so on conflict,
+// null out the duped tokens (owners just re-download the .bat) and retry.
+try {
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_servers_launcher_token
+           ON servers(launcher_token) WHERE launcher_token IS NOT NULL`);
+} catch (err) {
+  console.warn('[db] launcher_token index: deduping —', err.message);
+  db.exec(`UPDATE servers SET launcher_token = NULL WHERE launcher_token IN (
+             SELECT launcher_token FROM servers WHERE launcher_token IS NOT NULL
+             GROUP BY launcher_token HAVING COUNT(*) > 1)`);
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_servers_launcher_token
+           ON servers(launcher_token) WHERE launcher_token IS NOT NULL`);
+}
 
 // Password reset tokens
 db.exec(`
