@@ -153,7 +153,10 @@ app.use(
     referrerPolicy: { policy: "strict-origin-when-cross-origin" },
   }),
 );
-app.use(cors({ origin: true, credentials: true }));
+// Public read APIs (jar catalog, launcher) stay browser-callable from anywhere,
+// but never with credentials: the app itself is same-origin (CORS doesn't apply
+// to it), so reflecting arbitrary origins WITH cookies was pure attack surface.
+app.use(cors({ origin: true, credentials: false }));
 app.use(express.json({ limit: "2mb" }));
 app.use(cookieParser());
 
