@@ -83,6 +83,7 @@ router.post("/:token/stop", async (req, res) => {
     return res.send("OK already offline");
   try {
     pubtun.stop(s.id);
+    playit.stop(s.id);
     await dc.stopServer(s);
     db.prepare("UPDATE servers SET status = ? WHERE id = ?").run(
       "offline",
@@ -104,13 +105,32 @@ router.post("/:token/restart", async (req, res) => {
       .send("ERROR unknown launcher - re-download the .bat from your dashboard");
   if (s.status === "offline" || s.status === "stopped")
     return res.send("ERROR server is offline - start it first");
+  if (oplock.has(s.id))
+    return res
+      .status(409)
+      .send("ERROR server is busy (backup/restore in progress) - try again in a minute");
   try {
-    await dc.restartServer(s);
+    pubtun.stop(s.id);
+    playit.stop(s.id);
+    const r = await dc.restartServer(s);
+    if (r?.containerId && r.containerId !== s.container_id)
+      db.prepare("UPDATE servers SET container_id = ? WHERE id = ?").run(
+        r.containerId,
+        s.id,
+      );
     db.prepare("UPDATE servers SET status = ? WHERE id = ?").run(
       "starting",
       s.id,
     );
     servers.audit(s.user_id, "server.restart.launcher", s.id, req.ip);
+    if (pubtun.isAvailable())
+      pubtun
+        .start(s.id, servers.internalListenPort(s))
+        .catch((err) => console.warn("[launcher] tunnel:", err.message));
+    if (s.playit_secret && playit.isAvailable())
+      playit
+        .start(s.id, servers.bedrockLocalPort(s), s.playit_secret)
+        .catch((err) => console.warn("[launcher] playit:", err.message));
     res.send("OK restarting");
   } catch (err) {
     res.status(500).send(`ERROR ${err.message || "restart failed"}`);
