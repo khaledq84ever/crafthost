@@ -203,6 +203,8 @@ app.use("/api/jars", require("./routes/jars"));
 app.use("/api/plans", require("./routes/plans"));
 app.use("/api/versions", require("./routes/versions"));
 app.use("/api/modrinth", require("./routes/modrinth"));
+// Public (token-auth'd) endpoints for the one-click .bat starter.
+app.use("/api/launcher", require("./routes/launcher"));
 
 // Cached boot timestamp so /api/status can show platform uptime
 const BOOT_TS = Date.now();

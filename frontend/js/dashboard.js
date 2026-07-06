@@ -372,6 +372,9 @@ function renderServer(s) {
         <button role="menuitem" onclick="closeCardMenu();copyText('${escapeHtml(ip)}')">
           <span class="sc-menu-icon">📋</span><span>${t("menu_copy_address")}</span>
         </button>
+        <button role="menuitem" onclick="closeCardMenu();downloadLauncher('${escapeHtml(s.id)}')">
+          <span class="sc-menu-icon">🖱️</span><span>${t("menu_launcher")}</span>
+        </button>
         ${
           [
             "paper",
@@ -1708,6 +1711,13 @@ function goToConsole(id) {
   localStorage.setItem("crafthost.currentServerId", id);
   location.href = "/console.html";
 }
+
+// One-click .bat starter download — plain navigation so the auth cookie rides
+// along and the browser saves the attachment.
+function downloadLauncher(id) {
+  location.href = `/api/servers/${id}/launcher.bat`;
+}
+window.downloadLauncher = downloadLauncher;
 
 window.serverAction = serverAction;
 window.deleteServer = deleteServer;
