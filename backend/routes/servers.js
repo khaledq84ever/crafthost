@@ -2263,6 +2263,16 @@ router.post(
       } catch {}
     }
 
+    // Zip-Slip guard: a crafted entry name (world/../../../etc) resolves a dest
+    // outside the server dir. Reject anything that escapes root before writing.
+    const rootResolved = path.resolve(root);
+    function destUnderRoot(name) {
+      const dest = path.resolve(root, name);
+      if (dest !== rootResolved && !dest.startsWith(rootResolved + path.sep))
+        throw new Error(`unsafe path in archive: ${name}`);
+      return dest;
+    }
+
     try {
       // 1) Stop the server (no-op if already stopped).
       try {
@@ -2327,7 +2337,7 @@ router.post(
           const name = e.entryName.replace(/^\/+/, "");
           const top = name.split("/")[0];
           if (!dimDirs.includes(top)) continue;
-          const dest = path.join(root, name);
+          const dest = destUnderRoot(name);
           await fsp.mkdir(path.dirname(dest), { recursive: true });
           fs.writeFileSync(dest, e.getData());
           restored[top] = (restored[top] || 0) + 1;
@@ -2343,7 +2353,7 @@ router.post(
           if (prefix && !name.startsWith(prefix)) continue;
           const rel = prefix ? name.slice(prefix.length) : name;
           if (!rel) continue;
-          const dest = path.join(root, "world", rel);
+          const dest = destUnderRoot(path.join("world", rel));
           await fsp.mkdir(path.dirname(dest), { recursive: true });
           fs.writeFileSync(dest, e.getData());
         }
@@ -2482,10 +2492,20 @@ router.post("/:id/console", async (req, res) => {
   const s = getOwnedServer(req, res);
   if (!s) return;
   const { command } = req.body || {};
-  if (!command) return res.status(400).json({ error: "Missing command" });
-  const resp = await dc.sendRcon(s, command);
-  audit(req.user.id, "server.rcon", s.id, req.ip, { command });
-  res.json({ response: resp });
+  if (typeof command !== "string" || !command.trim())
+    return res.status(400).json({ error: "Missing command" });
+  // Minecraft ignores absurdly long lines; cap to avoid a stdin flood.
+  if (command.length > 1000)
+    return res.status(400).json({ error: "Command too long (max 1000)" });
+  if (s.status !== "online" && s.status !== "running")
+    return res.status(409).json({ error: "Server is not online" });
+  try {
+    const resp = await dc.sendRcon(s, command);
+    audit(req.user.id, "server.rcon", s.id, req.ip, { command });
+    res.json({ response: resp });
+  } catch (err) {
+    res.status(502).json({ error: err.message || "Command failed" });
+  }
 });
 
 function audit(user_id, action, resource_id, ip, metadata) {
