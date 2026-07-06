@@ -2312,15 +2312,24 @@ async function renderBedrockStatus(sid, sname) {
              ⟳ ${escapeHtml(status.restart_reason || "Restart the server to apply changes.")}
            </div>`
         : "";
+      const javaIp = ipFor(srv);
       body.innerHTML = `
         <div style="background:rgba(16,185,129,0.10);border:1px solid rgba(16,185,129,0.3);border-radius:9px;padding:12px;margin-bottom:14px;">
           <div style="font-weight:700;color:var(--emerald);margin-bottom:4px;">✓ Bedrock cross-play active</div>
-          <div style="font-size:12px;color:var(--slate-400);">Mobile / Xbox / Switch / PS players can connect using:</div>
+          <div style="font-size:12px;color:var(--slate-400);">${t("bedrock_addr_label")}:</div>
         </div>
-        <div class="sc-ip" onclick="copyText('${escapeHtml(srv.playit_host + ":" + srv.playit_port)}')" style="cursor:pointer;margin-bottom:14px;border-color:rgba(255,107,53,0.4);">
+        <div class="sc-ip" onclick="copyText('${escapeHtml(srv.playit_host + ":" + srv.playit_port)}')" style="cursor:pointer;margin-bottom:10px;border-color:rgba(255,107,53,0.4);">
           <span style="flex:1;font-family:monospace;font-size:14px;">📱 ${escapeHtml(srv.playit_host)}:${escapeHtml(String(srv.playit_port))}</span>
           <span class="sc-copy">${t("copy")}</span>
         </div>
+        <div style="background:rgba(245,158,11,0.10);border:1px solid rgba(245,158,11,0.3);border-radius:9px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:#fbbf24;">
+          ⚠ ${t("bedrock_diff_note")}
+        </div>
+        ${javaIp ? `
+        <div class="sc-ip" onclick="copyText('${escapeHtml(javaIp)}')" style="cursor:pointer;margin-bottom:14px;opacity:.75;">
+          <span style="flex:1;font-size:12px;"><span style="font-weight:600;">☕ ${t("java_addr_label")}:</span> <span style="font-family:monospace;">${escapeHtml(javaIp)}</span></span>
+          <span class="sc-copy">${t("copy")}</span>
+        </div>` : ""}
         ${pluginsRow}
         ${restartHint}
         <div style="display:flex;gap:8px;justify-content:flex-end;">
