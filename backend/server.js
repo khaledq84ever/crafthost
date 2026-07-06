@@ -199,6 +199,8 @@ app.use("/api/servers/:id/files", require("./routes/files"));
 app.use("/api/servers/:id/plugins", require("./routes/plugins"));
 app.use("/api/servers/:id/backups", require("./routes/backups"));
 app.use("/api/admin", require("./routes/admin"));
+// Public jar catalog must mount before the auth'd per-user jar library.
+app.use("/api/jars/catalog", require("./routes/jar-catalog"));
 app.use("/api/jars", require("./routes/jars"));
 app.use("/api/plans", require("./routes/plans"));
 app.use("/api/versions", require("./routes/versions"));

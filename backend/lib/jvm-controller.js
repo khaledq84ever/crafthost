@@ -2322,4 +2322,10 @@ module.exports = {
   getCrashes,
   clearCrash,
   refreshManagedBedrockPlugins, // exported for tests
+  // Jar URL resolvers — consumed by the public /api/jars/catalog routes.
+  paperJarUrl,
+  purpurJarUrl,
+  fabricJarUrl,
+  neoforgeJarUrl,
+  vanillaJarUrl,
 };
