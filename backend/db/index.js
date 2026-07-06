@@ -147,6 +147,13 @@ if (!hasColumn('servers', 'last_scheduled_restart_at')) {
   db.exec(`ALTER TABLE servers ADD COLUMN last_scheduled_restart_at INTEGER`);
 }
 
+// One-click launcher token — a long random secret embedded in the downloadable
+// start-<server>.bat. /api/launcher/:token/{start,status} accept it without a
+// login session, scoped to exactly this server.
+if (!hasColumn('servers', 'launcher_token')) {
+  db.exec(`ALTER TABLE servers ADD COLUMN launcher_token TEXT`);
+}
+
 // Password reset tokens
 db.exec(`
   CREATE TABLE IF NOT EXISTS password_resets (

@@ -2508,9 +2508,101 @@ function audit(user_id, action, resource_id, ip, metadata) {
   }
 }
 
+// One-click Windows starter — a downloadable .bat with an embedded per-server
+// token. Double-clicking it starts the server, waits for it to come online,
+// then shows the join address and copies it to the clipboard. The public
+// endpoints it talks to live in routes/launcher.js; the token only allows
+// start/status on this one server (no login on the friend's PC).
+function buildLauncherBat(name, base, token) {
+  const start = `${base}/api/launcher/${token}/start`;
+  const status = `${base}/api/launcher/${token}/status`;
+  return [
+    "@echo off",
+    "setlocal",
+    `title CraftHost - ${name}`,
+    "echo.",
+    "echo  ==============================================",
+    "echo    CraftHost One-Click Starter",
+    `echo    Server: ${name}`,
+    "echo  ==============================================",
+    "echo.",
+    "where curl >nul 2>&1 || (echo  This starter needs Windows 10 or newer - curl.exe is missing. & pause & exit /b 1)",
+    "echo  Starting your server...",
+    `for /f "usebackq delims=" %%A in (\`curl -s -m 30 -X POST "${start}"\`) do set "START=%%A"`,
+    'if not defined START set "START=ERROR no reply from CraftHost - check your internet"',
+    "echo  %START%",
+    'echo %START%| findstr /b /c:"ERROR" >nul && (echo. & pause & exit /b 1)',
+    "echo.",
+    "set /a TRIES=0",
+    ":poll",
+    "set /a TRIES+=1",
+    `if %TRIES% GTR 60 (echo  Taking longer than usual - check your dashboard: ${base} & pause & exit /b 1)`,
+    "timeout /t 5 /nobreak >nul",
+    'set "LINE="',
+    `for /f "usebackq delims=" %%A in (\`curl -s -m 30 "${status}"\`) do set "LINE=%%A"`,
+    'for /f "tokens=1,2" %%A in ("%LINE% .") do (set "ST=%%A" & set "ADDR=%%B")',
+    'if /i "%ST%"=="crashed" (echo  Server crashed while starting - CraftHost auto-heal will retry. Check the dashboard. & pause & exit /b 1)',
+    'if /i "%ST%"=="online" if not "%ADDR%"=="." goto up',
+    "echo  ... waiting: %ST%  [%TRIES%/60]",
+    "goto poll",
+    ":up",
+    "echo.",
+    "echo  ==============================================",
+    "echo    SERVER IS ONLINE",
+    "echo    Address: %ADDR%",
+    "echo    Copied to clipboard - paste it in Minecraft",
+    "echo  ==============================================",
+    "echo %ADDR%| clip",
+    "echo.",
+    "pause",
+    "",
+  ].join("\r\n");
+}
+
+router.get("/:id/launcher.bat", (req, res) => {
+  const s = getOwnedServer(req, res);
+  if (!s) return;
+  let token = s.launcher_token;
+  if (!token) {
+    token = crypto.randomBytes(24).toString("hex");
+    db.prepare("UPDATE servers SET launcher_token = ? WHERE id = ?").run(
+      token,
+      s.id,
+    );
+    audit(req.user.id, "server.launcher_token", s.id, req.ip);
+  }
+  const proto = String(
+    req.headers["x-forwarded-proto"] || req.protocol || "https",
+  ).split(",")[0];
+  const base = `${proto}://${req.get("host")}`;
+  // Batch is fragile with quotes/carets/percent and non-ASCII garbles in
+  // cmd.exe — strip the name down to safe printable characters.
+  const safeName =
+    (s.name || "")
+      .replace(/[^\x20-\x7E]/g, "")
+      .replace(/["%^&<>|`]/g, "")
+      .trim() || "server";
+  const fileSlug =
+    safeName
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "server";
+  res.setHeader("Content-Type", "application/x-bat");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="start-${fileSlug}.bat"`,
+  );
+  res.send(buildLauncherBat(safeName, base, token));
+});
+
 // Multer error handler for the world.zip / icon uploads — without this an
 // oversized file falls through to Express's default handler as an HTML 500.
 router.use(uploadErrors());
 
 module.exports = router;
 module.exports.createServerForUser = createServerForUser;
+// Shared with routes/launcher.js (public one-click start endpoints).
+module.exports.checkRunningQuota = checkRunningQuota;
+module.exports.internalListenPort = internalListenPort;
+module.exports.bedrockLocalPort = bedrockLocalPort;
+module.exports.audit = audit;
