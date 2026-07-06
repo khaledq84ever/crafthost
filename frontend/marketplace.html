@@ -568,7 +568,7 @@
         row.innerHTML = TOP_PICKS.map(
           (p) => `
     <div class="mp-pick" style="--c:${p.c};" data-slug="${p.slug}" data-name="${escapeHtml(p.name)}">
-      <div class="mp-pick-icon" data-letter="${escapeHtml((p.name || "?")[0])}"><img src="${p.img}" alt="" loading="lazy" onerror="this.remove();this.parentElement.classList.add('mp-pick-icon-fb');" /></div>
+      <div class="mp-pick-icon" data-letter="${escapeHtml((p.name || "?")[0])}"><img src="${p.img}" alt="" loading="lazy" onerror="this.parentElement.classList.add('mp-pick-icon-fb');this.remove();" /></div>
       <div class="mp-pick-text">
         <div class="mp-pick-name">${p.name}</div>
         <div class="mp-pick-desc">${escapeHtml(p.desc)}</div>
