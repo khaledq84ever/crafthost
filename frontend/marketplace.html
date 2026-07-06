@@ -125,6 +125,13 @@
         object-fit: cover;
         border-radius: 7px;
       }
+      /* Fallback when a plugin has no/broken icon: a colored initial tile. */
+      .mp-pick-icon.mp-pick-icon-fb::before {
+        content: attr(data-letter);
+        font-weight: 800;
+        color: var(--c);
+        text-transform: uppercase;
+      }
       .mp-pick-text {
         flex: 1;
         min-width: 0;
@@ -478,6 +485,13 @@
           desc: "Bedrock players → Java",
         },
         {
+          slug: "floodgate",
+          name: "Floodgate",
+          img: "/img/plugins/floodgate.webp",
+          c: "#22C55E",
+          desc: "Bedrock auth (pairs with Geyser)",
+        },
+        {
           slug: "skinsrestorer",
           name: "SkinsRestorer",
           img: "/img/plugins/skinsrestorer.webp",
@@ -512,6 +526,41 @@
           c: "#92400E",
           desc: "Pre-generate chunks",
         },
+        {
+          slug: "spark",
+          name: "spark",
+          img: "https://cdn.modrinth.com/data/l6YH9Als/61a777dd08a8447ac93e8b6372e6d27d48cd1e1a_96.webp",
+          c: "#F97316",
+          desc: "Performance profiler",
+        },
+        {
+          slug: "griefprevention",
+          name: "GriefPrevention",
+          img: "https://cdn.modrinth.com/data/O4o4mKaq/6aeade7ea5551c41dbe71e379ea893777356650d_96.webp",
+          c: "#D97706",
+          desc: "Land claims & anti-grief",
+        },
+        {
+          slug: "dynmap",
+          name: "Dynmap",
+          img: "https://cdn.modrinth.com/data/fRQREgAc/2eaa1e6a6fa03e485a319a628d6b29ba382855b4_96.webp",
+          c: "#0EA5E9",
+          desc: "Live web map",
+        },
+        {
+          slug: "multiverse-inventories",
+          name: "MV-Inventories",
+          img: "https://cdn.modrinth.com/data/qvdtDX3s/3e3c705351a85c68b78a6131aff23f4674b2f71f_96.webp",
+          c: "#6366F1",
+          desc: "Per-world inventories",
+        },
+        {
+          slug: "vaultunlocked",
+          name: "Vault",
+          img: "https://cdn.modrinth.com/data/ayRaM8J7/75b4141b5e316a73a0372e895bb24e09122759f1_96.webp",
+          c: "#64748B",
+          desc: "Economy & perms API bridge",
+        },
       ];
       function renderTopPicks() {
         const row = document.getElementById("topPicksRow");
@@ -519,7 +568,7 @@
         row.innerHTML = TOP_PICKS.map(
           (p) => `
     <div class="mp-pick" style="--c:${p.c};" data-slug="${p.slug}" data-name="${escapeHtml(p.name)}">
-      <div class="mp-pick-icon"><img src="${p.img}" alt="" loading="lazy" /></div>
+      <div class="mp-pick-icon" data-letter="${escapeHtml((p.name || "?")[0])}"><img src="${p.img}" alt="" loading="lazy" onerror="this.remove();this.parentElement.classList.add('mp-pick-icon-fb');" /></div>
       <div class="mp-pick-text">
         <div class="mp-pick-name">${p.name}</div>
         <div class="mp-pick-desc">${escapeHtml(p.desc)}</div>
