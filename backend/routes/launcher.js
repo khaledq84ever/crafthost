@@ -82,7 +82,7 @@ router.post("/:token/stop", async (req, res) => {
   if (s.status === "offline" || s.status === "stopped")
     return res.send("OK already offline");
   try {
-    pubtun.stop(s.id).catch(() => {});
+    pubtun.stop(s.id);
     await dc.stopServer(s);
     db.prepare("UPDATE servers SET status = ? WHERE id = ?").run(
       "offline",
