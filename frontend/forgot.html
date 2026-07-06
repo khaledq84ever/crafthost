@@ -49,20 +49,16 @@ document.getElementById('forgotForm').addEventListener('submit', async (e) => {
   const orig = btn.textContent;
   btn.disabled = true; btn.textContent = 'Sending…';
   try {
-    const r = await api('/api/auth/forgot', { method: 'POST', body: { email: fd.get('email') } });
-    if (r.reset_url) {
-      // No email service yet — surface the link directly
-      const card = document.querySelector('.auth-card');
-      card.innerHTML = `
-        <h2>Reset link ready</h2>
-        <p class="sub">Email isn't wired yet — open the link below to set a new password. Expires in ${r.expires_in_minutes || 60} minutes.</p>
-        <a href="${r.reset_url}" class="btn btn-primary btn-block btn-lg">Continue to reset →</a>
-        <button class="btn btn-secondary btn-block btn-sm" onclick="navigator.clipboard.writeText('${r.reset_url}');toast('Link copied');">Copy link</button>
-        <p class="auth-foot">Back to<a href="/login.html">Sign in</a></p>
-      `;
-    } else {
-      toast(r.message || 'If an account exists, a reset link has been issued.');
-    }
+    await api('/api/auth/forgot', { method: 'POST', body: { email: fd.get('email') } });
+    // The reset link is issued out-of-band (Discord) — never shown here, so
+    // knowing someone's email is not enough to take over their account.
+    const card = document.querySelector('.auth-card');
+    card.innerHTML = `
+      <h2>Reset requested</h2>
+      <p class="sub">If an account exists for that email, a reset link is ready. Ping us on Discord and we'll send it to you after a quick check. <span dir="rtl">اطلب رابط الاستعادة عبر ديسكورد</span></p>
+      <a href="https://discord.gg/zbHbSsCUua" target="_blank" rel="noopener" class="btn btn-primary btn-block btn-lg">Open Discord →</a>
+      <p class="auth-foot">Back to<a href="/login.html">Sign in</a></p>
+    `;
   } catch (err) {
     toast(err.message || 'Could not generate reset link', 'error');
   } finally {

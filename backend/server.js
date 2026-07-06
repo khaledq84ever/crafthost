@@ -194,6 +194,8 @@ const authLimit = rateLimit({
 });
 app.use("/api/auth/register", authLimit);
 app.use("/api/auth/login", authLimit);
+app.use("/api/auth/forgot", authLimit);
+app.use("/api/auth/reset", authLimit);
 
 // Routes
 app.use("/api/auth", require("./routes/auth"));

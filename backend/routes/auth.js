@@ -15,7 +15,11 @@ router.post('/register', async (req, res) => {
   const { username, email, password } = req.body || {};
   if (!username || !email || !password) return res.status(400).json({ error: 'Missing fields' });
   if (password.length < 8) return res.status(400).json({ error: 'Password too short (min 8)' });
+  if (password.length > 128) return res.status(400).json({ error: 'Password too long (max 128)' });
   if (username.length < 3) return res.status(400).json({ error: 'Username too short (min 3)' });
+  if (username.length > 32) return res.status(400).json({ error: 'Username too long (max 32)' });
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return res.status(400).json({ error: 'Invalid email address' });
 
   const exists = db.prepare('SELECT id FROM users WHERE email = ? OR username = ?').get(email, username);
   if (exists) return res.status(409).json({ error: 'Email or username already exists' });
@@ -169,31 +173,30 @@ router.delete('/me', authMiddleware, async (req, res) => {
 });
 
 // POST /api/auth/forgot { email } — issues a one-shot password reset token.
-// Since we don't have an email service wired, we surface the reset URL in the
-// response so the user can use it directly (only if the email actually exists,
-// to avoid email enumeration we always say "if account exists…" but include
-// the reset URL only when the email matches).
+// No email service is wired, and the link must NEVER go back to the requester:
+// that let anyone who knew (or guessed) an email take over the account. The
+// link goes to the server log + a platform event instead — the owner verifies
+// the person in Discord and hands them the link out-of-band.
 const crypto = require('crypto');
 router.post('/forgot', (req, res) => {
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ error: 'Email required' });
+  const generic = {
+    ok: true,
+    message: 'If an account exists, a reset link has been issued. Ask in our Discord to receive it.',
+  };
   const user = db.prepare('SELECT id, email FROM users WHERE email = ?').get(email);
-  if (!user) {
-    // Don't leak enumeration; give the same response shape but no token
-    return res.json({ ok: true, message: 'If an account exists, a reset link has been issued.' });
-  }
+  if (!user) return res.json(generic); // same shape — no enumeration
   const token = crypto.randomBytes(32).toString('hex');
   const expires = Math.floor(Date.now() / 1000) + 60 * 60; // 1 hour
   db.prepare('INSERT INTO password_resets (token, user_id, expires_at) VALUES (?, ?, ?)')
     .run(token, user.id, expires);
-  const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
-  const resetUrl = `${origin}/reset.html?token=${token}`;
-  res.json({
-    ok: true,
-    message: 'Reset link generated. (No email service yet — copy this link to reset.)',
-    reset_url: resetUrl,
-    expires_in_minutes: 60,
-  });
+  // Host header (not attacker-supplied Origin) — behind Railway's proxy this
+  // is the real deploy host, so the logged link can't be poisoned.
+  const resetUrl = `${req.protocol}://${req.get('host')}/reset.html?token=${token}`;
+  console.log(`[auth] password reset requested for ${user.email} (user ${user.id}): ${resetUrl} — expires in 60 min`);
+  require('../lib/events').record('password_reset_requested', null, { user_id: user.id, email: user.email });
+  res.json(generic);
 });
 
 // POST /api/auth/reset { token, password } — set new password using the token.
