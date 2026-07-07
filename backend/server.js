@@ -752,13 +752,10 @@ server.listen(PORT, async () => {
     const pubtun = require("./lib/public-tunnel");
     const monMin = parseInt(process.env.JOIN_MONITOR_MINUTES || "4", 10);
     const failures = new Map(); // serverId → consecutive failed pings
-    const restarts = new Map(); // serverId → { count, at } — escalating backoff:
-    // a restart that didn't cure the tunnel must not repeat in a tight loop
-    // (seen live: same playit address restarted every ~12min for hours).
-    // Recovery (successful public ping) resets the counter.
-    // Backoff doubles per restart, capped at 8× the monitor interval.
-    // Actual fault (e.g. wedged playit route) may need the agent, not us.
-    // Backoff doubles: 1×, 2×, 4×, 8× monMin between restart attempts.
+    const restarts = new Map(); // serverId → { count, at } — a restart that
+    // didn't cure the tunnel must not repeat in a tight loop (seen live: same
+    // playit address restarted every ~12min for hours). Backoff doubles per
+    // attempt (2×, 4×, 8×… monMin, capped 60min); a successful ping resets it.
     // Mirrors routes/servers.js internalListenPort — the JVM's real local port.
     const internalPort = (s) =>
       26000 + (Math.max(0, parseInt(s.port, 10) - 25565) % 1000);
@@ -772,6 +769,9 @@ server.listen(PORT, async () => {
                AND tunnel_host IS NOT NULL AND tunnel_port IS NOT NULL`,
           )
           .all();
+        const liveIds = new Set(rows.map((s) => s.id));
+        for (const k of failures.keys()) if (!liveIds.has(k)) failures.delete(k);
+        for (const k of restarts.keys()) if (!liveIds.has(k)) restarts.delete(k);
         for (const s of rows) {
           // Only alert on tunnel problems, not JVM problems — if the JVM
           // itself is down the auto-restart loop owns that. Local ping first.
@@ -783,6 +783,7 @@ server.listen(PORT, async () => {
           const pub = await mcping.ping(s.tunnel_host, s.tunnel_port, 8000);
           if (pub.ok) {
             failures.delete(s.id);
+            restarts.delete(s.id);
             continue;
           }
           const n = (failures.get(s.id) || 0) + 1;
@@ -796,6 +797,18 @@ server.listen(PORT, async () => {
               address: `${s.tunnel_host}:${s.tunnel_port}`,
               error: pub.error,
             });
+            const r = restarts.get(s.id) || { count: 0, at: 0 };
+            const waitMs = Math.min(
+              2 ** r.count * monMin * 60_000,
+              60 * 60_000,
+            );
+            if (r.count > 0 && Date.now() - r.at < waitMs) {
+              console.warn(
+                `[join-monitor] ${s.name}: ${r.count} restart(s) haven't helped — next attempt in ~${Math.ceil((r.at + waitMs - Date.now()) / 60_000)}min`,
+              );
+              continue;
+            }
+            restarts.set(s.id, { count: r.count + 1, at: Date.now() });
             try {
               pubtun.stop(s.id);
               const t = await pubtun.start(s.id, internalPort(s));
