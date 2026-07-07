@@ -1,0 +1,24 @@
+name: CI
+
+# Syntax-check the backend and run the self-contained unit tests (no live
+# server / DB needed) on every push / PR. Build/test only — deploys stay manual.
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Syntax check backend entrypoint
+        run: node --check backend/server.js
+      - name: Unit tests (mock RCON + console health, no live server)
+        run: |
+          node scripts/test-console-health.mjs
+          node scripts/test-rcon-tick.mjs
