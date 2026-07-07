@@ -752,6 +752,13 @@ server.listen(PORT, async () => {
     const pubtun = require("./lib/public-tunnel");
     const monMin = parseInt(process.env.JOIN_MONITOR_MINUTES || "4", 10);
     const failures = new Map(); // serverId → consecutive failed pings
+    const restarts = new Map(); // serverId → { count, at } — escalating backoff:
+    // a restart that didn't cure the tunnel must not repeat in a tight loop
+    // (seen live: same playit address restarted every ~12min for hours).
+    // Recovery (successful public ping) resets the counter.
+    // Backoff doubles per restart, capped at 8× the monitor interval.
+    // Actual fault (e.g. wedged playit route) may need the agent, not us.
+    // Backoff doubles: 1×, 2×, 4×, 8× monMin between restart attempts.
     // Mirrors routes/servers.js internalListenPort — the JVM's real local port.
     const internalPort = (s) =>
       26000 + (Math.max(0, parseInt(s.port, 10) - 25565) % 1000);

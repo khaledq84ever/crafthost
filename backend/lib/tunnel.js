@@ -73,10 +73,22 @@ async function start(serverId, localPort) {
 
     proc.on('exit', (code, sig) => {
       const hadPort = !!state.assignedPort;
-      tunnels.delete(serverId);
-      try { db.prepare('UPDATE servers SET tunnel_host = NULL, tunnel_port = NULL WHERE id = ?').run(serverId); } catch {}
-      console.warn(`[tunnel] ${serverId}: bore exited (code=${code} sig=${sig} hadPort=${hadPort})`);
+      // Only remove our own map entry — stop() already deleted it, and a new
+      // start() may have registered a fresh tunnel we must not clobber.
+      if (tunnels.get(serverId) === state) tunnels.delete(serverId);
+      console.warn(`[tunnel] ${serverId}: bore exited (code=${code} sig=${sig} hadPort=${hadPort}${state.stopped ? ' intentional' : ''})`);
       if (!hadPort) done(null);
+      // Intentional stop (server stopping, or playit upgrade tearing bore down
+      // right after writing the playit address to the DB): the caller owns the
+      // DB row now — clearing or respawning here would undo the upgrade.
+      if (state.stopped) return;
+      // Unexpected death: clear the DB address only if it is still OURS.
+      try {
+        const row = db.prepare('SELECT tunnel_host, tunnel_port FROM servers WHERE id = ?').get(serverId);
+        if (row && row.tunnel_host === TUNNEL_HOST && row.tunnel_port === state.assignedPort) {
+          db.prepare('UPDATE servers SET tunnel_host = NULL, tunnel_port = NULL WHERE id = ?').run(serverId);
+        }
+      } catch {}
       // Auto-respawn if the MC server is still meant to be running.
       try {
         const srv = db.prepare(`SELECT status FROM servers WHERE id = ?`).get(serverId);
@@ -97,6 +109,7 @@ async function start(serverId, localPort) {
 function stop(serverId) {
   const t = tunnels.get(serverId);
   if (!t) return false;
+  t.stopped = true; // exit handler must not clear the DB or respawn
   try { t.proc.kill('SIGTERM'); } catch {}
   tunnels.delete(serverId);
   try {
