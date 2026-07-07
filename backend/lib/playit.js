@@ -524,6 +524,17 @@ function ensureAgent(secret) {
 
 const agentRunning = () => !!(agentProc && !agentProc.killed);
 
+// Kill + respawn the singleton agent. A wedged agent can keep serving stale
+// edge routes (players get ECONNRESET while local pings pass); a clean respawn
+// re-registers every tunnel route. Used by the join-monitor escalation.
+function restartAgent(secret) {
+  if (!agentProc || agentProc.killed) return !!ensureAgent(secret);
+  try {
+    agentProc.kill("SIGTERM"); // exit handler respawns (agentWanted stays true)
+  } catch {}
+  return true;
+}
+
 // Ensure a per-server Minecraft-Java TCP tunnel forwarding to the server's local
 // port. Reuses/re-points the tunnel named `chj-<serverId>`. Returns { host, port }.
 async function ensureJavaTunnel(
@@ -897,6 +908,7 @@ module.exports = {
   info,
   list,
   ensureAgent,
+  restartAgent,
   ensureJavaTunnel,
   deleteServerTunnels,
   claimStart,

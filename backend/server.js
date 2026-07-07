@@ -810,6 +810,29 @@ server.listen(PORT, async () => {
             }
             restarts.set(s.id, { count: r.count + 1, at: Date.now() });
             try {
+              // For playit-served tunnels a plain stop/start is a no-op: it
+              // finds the existing tunnel record and hands back the same
+              // address without touching the agent. Escalate for real:
+              // attempt 2 → bounce the agent (re-registers all edge routes),
+              // attempt 3+ → recreate this server's tunnel record (new
+              // address — last resort, but reachable beats stable).
+              const isPlayit = /joinmc\.link$/.test(s.tunnel_host || "");
+              if (isPlayit && r.count >= 1) {
+                const playit = require("./lib/playit");
+                const secret = pubtun.sharedSecret();
+                if (r.count >= 2) {
+                  console.warn(
+                    `[join-monitor] ${s.name}: escalation — recreating playit java tunnel record`,
+                  );
+                  await playit.deleteServerTunnels(secret, s.id);
+                } else {
+                  console.warn(
+                    `[join-monitor] ${s.name}: escalation — restarting playit agent`,
+                  );
+                  playit.restartAgent(secret);
+                  await new Promise((w) => setTimeout(w, 8000));
+                }
+              }
               pubtun.stop(s.id);
               const t = await pubtun.start(s.id, internalPort(s));
               console.log(
