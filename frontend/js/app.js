@@ -57,6 +57,31 @@ window.I18N = {
     // Landing page
     hero_title: "Your Minecraft Server.",
     hero_title_line2: "Live in 60 Seconds.",
+    ld_hint_click: "click the block ⛏",
+    ld_engines_eyebrow: "engines",
+    ld_engines_title: "One block, five engines.",
+    ld_engines_sub:
+      "Pick the runtime — CraftHost resolves the latest build, boots it and keeps it patched.",
+    ld_e_plugins: "plugins",
+    ld_e_perf: "performance +",
+    ld_e_vanilla: "pure Mojang",
+    ld_e_mods: "mods",
+    ld_e_modded: "heavy modpacks",
+    ld_cross_eyebrow: "cross-play",
+    ld_cross_title: "Java and Bedrock. Same world.",
+    ld_cross_sub:
+      "Geyser is wired in automatically — friends on phones, Xbox, Switch and PlayStation join the same server as PC players.",
+    ld_cross_java: "Java Edition",
+    ld_cross_java_d: "PC — plugins, mods, full control",
+    ld_cross_bed: "Bedrock Edition",
+    ld_cross_bed_d: "Mobile, Xbox, Switch, PS — zero setup",
+    ld_deploy_eyebrow: "deploy",
+    ld_deploy_title: "Live in one command.",
+    ld_deploy_sub:
+      "Console, file manager, plugin marketplace and backups are already there when the server comes up.",
+    ld_cta_title: "Place your block.",
+    ld_cta_sub:
+      "Free forever. No card, no queue — your server is one click away.",
     hero_sub:
       "Deploy vanilla, modded, or custom-JAR servers in a click. Real hardware. Zero throttling. DDoS-protected.",
     hero_sub_free:
@@ -254,6 +279,30 @@ window.I18N = {
     msPT: "MSPT",
     hero_title: "سيرفر ماين كرافت الخاص بك.",
     hero_title_line2: "جاهز خلال ٦٠ ثانية.",
+    ld_hint_click: "اضغط على المكعب ⛏",
+    ld_engines_eyebrow: "المحركات",
+    ld_engines_title: "مكعب واحد، خمسة محركات.",
+    ld_engines_sub:
+      "اختر المحرك — كرافت هوست يجلب أحدث نسخة، يشغّلها ويبقيها محدّثة.",
+    ld_e_plugins: "إضافات",
+    ld_e_perf: "أداء أعلى",
+    ld_e_vanilla: "أصلي من موجانغ",
+    ld_e_mods: "مودات",
+    ld_e_modded: "مود باك ثقيلة",
+    ld_cross_eyebrow: "لعب مشترك",
+    ld_cross_title: "Java و Bedrock. نفس العالم.",
+    ld_cross_sub:
+      "Geyser يعمل تلقائياً — أصدقاؤك على الجوال و Xbox و Switch و PlayStation يدخلون نفس السيرفر مع لاعبي الكمبيوتر.",
+    ld_cross_java: "نسخة Java",
+    ld_cross_java_d: "كمبيوتر — إضافات ومودات وتحكم كامل",
+    ld_cross_bed: "نسخة Bedrock",
+    ld_cross_bed_d: "جوال، Xbox، Switch، PS — بدون أي إعداد",
+    ld_deploy_eyebrow: "النشر",
+    ld_deploy_title: "جاهز بأمر واحد.",
+    ld_deploy_sub:
+      "الكونسول ومدير الملفات وسوق الإضافات والنسخ الاحتياطي كلها جاهزة لحظة تشغيل السيرفر.",
+    ld_cta_title: "ضع مكعبك.",
+    ld_cta_sub: "مجاني للأبد. بدون بطاقة وبدون انتظار — سيرفرك على بعد ضغطة.",
     hero_sub:
       "انشر سيرفرات فانيلا أو مودات أو JAR مخصص بضغطة. أجهزة حقيقية، بدون اختناقات، حماية من DDoS.",
     hero_sub_free:
