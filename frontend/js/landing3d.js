@@ -100,7 +100,7 @@ import * as THREE from "/js/vendor/three.module.min.js";
         put(
           pos[1],
           i,
-          (k - 2) * 1.55 + (rnd(i + 9) - 0.5) * 0.5,
+          (k - 2) * 1.22 + (rnd(i + 9) - 0.5) * 0.45,
           ((ci % 4) - 1.5) * 0.55 + (rnd(i + 3) - 0.5) * 0.35,
           (rnd(i + 5) - 0.5) * 1.2,
         );
@@ -189,7 +189,7 @@ import * as THREE from "/js/vendor/three.module.min.js";
   }
 
   // per-segment group offsets (fractions of visible half-width)
-  const XOFF = [0.5, -0.28, 0, -0.42, 0];
+  const XOFF = [0.5, -0.3, 0.35, -0.42, 0];
   const YOFF = [0, 0.25, 0.3, 0, 0.55];
   const SCALE = [1, 0.85, 0.8, 0.9, 1.05];
   const rtl = () => document.documentElement.getAttribute("dir") === "rtl";
@@ -284,7 +284,7 @@ import * as THREE from "/js/vendor/three.module.min.js";
     const gy = YOFF[seg] + (YOFF[Math.min(seg + 1, 4)] - YOFF[seg]) * segT;
     const gs = (SCALE[seg] + (SCALE[Math.min(seg + 1, 4)] - SCALE[seg]) * segT) * (isMobile ? 0.62 : 1);
     group.position.x += (gx * (isMobile ? 0 : 1) - group.position.x) * 0.08;
-    group.position.y += ((isMobile ? gy + 1.9 : gy) - group.position.y) * 0.08;
+    group.position.y += ((isMobile ? gy + 2.15 : gy) - group.position.y) * 0.08;
     group.scale.setScalar(group.scale.x + (gs - group.scale.x) * 0.08);
 
     spinKick *= 0.95;

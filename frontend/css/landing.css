@@ -746,11 +746,11 @@ body.gl-on #gl3d {
 /* hero right column is the block's stage */
 .hero-stage {
   position: relative;
-  min-height: 320px;
+  min-height: 440px;
 }
 .stage-hint {
   position: absolute;
-  bottom: 8%;
+  bottom: 0;
   left: 50%;
   transform: translateX(-50%);
   font-family: var(--font-mono);
