@@ -107,6 +107,7 @@
     <link rel="stylesheet" href="/css/landing.css" />
   </head>
   <body class="is-home">
+    <canvas id="gl3d" aria-hidden="true"></canvas>
     <nav class="nav">
       <div class="nav-inner">
         <a href="/" class="brand">
@@ -132,9 +133,10 @@
       </div>
     </nav>
 
-    <section class="hero">
+    <main class="l3d">
+    <section class="hero" id="s-hero">
       <div class="container hero-inner">
-        <div>
+        <div class="hero-copy">
           <div class="hero-eyebrow">
             <span class="dot"></span> Now in production
           </div>
@@ -173,7 +175,88 @@
           </div>
         </div>
 
-        <div class="hero-term">
+        <div class="hero-stage" aria-hidden="true">
+          <span class="stage-hint gl-only" data-i18n="ld_hint_click"
+            >click the block ⛏</span
+          >
+        </div>
+      </div>
+    </section>
+
+    <section class="section lsec" id="s-engines">
+      <div class="container lsec-grid stage-first">
+        <div class="lsec-stage" aria-hidden="true"></div>
+        <div class="lsec-copy" data-reveal>
+          <div class="hero-eyebrow" data-i18n="ld_engines_eyebrow">
+            engines
+          </div>
+          <h2 data-i18n="ld_engines_title">One block, five engines.</h2>
+          <p data-i18n="ld_engines_sub">
+            Pick the runtime — CraftHost resolves the latest build, boots it
+            and keeps it patched.
+          </p>
+          <div class="engine-list">
+            <div class="type-card">
+              <span class="type-logo" style="--c: #e8ecf3">P</span>
+              <div>Paper<small data-i18n="ld_e_plugins">plugins</small></div>
+            </div>
+            <div class="type-card">
+              <span class="type-logo" style="--c: #a78bfa">Pu</span>
+              <div>Purpur<small data-i18n="ld_e_perf">performance +</small></div>
+            </div>
+            <div class="type-card">
+              <span class="type-logo" style="--c: #f59e0b">V</span>
+              <div>Vanilla<small data-i18n="ld_e_vanilla">pure Mojang</small></div>
+            </div>
+            <div class="type-card">
+              <span class="type-logo" style="--c: #22d3ee">F</span>
+              <div>Fabric<small data-i18n="ld_e_mods">mods</small></div>
+            </div>
+            <div class="type-card">
+              <span class="type-logo" style="--c: #fb923c">N</span>
+              <div>NeoForge<small data-i18n="ld_e_modded">heavy modpacks</small></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section lsec" id="s-cross">
+      <div class="container lsec-grid">
+        <div class="lsec-copy" data-reveal>
+          <div class="hero-eyebrow" data-i18n="ld_cross_eyebrow">
+            cross-play
+          </div>
+          <h2 data-i18n="ld_cross_title">Java and Bedrock. Same world.</h2>
+          <p data-i18n="ld_cross_sub">
+            Geyser is wired in automatically — friends on phones, Xbox, Switch
+            and PlayStation join the same server as PC players.
+          </p>
+          <div class="cross-cards">
+            <div class="cross-card">
+              <strong data-i18n="ld_cross_java">Java Edition</strong>
+              <span data-i18n="ld_cross_java_d">PC — plugins, mods, full control</span>
+            </div>
+            <div class="cross-card is-bedrock">
+              <strong data-i18n="ld_cross_bed">Bedrock Edition</strong>
+              <span data-i18n="ld_cross_bed_d">Mobile, Xbox, Switch, PS — zero setup</span>
+            </div>
+          </div>
+        </div>
+        <div class="lsec-stage" aria-hidden="true"></div>
+      </div>
+    </section>
+
+    <section class="section lsec" id="s-deploy">
+      <div class="container lsec-grid stage-first">
+        <div class="lsec-stage" aria-hidden="true"></div>
+        <div class="lsec-copy" data-reveal>
+          <div class="hero-eyebrow" data-i18n="ld_deploy_eyebrow">deploy</div>
+          <h2 data-i18n="ld_deploy_title">Live in one command.</h2>
+          <p data-i18n="ld_deploy_sub">
+            Console, file manager, plugin marketplace and backups are already
+            there when the server comes up.
+          </p>
           <div class="term-block">
             <div class="term-chrome">
               <span class="tc-dot r"></span><span class="tc-dot y"></span
@@ -228,6 +311,33 @@
       </div>
     </section>
 
+    <section class="section" id="s-cta">
+      <div class="container">
+        <div class="cta-band cta-glass" data-reveal>
+          <h2 data-i18n="ld_cta_title">Place your block.</h2>
+          <p data-i18n="ld_cta_sub">
+            Free forever. No card, no queue — your server is one click away.
+          </p>
+          <div class="hero-cta" style="justify-content: center">
+            <a
+              href="/dashboard.html"
+              class="btn btn-primary btn-lg"
+              data-i18n="hero_cta_deploy"
+              >Deploy your server →</a
+            >
+            <a
+              href="https://discord.gg/zbHbSsCUua"
+              class="btn btn-discord btn-lg"
+              target="_blank"
+              rel="noopener"
+              ><span data-i18n="join_discord">Join Discord</span></a
+            >
+          </div>
+        </div>
+      </div>
+    </section>
+    </main>
+
     <footer class="footer footer-minimal">
       <div class="container ft-pad">
         <div class="brand ft-brand">
@@ -257,5 +367,6 @@
 
     <script src="/js/app.js"></script>
     <script src="/js/landing.js"></script>
+    <script type="module" src="/js/landing3d.js"></script>
   </body>
 </html>
