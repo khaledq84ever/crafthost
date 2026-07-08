@@ -94,15 +94,16 @@ import * as THREE from "/js/vendor/three.module.min.js";
         const jit = base.clone().multiplyScalar(0.92 + rnd(i) * 0.16);
         tint(col[0], i, jit);
 
-        // phase 1 — five engine clusters strung across the stage
+        // phase 1 — five engine clusters on a ring (reads from any Y rotation)
         const k = i % 5;
         const ci = Math.floor(i / 5);
+        const ang = (k / 5) * Math.PI * 2;
         put(
           pos[1],
           i,
-          (k - 2) * 1.22 + (rnd(i + 9) - 0.5) * 0.45,
-          ((ci % 4) - 1.5) * 0.55 + (rnd(i + 3) - 0.5) * 0.35,
-          (rnd(i + 5) - 0.5) * 1.2,
+          Math.cos(ang) * 1.6 + (rnd(i + 9) - 0.5) * 0.45,
+          ((ci % 4) - 1.5) * 0.5 + (rnd(i + 3) - 0.5) * 0.35,
+          Math.sin(ang) * 1.6 + (rnd(i + 5) - 0.5) * 0.45,
         );
         tint(col[1], i, ENGINE[k].clone().multiplyScalar(0.8 + rnd(i + 2) * 0.3));
 
@@ -115,8 +116,8 @@ import * as THREE from "/js/vendor/three.module.min.js";
         put(
           pos[2],
           i,
-          (right ? 1.7 : -1.7) + (gx - 1) * CELL,
-          (gy - 1) * CELL + (gz > 2 ? CELL : 0),
+          (right ? 1.4 : -1.4) + (gx - 1) * CELL,
+          (right ? 0.6 : -0.6) + (gy - 1) * CELL + (gz > 2 ? CELL : 0),
           (Math.min(gz, 2) - 1) * CELL,
         );
         tint(col[2], i, right ? BEDROCK[i % 4].clone().multiplyScalar(0.85 + rnd(i) * 0.25) : jit);
@@ -288,7 +289,7 @@ import * as THREE from "/js/vendor/three.module.min.js";
     group.scale.setScalar(group.scale.x + (gs - group.scale.x) * 0.08);
 
     spinKick *= 0.95;
-    group.rotation.y = t * 0.22 + scrollProg * Math.PI * 1.6 + mx * 0.22 + spinKick * 10;
+    group.rotation.y = t * 0.22 + scrollProg * Math.PI * 1.2 + mx * 0.22 + spinKick * 10;
     group.rotation.x = 0.12 + my * 0.12;
 
     ember.position.copy(group.position);
