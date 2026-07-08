@@ -746,7 +746,7 @@ body.gl-on #gl3d {
 /* hero right column is the block's stage */
 .hero-stage {
   position: relative;
-  min-height: 440px;
+  min-height: 520px;
 }
 .stage-hint {
   position: absolute;
