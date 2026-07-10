@@ -632,6 +632,24 @@
   letter-spacing: 0.02em;
   transition: color 0.12s;
   text-transform: uppercase;
+  /* 44px min tap target without changing the visual rhythm */
+  padding: 14px 6px;
+  margin: -14px -6px;
+}
+.skip-link {
+  position: fixed;
+  top: -48px;
+  left: 12px;
+  z-index: 200;
+  padding: 12px 18px;
+  background: var(--amber, #f59e0b);
+  color: #0b0d13;
+  font-weight: 700;
+  border-radius: 8px;
+  transition: top 0.15s;
+}
+.skip-link:focus-visible {
+  top: 12px;
 }
 .ft-links a:hover {
   color: var(--text-strong);
