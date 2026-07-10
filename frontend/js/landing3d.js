@@ -98,12 +98,14 @@ import * as THREE from "/js/vendor/three.module.min.js";
         const k = i % 5;
         const ci = Math.floor(i / 5);
         const ang = (k / 5) * Math.PI * 2;
+        // wider ring + tighter jitter so the 5 clusters read as distinct
+        // towers instead of one blob (and never drift into the heading text)
         put(
           pos[1],
           i,
-          Math.cos(ang) * 1.6 + (rnd(i + 9) - 0.5) * 0.45,
-          ((ci % 4) - 1.5) * 0.5 + (rnd(i + 3) - 0.5) * 0.35,
-          Math.sin(ang) * 1.6 + (rnd(i + 5) - 0.5) * 0.45,
+          Math.cos(ang) * 2.2 + (rnd(i + 9) - 0.5) * 0.28,
+          ((ci % 4) - 1.5) * 0.45 + (rnd(i + 3) - 0.5) * 0.22,
+          Math.sin(ang) * 2.2 + (rnd(i + 5) - 0.5) * 0.28,
         );
         tint(col[1], i, ENGINE[k].clone().multiplyScalar(0.8 + rnd(i + 2) * 0.3));
 
@@ -190,9 +192,9 @@ import * as THREE from "/js/vendor/three.module.min.js";
   }
 
   // per-segment group offsets (fractions of visible half-width)
-  const XOFF = [0.5, -0.3, 0.35, -0.42, 0];
-  const YOFF = [0, 0.25, 0.3, 0, 0.55];
-  const SCALE = [1, 0.85, 0.8, 0.9, 1.05];
+  const XOFF = [0.5, -0.38, 0.35, -0.42, 0];
+  const YOFF = [0, 0.25, 0.3, 0, 0.82]; // cta raised so grass top clears the glass band
+  const SCALE = [1, 0.72, 0.8, 0.9, 1.02];
   const rtl = () => document.documentElement.getAttribute("dir") === "rtl";
 
   // ---- interaction -------------------------------------------------------
