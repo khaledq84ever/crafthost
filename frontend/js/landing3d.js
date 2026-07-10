@@ -193,7 +193,7 @@ import * as THREE from "/js/vendor/three.module.min.js";
 
   // per-segment group offsets (fractions of visible half-width)
   const XOFF = [0.5, -0.38, 0.35, -0.42, 0];
-  const YOFF = [0, 0.25, 0.3, 0, 0.82]; // cta raised so grass top clears the glass band
+  const YOFF = [0, 0.25, 0.3, 0, 1.45]; // cta raised so grass top clears the glass band
   const SCALE = [1, 0.72, 0.8, 0.9, 1.02];
   const rtl = () => document.documentElement.getAttribute("dir") === "rtl";
 
@@ -287,7 +287,7 @@ import * as THREE from "/js/vendor/three.module.min.js";
     const gy = YOFF[seg] + (YOFF[Math.min(seg + 1, 4)] - YOFF[seg]) * segT;
     const gs = (SCALE[seg] + (SCALE[Math.min(seg + 1, 4)] - SCALE[seg]) * segT) * (isMobile ? 0.62 : 1);
     group.position.x += (gx * (isMobile ? 0 : 1) - group.position.x) * 0.08;
-    group.position.y += ((isMobile ? gy + 2.15 : gy) - group.position.y) * 0.08;
+    group.position.y += ((isMobile ? gy + 2.3 : gy) - group.position.y) * 0.08;
     group.scale.setScalar(group.scale.x + (gs - group.scale.x) * 0.08);
 
     spinKick *= 0.95;
