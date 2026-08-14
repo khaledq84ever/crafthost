@@ -1,12 +1,16 @@
 /* CraftHost — Premium Console design system
    Aesthetic: Vercel / Linear / Railway. Deep ink black, hairline borders, mono numerics,
-   tight grid, electric emerald accent. No gradients on UI chrome. */
+   tight grid, electric amber accent. No gradients on UI chrome. */
 :root {
-  /* Brand — electric emerald, used sparingly */
-  --emerald: #34d399;
-  --emerald-deep: #10b981;
-  --emerald-dim: #059669;
-  --emerald-glow: rgba(52, 211, 153, 0.18);
+  /* Brand — electric amber, used sparingly. (Variable is still named --emerald
+     throughout the codebase — 100+ call sites across theme/dashboard/landing/
+     wizard/auth CSS + several .html files — so only the token VALUE changed
+     here rather than renaming; renaming would be a much larger, riskier diff
+     for the same visual result.) */
+  --emerald: #f59e0b;
+  --emerald-deep: #b45309;
+  --emerald-dim: #92400e;
+  --emerald-glow: rgba(245, 158, 11, 0.18);
 
   /* Ink surfaces — deep, slightly cool */
   --ink-950: #050709;
