@@ -1109,12 +1109,16 @@ router.post("/:id/start", async (req, res) => {
 router.post("/:id/stop", async (req, res) => {
   const s = getOwnedServer(req, res);
   if (!s) return;
-  pubtun.stop(s.id);
-  playit.stop(s.id);
-  const r = await dc.stopServer(s);
-  db.prepare("UPDATE servers SET status = ? WHERE id = ?").run("offline", s.id);
-  audit(req.user.id, "server.stop", s.id, req.ip);
-  res.json(r);
+  try {
+    pubtun.stop(s.id);
+    playit.stop(s.id);
+    const r = await dc.stopServer(s);
+    db.prepare("UPDATE servers SET status = ? WHERE id = ?").run("offline", s.id);
+    audit(req.user.id, "server.stop", s.id, req.ip);
+    res.json(r);
+  } catch (err) {
+    res.status(500).json({ error: err.message || "stop failed" });
+  }
 });
 
 router.post("/:id/restart", async (req, res) => {
