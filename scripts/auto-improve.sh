@@ -9,6 +9,10 @@
 #
 # crontab: 7 10 * * 0 bash /home/khaled/crafthost/scripts/auto-improve.sh
 set -u
+# cron runs with a minimal PATH that doesn't include ~/.local/bin (claude) or
+# ~/.railway/bin (railway CLI) — export explicitly so `command -v claude`
+# below doesn't false-negative under cron the way it did 2026-08-12→14.
+export PATH="$HOME/.local/bin:$HOME/.railway/bin:$HOME/bin:$PATH"
 DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LOG="/tmp/crafthost-improve-$(date +%Y%m%d).log"
 LOCK="/tmp/crafthost-claude-auto.lock"
