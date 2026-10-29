@@ -65,12 +65,38 @@ function safeJoin(root, userPath) {
     .replace(/\\/g, "/")
     .replace(/\0/g, "");
   const target = path.resolve(root, "." + path.posix.normalize("/" + cleaned));
-  if (target !== root && !target.startsWith(root + path.sep)) {
-    const err = new Error("Path escapes server root");
-    err.code = "EPATH";
-    throw err;
-  }
+  if (!isInside(root, target)) throw pathError();
+  // The lexical check alone follows symlinks: a link the server process
+  // created (e.g. `x -> /`) would expose the host. Resolve the deepest
+  // existing ancestor and require it to stay inside the real root.
+  if (!isInside(fs.realpathSync(root), realpathOfExisting(target))) throw pathError();
   return target;
+}
+
+function isInside(root, target) {
+  return target === root || target.startsWith(root + path.sep);
+}
+
+function realpathOfExisting(p) {
+  let cur = p;
+  const rest = [];
+  for (;;) {
+    try {
+      return path.join(fs.realpathSync(cur), ...rest.reverse());
+    } catch (err) {
+      if (err.code !== "ENOENT" && err.code !== "ENOTDIR") throw err;
+      const parent = path.dirname(cur);
+      if (parent === cur) throw err;
+      rest.push(path.basename(cur));
+      cur = parent;
+    }
+  }
+}
+
+function pathError() {
+  const err = new Error("Path escapes server root");
+  err.code = "EPATH";
+  return err;
 }
 
 function relTo(root, abs) {
@@ -234,12 +260,11 @@ router.get("/download", async (req, res) => {
     const st = await fsp.stat(target).catch(() => null);
     if (!st) return res.status(404).json({ error: "File not found" });
     if (!st.isFile()) return res.status(400).json({ error: "Not a file" });
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${path.basename(target)}"`,
-    );
-    res.setHeader("Content-Length", st.size);
-    fs.createReadStream(target).pipe(res);
+    // res.download encodes any filename safely and handles read errors; a bare
+    // createReadStream().pipe() crashed the process on an unreadable file.
+    res.download(target, path.basename(target), { dotfiles: "allow" }, (err) => {
+      if (err && !res.headersSent) res.status(500).json({ error: "Download failed" });
+    });
   } catch (err) {
     res.status(err.code === "EPATH" ? 400 : 500).json({
       error: err.code === "EPATH" ? "Invalid path" : "Download failed",

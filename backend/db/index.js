@@ -208,6 +208,11 @@ const upsertPlan = db.prepare(`
 `);
 seedPlans.forEach(p => upsertPlan.run(...p));
 
+// Bumped on password change/reset; tokens carrying an older version are rejected.
+if (!hasColumn('users', 'token_version')) {
+  db.exec(`ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0`);
+}
+
 // Add a "hidden" column to plans (0 = visible, 1 = hidden from public listings).
 // Idempotent migration. Then mark all deprecated tiers as hidden.
 if (!hasColumn('plans', 'hidden')) {
