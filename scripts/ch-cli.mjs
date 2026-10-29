@@ -1,24 +1,77 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, chmodSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 
 const CFG = join(homedir(), ".crafthost-cli.json");
 const BASE = process.env.CRAFTHOST_API || "http://localhost:4000";
+const TIMEOUT_MS = Number(process.env.CRAFTHOST_TIMEOUT_MS) || 20000;
+
+/** fetch that gives up after TIMEOUT_MS instead of hanging on an unresponsive API. */
+async function request(url, init) {
+  try {
+    return await fetch(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  } catch (err) {
+    if (err.name === "TimeoutError") throw new Error(`No response from ${BASE} within ${TIMEOUT_MS / 1000}s`);
+    throw new Error(`Cannot reach ${BASE}: ${err.cause?.code || err.cause?.message || err.message}`);
+  }
+}
 
 function load() {
   if (!existsSync(CFG)) return {};
-  return JSON.parse(readFileSync(CFG, "utf-8"));
+  try {
+    return JSON.parse(readFileSync(CFG, "utf-8"));
+  } catch {
+    throw new Error(`${CFG} is corrupt; delete it and run 'ch-cli login' again`);
+  }
+}
+
+/** Reads a password without echoing it (TTY), or one line from piped stdin. */
+function readPassword(prompt) {
+  return new Promise((resolve, reject) => {
+    const { stdin, stdout } = process;
+    if (!stdin.isTTY) {
+      let data = "";
+      stdin.setEncoding("utf8");
+      stdin.on("data", (c) => (data += c));
+      stdin.on("end", () => resolve(data.split(/\r?\n/)[0]));
+      stdin.on("error", reject);
+      return;
+    }
+    stdout.write(prompt);
+    stdin.setRawMode(true);
+    stdin.setEncoding("utf8");
+    let pw = "";
+    const onData = (ch) => {
+      if (ch === "\r" || ch === "\n" || ch === "\u0004") {
+        stdin.setRawMode(false);
+        stdin.pause();
+        stdin.off("data", onData);
+        stdout.write("\n");
+        resolve(pw);
+      } else if (ch === "\u0003") {
+        stdin.setRawMode(false);
+        reject(new Error("Cancelled"));
+      } else if (ch === "\u007f" || ch === "\b") {
+        pw = pw.slice(0, -1);
+      } else {
+        pw += ch;
+      }
+    };
+    stdin.on("data", onData);
+  });
 }
 function save(data) {
-  writeFileSync(CFG, JSON.stringify(data, null, 2));
+  // The session token grants full account access: keep it private to this user.
+  writeFileSync(CFG, JSON.stringify(data, null, 2), { mode: 0o600 });
+  try { chmodSync(CFG, 0o600); } catch {} // tighten a file created by an older version
 }
 
 async function api(method, path, body) {
   const cfg = load();
   const headers = { "Content-Type": "application/json" };
   if (cfg.token) headers["Cookie"] = `token=${cfg.token}`;
-  const res = await fetch(`${BASE}/api${path}`, {
+  const res = await request(`${BASE}/api${path}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
@@ -37,7 +90,11 @@ async function api(method, path, body) {
 }
 
 async function login(email, password) {
-  const res = await fetch(`${BASE}/api/auth/login`, {
+  if (!email) throw new Error("Usage: ch-cli login <email>   (you'll be asked for the password)");
+  // A password on the command line lands in shell history and `ps`; prefer the prompt or env var.
+  password ||= process.env.CRAFTHOST_PASSWORD || (await readPassword("Password: "));
+  if (!password) throw new Error("No password given");
+  const res = await request(`${BASE}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
@@ -46,7 +103,9 @@ async function login(email, password) {
   const setCookie = res.headers.get("set-cookie");
   if (!setCookie) {
     const text = await res.text();
-    throw new Error(text || "Login failed");
+    let message = text;
+    try { message = JSON.parse(text).error || text; } catch {}
+    throw new Error(message || `Login failed (HTTP ${res.status})`);
   }
   const m = setCookie.match(/token=([^;]+)/);
   if (!m) throw new Error("No token in response");
@@ -72,15 +131,24 @@ async function listServers() {
   }
 }
 
+/** Finds a server by full id or by the id prefix `list` prints. */
+async function findServer(id) {
+  if (!id) throw new Error("Missing server id (see: ch-cli list)");
+  const list = await api("GET", "/servers");
+  const matches = (list.servers || []).filter((x) => x.id.startsWith(id));
+  if (!matches.length) throw new Error("Server not found");
+  if (matches.length > 1) throw new Error(`Id prefix '${id}' matches ${matches.length} servers; use more characters`);
+  return matches[0];
+}
+
 async function serverCmd(id, action) {
-  const data = await api("POST", `/servers/${id}/${action}`);
+  const s = await findServer(id);
+  const data = await api("POST", `/servers/${s.id}/${action}`);
   console.log(data.status || data.message || "OK");
 }
 
 async function serverStatus(id) {
-  const list = await api("GET", "/servers");
-  const s = list.servers.find((x) => x.id.startsWith(id));
-  if (!s) throw new Error("Server not found");
+  const s = await findServer(id);
   console.log(`Name:     ${s.name}`);
   console.log(`ID:       ${s.id}`);
   console.log(`Type:     ${s.type} ${s.version || ""}`);
@@ -93,25 +161,24 @@ async function serverStatus(id) {
 }
 
 async function tailLogs(id) {
-  const list = await api("GET", "/servers");
-  const s = list.servers.find((x) => x.id.startsWith(id));
-  if (!s) throw new Error("Server not found");
+  const s = await findServer(id);
   const wsUrl = BASE.replace(/^http/, "ws") + `/ws/servers/${s.id}/logs`;
   const cfg = load();
   const ws = new WebSocket(
     wsUrl + "?token=" + encodeURIComponent(cfg.token || "")
   );
-  ws.on("message", (raw) => {
-    const msg = JSON.parse(raw.toString());
+  ws.addEventListener("message", (ev) => {
+    let msg;
+    try { msg = JSON.parse(String(ev.data)); } catch { return; }
     if (msg.type === "log") console.log(msg.line);
     else if (msg.type === "stats")
       console.log(
-        `[stats] ${msg.stats.players} players · ${msg.stats.tps?.toFixed(1)} tps · ${Math.round(msg.stats.ram_used / 1024)}GB RAM`
+        `[stats] ${msg.stats.players ?? "?"} players · ${msg.stats.tps?.toFixed(1) ?? "?"} tps · ${msg.stats.ram_used != null ? Math.round(msg.stats.ram_used / 1024) : "?"}GB RAM`
       );
   });
-  ws.on("close", () => process.exit(0));
-  ws.on("error", (e) => {
-    console.error("WS error:", e.message);
+  ws.addEventListener("close", () => process.exit(0));
+  ws.addEventListener("error", (e) => {
+    console.error("WS error:", e.message || "connection failed");
     process.exit(1);
   });
 }
@@ -133,7 +200,8 @@ async function createServer(args) {
 }
 
 async function deleteServer(id) {
-  const data = await api("DELETE", `/servers/${id}`);
+  const s = await findServer(id);
+  const data = await api("DELETE", `/servers/${s.id}`);
   console.log("Deleted:", data.message || "OK");
 }
 
@@ -141,8 +209,8 @@ const HELP = `
 Usage: ch-cli <command> [options]
 
 Commands:
-  login <email> <password>        Log in and save session
-  servers list                    List all servers
+  login <email>                   Log in (prompts for the password) and save session
+  list  (or: servers list)        List all servers
   status <id>                     Show server details
   start <id>                      Start server
   stop <id>                       Stop server
@@ -157,7 +225,9 @@ Commands:
   help                            Show this help
 
 Environment:
-  CRAFTHOST_API  API base URL (default: http://localhost:4000)
+  CRAFTHOST_API         API base URL (default: http://localhost:4000)
+  CRAFTHOST_PASSWORD     Password for login, instead of the prompt (e.g. in scripts)
+  CRAFTHOST_TIMEOUT_MS  Give up on an unresponsive API after this many ms (default: 20000)
 `;
 
 const args = {};
@@ -186,9 +256,12 @@ try {
     case "login":
       await login(positional[1], positional[2]);
       break;
+    case "list":
+      await listServers();
+      break;
     case "servers":
       if (positional[1] === "list") await listServers();
-      else console.log("Usage: ch-cli servers list");
+      else console.log("Usage: ch-cli list");
       break;
     case "status":
       await serverStatus(positional[1]);
