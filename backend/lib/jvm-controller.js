@@ -27,6 +27,15 @@ const PUBLIC_PORT = parseInt(process.env.MC_PORT || "25565", 10);
 // memory limit, and the new JVM got OOM-killed silently (no logs survive).
 // Drop to 1024 MB heap so 3-4 small servers can coexist on the same container.
 // Override via MAX_HEAP_MB env per-deploy if heavier mod-packs need it.
+// Minecraft servers run user-supplied JARs and plugins, so they get only the
+// variables Java needs, never the backend's secrets (JWT_SECRET, API tokens).
+const CHILD_ENV_KEYS = ["PATH", "HOME", "LANG", "LC_ALL", "TZ", "TMPDIR", "JAVA_HOME"];
+function childEnv() {
+  const env = { JAVA_TOOL_OPTIONS: "" };
+  for (const k of CHILD_ENV_KEYS) if (process.env[k] !== undefined) env[k] = process.env[k];
+  return env;
+}
+
 const MAX_HEAP_MB = parseInt(process.env.MAX_HEAP_MB || "1024", 10);
 // CPU cap fed to the JVM via -XX:ActiveProcessorCount. Railway's underlying host
 // reports many cores (32+), so by default the JVM sizes its GC pools, JIT
@@ -221,7 +230,7 @@ const PAPER_V3 = process.env.PAPER_V3_API || "https://fill.papermc.io/v3";
 async function paperJarUrl(version) {
   const want = version && version !== "LATEST" ? version : null;
   try {
-    // ── v3 path ─────────────────────────────────────────────────────────────
+    // ── v3 path ─────────────────────────────────────────────────────────────────────────
     let mcVersion = want;
     if (!mcVersion) {
       const r = await fetch(`${PAPER_V3}/projects/paper`, {
@@ -251,7 +260,7 @@ async function paperJarUrl(version) {
       throw new Error(`v3 ${mcVersion}: no server:default download`);
     return { url: dl.url, version: mcVersion, build: detail.id };
   } catch (v3err) {
-    // ── v2 fallback ─────────────────────────────────────────────────────────
+    // ── v2 fallback ─────────────────────────────────────────────────────────────────────────
     try {
       let mcVersion = want;
       if (!mcVersion) {
@@ -546,7 +555,7 @@ async function startBedrockSidecar(id, server, javaPort) {
     {
       cwd: geyserDir,
       stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, JAVA_TOOL_OPTIONS: "" },
+      env: childEnv(),
     },
   );
   state.geyserProc = gproc;
@@ -1144,7 +1153,7 @@ async function startServer(containerId, server) {
   const proc = spawn("java", args, {
     cwd: dir,
     stdio: ["pipe", "pipe", "pipe"],
-    env: { ...process.env, JAVA_TOOL_OPTIONS: "" },
+    env: childEnv(),
   });
 
   // Persistent log listeners across restarts — WebSocket clients attached to
@@ -2071,7 +2080,7 @@ async function realTestJar(jarPath, type, version) {
         {
           cwd: testDir,
           stdio: ["pipe", "pipe", "pipe"],
-          env: { ...process.env, JAVA_TOOL_OPTIONS: "" },
+          env: childEnv(),
         },
       );
       let done = false,
