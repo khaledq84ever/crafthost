@@ -1,7 +1,8 @@
 name: CI
 
-# Syntax-check the backend and run the self-contained unit tests (no live
-# server / DB needed) on every push / PR. Build/test only — deploys stay manual.
+# Syntax-check the backend, run the self-contained unit tests, then boot the
+# app on a throwaway DB and run the smoke suite (`npm test`) on every push / PR.
+# Build/test only — deploys stay manual.
 on:
   push:
   pull_request:
@@ -22,3 +23,7 @@ jobs:
         run: |
           node scripts/test-console-health.mjs
           node scripts/test-rcon-tick.mjs
+      - name: Smoke tests (boot server on throwaway DB, page sweep + e2e health)
+        run: npm test
+      - name: Dependency audit (production deps)
+        run: npm audit --omit=dev --audit-level=high
