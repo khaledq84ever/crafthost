@@ -98,7 +98,7 @@ const db = require("./db");
 const dc = require("./lib/controller");
 const dockerCtl = require("./lib/docker-controller");
 const jvmCtl = require("./lib/jvm-controller");
-const { verifyToken } = require("./lib/auth");
+const { verifyToken, authenticate } = require("./lib/auth");
 
 const app = express();
 const server = http.createServer(app);
@@ -163,16 +163,11 @@ app.use(cookieParser());
 // Per-user OR per-IP rate limiter. Authenticated users key by user id; unauthed by IP.
 // IPv6 must use ipKeyGenerator helper or express-rate-limit refuses to start.
 function userKey(req, res) {
-  const cookie = req.headers.cookie || "";
-  const m = cookie.match(/(?:^|; )token=([^;]+)/);
-  if (m) {
-    try {
-      const payload = JSON.parse(
-        Buffer.from(m[1].split(".")[1], "base64").toString("utf8"),
-      );
-      if (payload?.id) return `u:${payload.id}`;
-    } catch {}
-  }
+  // Verify the signature: an unverified payload let clients pick a fresh id
+  // per request and dodge the limit entirely.
+  const m = (req.headers.cookie || "").match(/(?:^|; )token=([^;]+)/);
+  const payload = m ? verifyToken(m[1]) : null;
+  if (payload?.id) return `u:${payload.id}`;
   return `ip:${ipKeyGenerator(req, res)}`;
 }
 
@@ -433,8 +428,9 @@ server.on("upgrade", (req, socket, head) => {
     .find((c) => c.trim().startsWith("token="))
     ?.split("=")[1];
   const token = query.token || cookieToken;
-  const payload = token ? verifyToken(token) : null;
-  if (!payload) {
+  // authenticate() also rejects tokens of deleted users and revoked sessions.
+  const user = authenticate(token);
+  if (!user) {
     socket.destroy();
     return;
   }
@@ -455,7 +451,7 @@ server.on("upgrade", (req, socket, head) => {
     WHERE s.id = ? AND s.user_id = ?
   `,
     )
-    .get(serverId, payload.id);
+    .get(serverId, user.id);
   if (!srv) {
     socket.destroy();
     return;
